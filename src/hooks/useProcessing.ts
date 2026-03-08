@@ -213,6 +213,7 @@ export function useWIPProcessing() {
         make: params.wipItem.make,
         process: 'CTL',
         width: params.wipItem.width,
+        thickness: params.wipItem.thickness ?? null,
         length: item.length,
         coating: params.wipItem.coating,
         grade: params.wipItem.grade,
