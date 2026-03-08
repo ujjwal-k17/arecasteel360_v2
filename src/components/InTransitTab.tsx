@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
+import { isFieldValueValid } from '@/lib/field-validation';
 
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 
@@ -144,7 +145,12 @@ export default function InTransitTab() {
       <Input
         className="h-7 w-24 text-xs"
         value={val}
-        onChange={e => setEditValues(v => ({ ...v, [field]: e.target.value }))}
+        onChange={e => {
+          const newVal = e.target.value;
+          if (isFieldValueValid(field, newVal)) {
+            setEditValues(v => ({ ...v, [field]: newVal }));
+          }
+        }}
       />
     );
   };

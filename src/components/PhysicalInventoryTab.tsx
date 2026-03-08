@@ -11,6 +11,7 @@ import { ChevronDown, ChevronRight, Plus, RefreshCw, Trash2 } from 'lucide-react
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
 import InventoryFieldSelect from './InventoryFieldSelect';
+import { isFieldValueValid } from '@/lib/field-validation';
 
 interface SKUGroup {
   key: string;
@@ -207,8 +208,13 @@ export default function PhysicalInventoryTab() {
       <Input
         className="col-span-2 h-8 text-sm"
         value={val}
-        onChange={e => updateNewBatch(key, e.target.value)}
-        type={NUMERIC_FIELDS.includes(key) ? 'number' : key === 'purchase_date' ? 'date' : 'text'}
+        onChange={e => {
+          const newVal = e.target.value;
+          if (isFieldValueValid(key, newVal)) {
+            updateNewBatch(key, newVal);
+          }
+        }}
+        type={key === 'purchase_date' ? 'date' : 'text'}
       />
     );
   };
