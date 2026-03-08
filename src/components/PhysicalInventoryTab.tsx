@@ -258,15 +258,21 @@ export default function PhysicalInventoryTab() {
             </div>
           ) : addMode === 'import' ? (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Select an in-transit batch to move to physical inventory:</p>
+              <p className="text-sm text-muted-foreground">Select batches to move to physical inventory:</p>
               {inTransitBatches.length === 0 && <p className="text-sm text-muted-foreground">No in-transit batches available.</p>}
               {inTransitBatches.map(b => (
-                <div key={b.id} className="flex items-center justify-between p-2 border rounded hover:bg-muted/30 cursor-pointer" onClick={() => handleImportFromTransit(b)}>
-                  <span className="text-sm font-medium">{b.batch_number} — {b.material} {b.make}</span>
+                <div key={b.id} className={`flex items-center gap-2 p-2 border rounded cursor-pointer ${selectedImportIds.has(b.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted/30'}`} onClick={() => toggleImportSelection(b.id)}>
+                  <input type="checkbox" checked={selectedImportIds.has(b.id)} readOnly className="accent-primary" />
+                  <span className="text-sm font-medium flex-1">{b.batch_number} — {b.material} {b.make}</span>
                   <span className="text-xs text-muted-foreground font-mono-num">{b.net_weight} Kg</span>
                 </div>
               ))}
-              <Button variant="ghost" className="mt-2" onClick={() => setAddMode(null)}>← Back</Button>
+              <div className="flex items-center gap-2 mt-3">
+                <Button variant="ghost" onClick={() => { setAddMode(null); setSelectedImportIds(new Set()); }}>← Back</Button>
+                <Button disabled={selectedImportIds.size === 0} onClick={() => handleImportFromTransit(Array.from(selectedImportIds))}>
+                  Import {selectedImportIds.size > 0 ? `(${selectedImportIds.size})` : ''}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
