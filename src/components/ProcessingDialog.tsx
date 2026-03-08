@@ -124,18 +124,22 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
+    const isLooseCoilSaleOnly = looseCoilSaleTotal > 0 && !processType && !coilMode;
     const effectiveOutputType = processType === 'Slit' ? outputType : 'FG';
-    if (!processType || !effectiveOutputType) {
-      toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
-      return;
-    }
-    if (!coilMode) {
-      toast.error('Please select Full Coil or Partial Coil');
-      return;
-    }
-    if (processingQty <= 0) {
-      toast.error('Processing quantity must be greater than 0');
-      return;
+
+    if (!isLooseCoilSaleOnly) {
+      if (!processType || !effectiveOutputType) {
+        toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
+        return;
+      }
+      if (!coilMode) {
+        toast.error('Please select Full Coil or Partial Coil');
+        return;
+      }
+      if (processingQty <= 0) {
+        toast.error('Processing quantity must be greater than 0');
+        return;
+      }
     }
     if (exceedsUsable) {
       toast.error(`Total (${totalCommitted.toFixed(2)} Kg) exceeds usable qty (${usableQty.toFixed(2)} Kg)`);
@@ -192,47 +196,48 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         });
       }
 
-      let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
+      // 3-5. Only run processing if not loose-coil-sale-only
+      if (!isLooseCoilSaleOnly) {
+        let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
 
-      if (processType === 'Slit') {
-        if (autoCalcSlitWidths.length === 0 || autoCalcSlitWidths.some(s => !s.width)) {
-          toast.error('Please fill all slit width entries');
-          return;
+        if (processType === 'Slit') {
+          if (autoCalcSlitWidths.length === 0 || autoCalcSlitWidths.some(s => !s.width)) {
+            toast.error('Please fill all slit width entries');
+            return;
+          }
+          outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
+        } else if (processType === 'CTL') {
+          if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
+            toast.error('Please fill all CTL length entries');
+            return;
+          }
+          outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
         }
-        outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
-      } else if (processType === 'CTL') {
-        if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
-          toast.error('Please fill all CTL length entries');
-          return;
+
+        await insertProcessing.mutateAsync({
+          batchId: batch.id,
+          processType,
+          outputType: effectiveOutputType,
+          inputQty: processingQty,
+          orderId: '',
+          outputItems,
+          batch,
+        });
+
+        if (processType === 'Slit' && trimQty > 0.01) {
+          const { supabase } = await import('@/integrations/supabase/client');
+          await supabase.from('inventory_actions').insert({
+            batch_id: batch.id,
+            action_type: 'scrap',
+            scrap_type: 'Trimming',
+            net_weight: Math.round(trimQty * 100) / 100,
+            gross_weight: null,
+            order_id: null,
+            sales_date: null,
+            invoice_number: null,
+            defect_type: null,
+          } as any);
         }
-        outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
-      }
-
-      // 4. Insert processing record
-      await insertProcessing.mutateAsync({
-        batchId: batch.id,
-        processType,
-        outputType: effectiveOutputType,
-        inputQty: processingQty,
-        orderId: '',
-        outputItems,
-        batch,
-      });
-
-      // 5. Auto-insert trim qty as scrap for Slit process
-      if (processType === 'Slit' && trimQty > 0.01) {
-        const { supabase } = await import('@/integrations/supabase/client');
-        await supabase.from('inventory_actions').insert({
-          batch_id: batch.id,
-          action_type: 'scrap',
-          scrap_type: 'Trimming',
-          net_weight: Math.round(trimQty * 100) / 100,
-          gross_weight: null,
-          order_id: null,
-          sales_date: null,
-          invoice_number: null,
-          defect_type: null,
-        } as any);
       }
 
       toast.success(`Processing recorded for batch ${batch.batch_number}`);
@@ -264,6 +269,21 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               <span className="text-xs">{batch.coating || '-'}</span>
               <span className="text-muted-foreground text-xs">Usable Qty:</span>
               <span className="text-xs font-mono-num font-semibold">{usableQty.toFixed(2)} Kg</span>
+            </div>
+          </div>
+
+          {/* Loose Coil Sale Section */}
+          <div className="border rounded-md p-3 space-y-2">
+            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Loose Coil Sale</p>
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label className="text-xs">Sale Qty (Kg)</Label>
+              <Input
+                type="number"
+                className="h-8"
+                value={looseCoilSaleQty}
+                onChange={e => setLooseCoilSaleQty(e.target.value)}
+                placeholder="0"
+              />
             </div>
           </div>
 
@@ -320,21 +340,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             {inlineDefectiveTotal > 0 && (
               <div className="text-xs text-muted-foreground text-right">Total Defective: {inlineDefectiveTotal.toFixed(2)} Kg</div>
             )}
-          </div>
-
-          {/* Loose Coil Sale Section */}
-          <div className="border rounded-md p-3 space-y-2">
-            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Loose Coil Sale</p>
-            <div className="grid grid-cols-2 items-center gap-2">
-              <Label className="text-xs">Sale Qty (Kg)</Label>
-              <Input
-                type="number"
-                className="h-8"
-                value={looseCoilSaleQty}
-                onChange={e => setLooseCoilSaleQty(e.target.value)}
-                placeholder="0"
-              />
-            </div>
           </div>
 
           {/* Full Coil / Partial Coil */}
