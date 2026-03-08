@@ -172,6 +172,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 <span className="text-xs">{batch.material || '-'}</span>
                 <span className="text-muted-foreground text-xs">Grade:</span>
                 <span className="text-xs">{batch.grade || '-'}</span>
+                <span className="text-muted-foreground text-xs">Coating:</span>
+                <span className="text-xs">{batch.coating || '-'}</span>
                 <span className="text-muted-foreground text-xs">Usable Qty:</span>
                 <span className="text-xs font-mono-num font-semibold">{usableQty.toFixed(2)} Kg</span>
               </div>
