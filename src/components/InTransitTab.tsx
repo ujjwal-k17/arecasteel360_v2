@@ -13,7 +13,7 @@ import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-rea
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 import { isFieldValueValid } from '@/lib/field-validation';
-import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
+import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL, FORMS } from '@/lib/inventory-options';
 import * as XLSX from 'xlsx';
 import { differenceInDays, parseISO } from 'date-fns';
 
