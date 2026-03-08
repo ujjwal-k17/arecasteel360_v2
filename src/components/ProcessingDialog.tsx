@@ -129,6 +129,22 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         batch,
       });
 
+      // Auto-insert trim qty as scrap for Slit process
+      if (processType === 'Slit' && trimQty > 0.01) {
+        const { supabase } = await import('@/integrations/supabase/client');
+        await supabase.from('inventory_actions').insert({
+          batch_id: batch.id,
+          action_type: 'scrap',
+          scrap_type: 'Trimming',
+          net_weight: Math.round(trimQty * 100) / 100,
+          gross_weight: null,
+          order_id: null,
+          sales_date: null,
+          invoice_number: null,
+          defect_type: null,
+        } as any);
+      }
+
       toast.success(`Processing recorded for batch ${batch.batch_number}`);
       onClose();
     } catch {
@@ -158,21 +174,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 <span className="text-muted-foreground text-xs">Usable Qty:</span>
                 <span className="text-xs font-mono-num font-semibold">{usableQty.toFixed(2)} Kg</span>
               </div>
-            </div>
-
-            {/* Scrap & Defective buttons — on top */}
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowScrap(true)} className="text-xs">
-                Record Scrap
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowDefective(true)} className="text-xs">
-                Record Defective
-              </Button>
-              {scrapDefectiveQty > 0 && (
-                <span className="text-xs text-muted-foreground self-center ml-2">
-                  Scrap/Defective: {scrapDefectiveQty.toFixed(2)} Kg
-                </span>
-              )}
             </div>
 
             {/* Process Type */}
@@ -293,6 +294,21 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 ))}
               </div>
             )}
+
+            {/* Scrap & Defective buttons */}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowScrap(true)} className="text-xs">
+                Record Scrap
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowDefective(true)} className="text-xs">
+                Record Defective
+              </Button>
+              {scrapDefectiveQty > 0 && (
+                <span className="text-xs text-muted-foreground self-center ml-2">
+                  Scrap/Defective: {scrapDefectiveQty.toFixed(2)} Kg
+                </span>
+              )}
+            </div>
 
             {/* Validation warning */}
             {exceedsUsable && (
