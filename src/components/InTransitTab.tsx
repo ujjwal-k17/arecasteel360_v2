@@ -76,7 +76,7 @@ export default function InTransitTab() {
         make: r.make || null,
         thickness: r.thickness || null,
         width: r.width || null,
-        length: r.length || null,
+        length: r.length != null ? String(r.length) : null,
         coating: r.coating || null,
         grade: r.grade || null,
         gsm: r.gsm || null,

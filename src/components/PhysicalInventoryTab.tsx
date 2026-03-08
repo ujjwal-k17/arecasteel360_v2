@@ -139,7 +139,7 @@ export default function PhysicalInventoryTab() {
         make: newBatch.make || null,
         thickness: newBatch.thickness ? Number(newBatch.thickness) : null,
         width: newBatch.width ? Number(newBatch.width) : null,
-        length: newBatch.length ? Number(newBatch.length) : null,
+        length: newBatch.length || null,
         coating: newBatch.coating || null,
         grade: newBatch.grade || null,
         gsm: newBatch.gsm ? Number(newBatch.gsm) : null,
