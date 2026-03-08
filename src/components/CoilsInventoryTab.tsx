@@ -418,44 +418,77 @@ export default function CoilsInventoryTab() {
                                       </div>
                                     </TableCell>
                                   </TableRow>
-                                  {isExpanded && batchActions.length > 0 && (
-                                    <TableRow key={`${b.id}-actions`}>
+                                  {isExpanded && (
+                                    <TableRow key={`${b.id}-details`}>
                                       <TableCell colSpan={batchCols.length} className="p-0">
-                                        <div className="bg-muted/10 border-t border-b px-8 py-2">
-                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Actions for {b.batch_number}</p>
-                                          <Table>
-                                            <TableHeader>
-                                              <TableRow>
-                                                <TableHead className="text-xs">Type</TableHead>
-                                                <TableHead className="text-xs">Net Wt (Kg)</TableHead>
-                                                <TableHead className="text-xs">Gross Wt (Kg)</TableHead>
-                                                <TableHead className="text-xs">Order ID</TableHead>
-                                                <TableHead className="text-xs">Invoice</TableHead>
-                                                <TableHead className="text-xs">Date</TableHead>
-                                                <TableHead className="text-xs">Detail</TableHead>
-                                              </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                              {batchActions.map(a => (
-                                                <TableRow key={a.id}>
-                                                  <TableCell className="text-xs capitalize">{a.action_type}</TableCell>
-                                                  <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
-                                                  <TableCell className="text-xs font-mono-num">{a.gross_weight ?? '-'}</TableCell>
-                                                  <TableCell className="text-xs">{a.order_id || '-'}</TableCell>
-                                                  <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
-                                                  <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
-                                                  <TableCell className="text-xs">{a.defect_type || a.scrap_type || '-'}</TableCell>
-                                                </TableRow>
-                                              ))}
-                                            </TableBody>
-                                          </Table>
+                                        <div className="bg-muted/10 border-t border-b px-8 py-3 space-y-3">
+                                          {/* Inventory Actions */}
+                                          {batchActions.length > 0 && (
+                                            <>
+                                              <p className="text-xs font-semibold text-muted-foreground">Actions</p>
+                                              <Table>
+                                                <TableHeader>
+                                                  <TableRow>
+                                                    <TableHead className="text-xs">Type</TableHead>
+                                                    <TableHead className="text-xs">Net Wt (Kg)</TableHead>
+                                                    <TableHead className="text-xs">Gross Wt (Kg)</TableHead>
+                                                    <TableHead className="text-xs">Invoice</TableHead>
+                                                    <TableHead className="text-xs">Date</TableHead>
+                                                    <TableHead className="text-xs">Detail</TableHead>
+                                                  </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                  {batchActions.map(a => (
+                                                    <TableRow key={a.id}>
+                                                      <TableCell className="text-xs capitalize">{a.action_type}</TableCell>
+                                                      <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
+                                                      <TableCell className="text-xs font-mono-num">{a.gross_weight ?? '-'}</TableCell>
+                                                      <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
+                                                      <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
+                                                      <TableCell className="text-xs">{a.defect_type || a.scrap_type || '-'}</TableCell>
+                                                    </TableRow>
+                                                  ))}
+                                                </TableBody>
+                                              </Table>
+                                            </>
+                                          )}
+                                          {/* Processing Records */}
+                                          {(() => {
+                                            const batchProcRecords = allProcRecords.filter((p: any) => p.batch_id === b.id);
+                                            if (batchProcRecords.length === 0 && batchActions.length === 0) {
+                                              return <p className="text-xs text-muted-foreground text-center py-1">No actions or processing recorded for this batch.</p>;
+                                            }
+                                            if (batchProcRecords.length === 0) return null;
+                                            return (
+                                              <>
+                                                <p className="text-xs font-semibold text-muted-foreground">Processing Records</p>
+                                                <Table>
+                                                  <TableHeader>
+                                                    <TableRow>
+                                                      <TableHead className="text-xs">Process</TableHead>
+                                                      <TableHead className="text-xs">Output Type</TableHead>
+                                                      <TableHead className="text-xs">Input Qty (Kg)</TableHead>
+                                                      <TableHead className="text-xs">Order ID</TableHead>
+                                                      <TableHead className="text-xs">Date</TableHead>
+                                                    </TableRow>
+                                                  </TableHeader>
+                                                  <TableBody>
+                                                    {batchProcRecords.map((pr: any) => (
+                                                      <TableRow key={pr.id}>
+                                                        <TableCell className="text-xs">{pr.process_type}</TableCell>
+                                                        <TableCell className="text-xs">{pr.output_type}</TableCell>
+                                                        <TableCell className="text-xs font-mono-num">{pr.input_qty ?? '-'}</TableCell>
+                                                        <TableCell className="text-xs">{pr.order_id || '-'}</TableCell>
+                                                        <TableCell className="text-xs">{pr.created_at ? new Date(pr.created_at).toLocaleDateString() : '-'}</TableCell>
+                                                      </TableRow>
+                                                    ))}
+                                                  </TableBody>
+                                                </Table>
+                                              </>
+                                            );
+                                          })()}
                                         </div>
                                       </TableCell>
-                                    </TableRow>
-                                  )}
-                                  {isExpanded && batchActions.length === 0 && (
-                                    <TableRow key={`${b.id}-no-actions`}>
-                                      <TableCell colSpan={batchCols.length} className="text-center text-xs text-muted-foreground py-2">No actions recorded for this batch.</TableCell>
                                     </TableRow>
                                   )}
                                 </>
