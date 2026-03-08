@@ -177,7 +177,21 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
-      // 3. Build output items
+      // 2b. Save loose coil sale
+      if (looseCoilSaleTotal > 0) {
+        await insertAction.mutateAsync({
+          batch_id: batch.id,
+          action_type: 'loose_coil_sale',
+          net_weight: looseCoilSaleTotal,
+          gross_weight: null,
+          order_id: null,
+          sales_date: new Date().toISOString().slice(0, 10),
+          invoice_number: null,
+          defect_type: null,
+          scrap_type: null,
+        });
+      }
+
       let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
 
       if (processType === 'Slit') {
