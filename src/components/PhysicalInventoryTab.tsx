@@ -25,14 +25,13 @@ interface SKUGroup {
   length: string | null;
   coating: string | null;
   grade: string | null;
-  colour: string | null;
   totalNetWeight: number;
   totalBalanceQty: number;
   totalUsableQty: number;
 }
 
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
-const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_weight', 'gsm'];
+const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_weight'];
 
 const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
   'batch_number', 'material', 'make', 'thickness', 'width',
@@ -68,7 +67,6 @@ export default function PhysicalInventoryTab() {
   const [importSearch, setImportSearch] = useState('');
   const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
 
-  // Filters
   const [filters, setFilters] = useState<Record<string, string>>({});
 
   const setFilter = (field: string, value: string) => {
@@ -82,7 +80,7 @@ export default function PhysicalInventoryTab() {
 
   const [newBatch, setNewBatch] = useState({
     batch_number: '', material: '', make: '', thickness: '', width: '', length: '',
-    coating: '', grade: '', gross_weight: '', net_weight: '', gsm: '', colour: '',
+    coating: '', grade: '', gross_weight: '', net_weight: '',
     coil_number: '', purchase_date: '', purchase_from: '',
   });
 
@@ -90,9 +88,8 @@ export default function PhysicalInventoryTab() {
   const receivedBatches = (batches || []).filter(b => b.status === 'received');
   const inTransitBatches = (batches || []).filter(b => b.status === 'in-transit');
 
-  // Unique filter values
   const uniqueValues = useMemo(() => {
-    const fields = ['material', 'make', 'thickness', 'width', 'coating', 'grade', 'colour'];
+    const fields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
       const vals = [...new Set(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
@@ -101,7 +98,6 @@ export default function PhysicalInventoryTab() {
     return result;
   }, [receivedBatches]);
 
-  // Filter received batches
   const filteredBatches = useMemo(() => {
     return receivedBatches.filter(b => {
       for (const [field, val] of Object.entries(filters)) {
@@ -111,7 +107,6 @@ export default function PhysicalInventoryTab() {
     });
   }, [receivedBatches, filters]);
 
-  // Group by SKU
   const skuGroups: SKUGroup[] = useMemo(() => {
     const skuMap = new Map<string, Batch[]>();
     filteredBatches.forEach(b => {
@@ -128,15 +123,14 @@ export default function PhysicalInventoryTab() {
       groups.push({
         key, batches: batchList, material: first.material, make: first.make,
         thickness: first.thickness, width: first.width, length: first.length,
-        coating: first.coating, grade: first.grade, colour: first.colour,
+        coating: first.coating, grade: first.grade,
         totalNetWeight, totalBalanceQty, totalUsableQty,
       });
     });
     return groups;
   }, [filteredBatches, allActions]);
 
-  // Totals
-  const grandTotalNetWeight = useMemo(() => filteredBatches.reduce((s, b) => s + (b.net_weight || 0), 0), [filteredBatches]);
+  const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
   const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
 
   const toggleBatchSelect = (id: string) => {
@@ -185,14 +179,13 @@ export default function PhysicalInventoryTab() {
         batch_number: newBatch.batch_number, material: newBatch.material || null, make: newBatch.make || null,
         thickness: newBatch.thickness ? Number(newBatch.thickness) : null, width: newBatch.width ? Number(newBatch.width) : null,
         length: newBatch.length || null, coating: newBatch.coating || null, grade: newBatch.grade || null,
-        gsm: newBatch.gsm ? Number(newBatch.gsm) : null, colour: newBatch.colour || null,
         gross_weight: newBatch.gross_weight ? Number(newBatch.gross_weight) : null,
         net_weight: newBatch.net_weight ? Number(newBatch.net_weight) : null,
         coil_number: newBatch.coil_number || null, purchase_date: newBatch.purchase_date || null,
         purchase_from: newBatch.purchase_from || null, status: 'received',
       }]);
       toast.success('Batch added'); setShowAddDialog(false); setAddMode(null);
-      setNewBatch({ batch_number: '', material: '', make: '', thickness: '', width: '', length: '', coating: '', grade: '', gross_weight: '', net_weight: '', gsm: '', colour: '', coil_number: '', purchase_date: '', purchase_from: '' });
+      setNewBatch({ batch_number: '', material: '', make: '', thickness: '', width: '', length: '', coating: '', grade: '', gross_weight: '', net_weight: '', coil_number: '', purchase_date: '', purchase_from: '' });
     } catch { toast.error('Failed to add batch'); }
   };
 
@@ -236,7 +229,7 @@ export default function PhysicalInventoryTab() {
       return {
         'Batch No': b.batch_number, 'Material': b.material || '', 'Make': b.make || '',
         'Thickness': b.thickness ?? '', 'Width': b.width ?? '', 'Length': b.length ?? '',
-        'Coating': b.coating || '', 'Grade': b.grade || '', 'Colour': b.colour || '',
+        'Coating': b.coating || '', 'Grade': b.grade || '',
         'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
         'Coil No': b.coil_number || '', 'Purchase Date': b.purchase_date || '', 'Purchase From': b.purchase_from || '',
         'Sales (Kg)': salesWt || '', 'Defective (Kg)': defectiveWt || '', 'Scrap (Kg)': scrapWt || '',
@@ -251,9 +244,9 @@ export default function PhysicalInventoryTab() {
     toast.success('Downloaded');
   };
 
-  const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade', 'colour'];
-  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Colour', 'Physical Inv (Kg)', 'Usable Qty (Kg)', 'Total Inv (Kg)'];
-  const batchCols = ['', 'Material', 'Make', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Colour', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
+  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Physical Inv (Kg)', 'Usable Qty (Kg)', 'Total Inv (Kg)'];
+  const batchCols = ['', 'Material', 'Make', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
@@ -277,8 +270,8 @@ export default function PhysicalInventoryTab() {
       {/* Totals */}
       <div className="flex items-center gap-4 text-sm">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
-          <span className="text-muted-foreground">Total Net Weight:</span>{' '}
-          <span className="font-semibold font-mono-num">{grandTotalNetWeight.toFixed(2)} Kg</span>
+          <span className="text-muted-foreground">Total Balance Qty:</span>{' '}
+          <span className="font-semibold font-mono-num">{grandTotalBalanceQty.toFixed(2)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Usable Qty:</span>{' '}
@@ -327,7 +320,6 @@ export default function PhysicalInventoryTab() {
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
                   <TableCell className="text-sm">{g.coating || '-'}</TableCell>
                   <TableCell className="text-sm">{g.grade || '-'}</TableCell>
-                  <TableCell className="text-sm">{g.colour || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{g.totalNetWeight.toFixed(2)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{g.totalUsableQty.toFixed(2)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{g.totalBalanceQty.toFixed(2)}</TableCell>
@@ -360,7 +352,6 @@ export default function PhysicalInventoryTab() {
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
                                     <TableCell className="text-sm">{b.coating || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.grade || '-'}</TableCell>
-                                    <TableCell className="text-sm">{b.colour || '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.gross_weight ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.net_weight ?? '-'}</TableCell>
                                     <TableCell className="text-sm">{b.coil_number || '-'}</TableCell>

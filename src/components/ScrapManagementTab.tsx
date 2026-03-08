@@ -8,8 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface ScrapBatchDetail {
   batchNumber: string;
@@ -29,10 +30,8 @@ export default function ScrapManagementTab() {
   const [expandedScrapKey, setExpandedScrapKey] = useState<string | null>(null);
   const [expandedSoldKey, setExpandedSoldKey] = useState<string | null>(null);
 
-  // Aggregate scrap by type x material
   const scrapActions = (actions as any[] || []).filter((a: any) => a.action_type === 'scrap');
 
-  // Batch-level details for each scrap type x material
   const scrapMap = new Map<string, { scrapType: string; material: string; totalWeight: number; batches: ScrapBatchDetail[] }>();
   scrapActions.forEach((a: any) => {
     const material = a.batches?.material || 'Unknown';
@@ -49,7 +48,6 @@ export default function ScrapManagementTab() {
     });
   });
 
-  // Subtract sold scrap
   (scrapSales || []).forEach(s => {
     const key = `${s.scrap_type}|${s.material || 'Unknown'}`;
     if (scrapMap.has(key)) {
@@ -59,7 +57,6 @@ export default function ScrapManagementTab() {
 
   const scrapRows = Array.from(scrapMap.values()).filter(r => r.totalWeight > 0);
 
-  // Group sold scrap by scrap_type x material, then by date
   const soldGroupMap = new Map<string, { scrapType: string; material: string; totalQty: number; totalAmount: number; sales: typeof scrapSales }>();
   (scrapSales || []).forEach(s => {
     const key = `${s.scrap_type}|${s.material || 'Unknown'}`;
@@ -88,6 +85,48 @@ export default function ScrapManagementTab() {
     } catch { toast.error('Failed'); }
   };
 
+  const handleDownloadScrapInventory = () => {
+    const allBatchDetails: { 'Scrap Type': string; 'Batch Number': string; 'Material': string; 'Net Weight (Kg)': string; 'Date': string }[] = [];
+    scrapRows.forEach(r => {
+      r.batches.forEach(bd => {
+        allBatchDetails.push({
+          'Scrap Type': bd.scrapType,
+          'Batch Number': bd.batchNumber,
+          'Material': bd.material,
+          'Net Weight (Kg)': bd.netWeight.toFixed(2),
+          'Date': bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '',
+        });
+      });
+    });
+    if (allBatchDetails.length === 0) { toast.info('No data to download'); return; }
+    const ws = XLSX.utils.json_to_sheet(allBatchDetails);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Scrap Inventory');
+    XLSX.writeFile(wb, `scrap_inventory_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success('Downloaded');
+  };
+
+  const handleDownloadSoldScrap = () => {
+    const rows: { 'Scrap Type': string; 'Material': string; 'Qty Sold (Kg)': string; 'Date': string; 'Amount (₹)': string }[] = [];
+    soldGroups.forEach(g => {
+      (g.sales as any[]).forEach((s: any) => {
+        rows.push({
+          'Scrap Type': g.scrapType,
+          'Material': g.material,
+          'Qty Sold (Kg)': (s.qty_sold ?? 0).toFixed(2),
+          'Date': s.sales_date || '',
+          'Amount (₹)': (s.amount_received ?? 0).toFixed(2),
+        });
+      });
+    });
+    if (rows.length === 0) { toast.info('No data to download'); return; }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sold Scrap');
+    XLSX.writeFile(wb, `sold_scrap_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success('Downloaded');
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -102,6 +141,11 @@ export default function ScrapManagementTab() {
         </TabsList>
 
         <TabsContent value="inventory" className="mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Button variant="outline" size="sm" onClick={handleDownloadScrapInventory} className="gap-2">
+              <Download className="h-4 w-4" /> Download Excel
+            </Button>
+          </div>
           <div className="overflow-x-auto rounded-md border bg-card">
             <Table>
               <TableHeader>
@@ -169,6 +213,11 @@ export default function ScrapManagementTab() {
         </TabsContent>
 
         <TabsContent value="sold" className="mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Button variant="outline" size="sm" onClick={handleDownloadSoldScrap} className="gap-2">
+              <Download className="h-4 w-4" /> Download Excel
+            </Button>
+          </div>
           <div className="overflow-x-auto rounded-md border bg-card">
             <Table>
               <TableHeader>
