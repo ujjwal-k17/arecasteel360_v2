@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 
 export default function ScrapManagementTab() {
   const { data: actions } = useAllActions();
+  const queryClient = useQueryClient();
   const { data: scrapSales } = useScrapSales();
   const insertScrapSale = useInsertScrapSale();
   const [sellDialog, setSellDialog] = useState<{ scrapType: string; material: string } | null>(null);
