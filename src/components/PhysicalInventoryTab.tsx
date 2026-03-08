@@ -30,7 +30,7 @@ interface SKUGroup {
   totalUsableQty: number;
 }
 
-const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
+const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade', 'form'];
 const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_weight'];
 
 const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
@@ -79,7 +79,7 @@ export default function PhysicalInventoryTab() {
   };
 
   const [newBatch, setNewBatch] = useState({
-    batch_number: '', material: '', make: '', thickness: '', width: '', length: '',
+    batch_number: '', material: '', make: '', form: '', thickness: '', width: '', length: '',
     coating: '', grade: '', gross_weight: '', net_weight: '',
     coil_number: '', purchase_date: '', purchase_from: '',
   });
@@ -89,7 +89,7 @@ export default function PhysicalInventoryTab() {
   const inTransitBatches = (batches || []).filter(b => b.status === 'in-transit');
 
   const uniqueValues = useMemo(() => {
-    const fields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
+    const fields = ['material', 'make', 'form', 'thickness', 'width', 'coating', 'grade'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
       const vals = [...new Set(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
@@ -172,11 +172,17 @@ export default function PhysicalInventoryTab() {
 
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
 
+  const isNewBatchValid = () => {
+    return Object.values(newBatch).every(v => v !== '');
+  };
+
   const handleAddNew = async () => {
+    if (!isNewBatchValid()) { toast.error('All fields are mandatory'); return; }
     if (existingBatchNumbers.has(newBatch.batch_number)) { toast.error(`Batch number "${newBatch.batch_number}" already exists`); return; }
     try {
       await insertBatches.mutateAsync([{
         batch_number: newBatch.batch_number, material: newBatch.material || null, make: newBatch.make || null,
+        form: newBatch.form || null,
         thickness: newBatch.thickness ? Number(newBatch.thickness) : null, width: newBatch.width ? Number(newBatch.width) : null,
         length: newBatch.length || null, coating: newBatch.coating || null, grade: newBatch.grade || null,
         gross_weight: newBatch.gross_weight ? Number(newBatch.gross_weight) : null,
@@ -185,7 +191,7 @@ export default function PhysicalInventoryTab() {
         purchase_from: newBatch.purchase_from || null, status: 'received',
       }]);
       toast.success('Batch added'); setShowAddDialog(false); setAddMode(null);
-      setNewBatch({ batch_number: '', material: '', make: '', thickness: '', width: '', length: '', coating: '', grade: '', gross_weight: '', net_weight: '', coil_number: '', purchase_date: '', purchase_from: '' });
+      setNewBatch({ batch_number: '', material: '', make: '', form: '', thickness: '', width: '', length: '', coating: '', grade: '', gross_weight: '', net_weight: '', coil_number: '', purchase_date: '', purchase_from: '' });
     } catch { toast.error('Failed to add batch'); }
   };
 
@@ -228,6 +234,7 @@ export default function PhysicalInventoryTab() {
       const scrapWt = batchActions.filter(a => a.action_type === 'scrap').reduce((s, a) => s + (a.net_weight || 0), 0);
       return {
         'Batch No': b.batch_number, 'Material': b.material || '', 'Make': b.make || '',
+        'Form': (b as any).form || '',
         'Thickness': b.thickness ?? '', 'Width': b.width ?? '', 'Length': b.length ?? '',
         'Coating': b.coating || '', 'Grade': b.grade || '',
         'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
@@ -244,9 +251,9 @@ export default function PhysicalInventoryTab() {
     toast.success('Downloaded');
   };
 
-  const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
-  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Physical Inv (Kg)', 'Usable Qty (Kg)', 'Total Inv (Kg)'];
-  const batchCols = ['', 'Material', 'Make', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  const filterFields = ['material', 'make', 'form', 'thickness', 'width', 'coating', 'grade'];
+  const skuCols = ['', 'Material', 'Make', 'Form', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Physical Inv (Kg)', 'Usable Qty (Kg)', 'Total Inv (Kg)'];
+  const batchCols = ['', 'Material', 'Make', 'Form', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
@@ -315,6 +322,7 @@ export default function PhysicalInventoryTab() {
                   <TableCell>{expandedSKU === g.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                   <TableCell className="text-sm">{g.material || '-'}</TableCell>
                   <TableCell className="text-sm">{g.make || '-'}</TableCell>
+                  <TableCell className="text-sm">{g.batches[0]?.form || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.thickness ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.width ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
@@ -347,6 +355,7 @@ export default function PhysicalInventoryTab() {
                                     <TableCell><Checkbox checked={selectedBatchIds.has(b.id)} onCheckedChange={() => toggleBatchSelect(b.id)} /></TableCell>
                                     <TableCell className="text-sm">{b.material || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.make || '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.form || '-'}</TableCell>
                                     <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
@@ -475,7 +484,7 @@ export default function PhysicalInventoryTab() {
               ))}
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setAddMode(null)}>← Back</Button>
-                <Button onClick={handleAddNew} disabled={!newBatch.batch_number}>Add Batch</Button>
+                <Button onClick={handleAddNew} disabled={!isNewBatchValid()}>Add Batch</Button>
               </DialogFooter>
             </div>
           )}

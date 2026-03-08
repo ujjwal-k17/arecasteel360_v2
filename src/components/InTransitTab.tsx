@@ -13,11 +13,11 @@ import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-rea
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 import { isFieldValueValid } from '@/lib/field-validation';
-import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
+import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL, FORMS } from '@/lib/inventory-options';
 import * as XLSX from 'xlsx';
 import { differenceInDays, parseISO } from 'date-fns';
 
-const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
+const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade', 'form'];
 
 export default function InTransitTab() {
   const [statusFilter, setStatusFilter] = useState<string>('in-transit');
@@ -63,7 +63,7 @@ export default function InTransitTab() {
 
   const uniqueValues = useMemo(() => {
     if (!batches) return {} as Record<string, string[]>;
-    const fields = ['material', 'make', 'coating', 'grade', 'purchase_from'];
+    const fields = ['material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
       const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
@@ -142,6 +142,7 @@ export default function InTransitTab() {
     if (filteredBatches.length === 0) { toast.info('No data to download'); return; }
     const rows = filteredBatches.map(b => ({
       'Batch No': b.batch_number, 'Material': b.material || '', 'Make': b.make || '',
+      'Form': (b as any).form || '',
       'Thickness': b.thickness ?? '', 'Width': b.width ?? '', 'Length': b.length ?? '',
       'Coating': b.coating || '', 'Grade': b.grade || '',
       'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
@@ -173,8 +174,8 @@ export default function InTransitTab() {
     toast.success(`Status changed to ${newStatus}`);
   };
 
-  const fields = ['batch_number', 'material', 'make', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
-  const filterableFields = ['material', 'make', 'coating', 'grade', 'purchase_from'];
+  const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
+  const filterableFields = ['material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
     const val = String((editValues as any)[field] ?? '');
@@ -223,6 +224,7 @@ export default function InTransitTab() {
     { field: 'batch_number', label: 'Batch No' },
     { field: 'material', label: 'Material' },
     { field: 'make', label: 'Make' },
+    { field: 'form', label: 'Form' },
     { field: 'thickness', label: 'Thickness' },
     { field: 'width', label: 'Width' },
     { field: 'length', label: 'Length' },
