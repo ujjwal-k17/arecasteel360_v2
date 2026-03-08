@@ -197,16 +197,30 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </Select>
             </div>
 
-            {/* Input Quantity */}
+            {/* Coil Processed - Full or Partial */}
             <div>
-              <Label className="text-xs">Input Quantity (Kg)</Label>
-              <div className="text-xs text-muted-foreground mb-1">Usable Qty: {usableQty.toFixed(2)} Kg</div>
-              {isPackCoil ? (
-                <Input type="number" value={usableQty.toFixed(2)} disabled className="bg-muted" />
-              ) : (
-                <Input type="number" value={inputQty} onChange={e => setInputQty(e.target.value)} placeholder={`Max: ${usableQty.toFixed(2)}`} />
-              )}
+              <Label className="text-xs">Coil Processed</Label>
+              <Select value={coilProcessed} onValueChange={v => { setCoilProcessed(v as 'full' | 'partial'); if (v === 'full') setInputQty(''); }}>
+                <SelectTrigger><SelectValue placeholder="Select Full or Partial" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full">Full</SelectItem>
+                  <SelectItem value="partial">Partial</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Input Quantity */}
+            {coilProcessed && (
+              <div>
+                <Label className="text-xs">Processing Quantity (Kg)</Label>
+                <div className="text-xs text-muted-foreground mb-1">Usable Qty: {usableQty.toFixed(2)} Kg</div>
+                {coilProcessed === 'full' ? (
+                  <Input type="number" value={usableQty.toFixed(2)} disabled className="bg-muted" />
+                ) : (
+                  <Input type="number" value={inputQty} onChange={e => setInputQty(e.target.value)} placeholder={`Max: ${usableQty.toFixed(2)}`} />
+                )}
+              </div>
+            )}
 
             {/* Slit-specific inputs */}
             {processType === 'Slit' && (
