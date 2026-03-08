@@ -117,14 +117,26 @@ export default function PhysicalInventoryTab() {
     });
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedBatchIds.size === 0) return;
-    if (!confirm(`Delete ${selectedBatchIds.size} selected batch(es)?`)) return;
+  const handleRevertToTransit = async (id: string, batchNumber: string) => {
+    if (!confirm(`Move batch ${batchNumber} back to In-Transit?`)) return;
     try {
-      await bulkDelete.mutateAsync(Array.from(selectedBatchIds));
-      toast.success(`${selectedBatchIds.size} batch(es) deleted`);
+      await updateBatch.mutateAsync({ id, status: 'in-transit' });
+      toast.success(`Batch ${batchNumber} moved back to In-Transit`);
+      setSelectedBatchIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+    } catch { toast.error('Failed to move batch'); }
+  };
+
+  const handleBulkRevert = async () => {
+    if (selectedBatchIds.size === 0) return;
+    if (!confirm(`Move ${selectedBatchIds.size} selected batch(es) back to In-Transit?`)) return;
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase.from('batches').update({ status: 'in-transit' }).in('id', Array.from(selectedBatchIds));
+      if (error) throw error;
+      toast.success(`${selectedBatchIds.size} batch(es) moved back to In-Transit`);
       setSelectedBatchIds(new Set());
-    } catch { toast.error('Failed to delete'); }
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+    } catch { toast.error('Failed to move batches'); }
   };
 
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
