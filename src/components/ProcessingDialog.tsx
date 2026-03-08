@@ -368,6 +368,20 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
           )}
 
+          {/* Trim option - only for Slit */}
+          {processType === 'Slit' && (
+            <div>
+              <Label className="text-xs">Trim</Label>
+              <Select value={trimOption} onValueChange={(v: 'yes' | 'no') => setTrimOption(v)}>
+                <SelectTrigger><SelectValue placeholder="Select Yes or No" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Slit-specific inputs */}
           {processType === 'Slit' && (
             <div className="space-y-3 border rounded-md p-3">
