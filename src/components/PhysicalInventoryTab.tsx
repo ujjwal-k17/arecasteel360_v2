@@ -125,6 +125,12 @@ export default function PhysicalInventoryTab() {
 
   const handleBulkRevert = async () => {
     if (selectedBatchIds.size === 0) return;
+    // Check if any selected batch has actions
+    const idsWithActions = Array.from(selectedBatchIds).filter(id => allActions.some(a => a.batch_id === id));
+    if (idsWithActions.length > 0) {
+      toast.error('Cannot move batches with recorded actions back to In-Transit');
+      return;
+    }
     if (!confirm(`Move ${selectedBatchIds.size} selected batch(es) back to In-Transit?`)) return;
     try {
       const { supabase } = await import('@/integrations/supabase/client');
