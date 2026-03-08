@@ -129,6 +129,10 @@ export function useInsertAction() {
 // Usable = GW + 80 - Processed Qty
 // Balance = GW + 80 - Processed Qty + Defective Qty (defective is physically present)
 
+export function isPackCoilSold(batch: Batch, actions: InventoryAction[]): boolean {
+  return actions.some(a => a.batch_id === batch.id && a.action_type === 'pack_coil_sale');
+}
+
 export function calcProcessedQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
   const batchActions = actions.filter(a => a.batch_id === batch.id);
   const actionDeductions = batchActions
@@ -141,10 +145,12 @@ export function calcProcessedQty(batch: Batch, actions: InventoryAction[], proce
 }
 
 export function calcUsableBalanceQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
+  if (isPackCoilSold(batch, actions)) return 0;
   return (batch.gross_weight || 0) + 80 - calcProcessedQty(batch, actions, processingRecords);
 }
 
 export function calcBalanceQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
+  if (isPackCoilSold(batch, actions)) return 0;
   const batchActions = actions.filter(a => a.batch_id === batch.id);
   const defectiveQty = batchActions
     .filter(a => a.action_type === 'defective')
