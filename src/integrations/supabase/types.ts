@@ -21,6 +21,7 @@ export type Database = {
           coil_number: string | null
           colour: string | null
           created_at: string
+          form: string | null
           grade: string | null
           gross_weight: number | null
           gsm: number | null
@@ -42,6 +43,7 @@ export type Database = {
           coil_number?: string | null
           colour?: string | null
           created_at?: string
+          form?: string | null
           grade?: string | null
           gross_weight?: number | null
           gsm?: number | null
@@ -63,6 +65,7 @@ export type Database = {
           coil_number?: string | null
           colour?: string | null
           created_at?: string
+          form?: string | null
           grade?: string | null
           gross_weight?: number | null
           gsm?: number | null
