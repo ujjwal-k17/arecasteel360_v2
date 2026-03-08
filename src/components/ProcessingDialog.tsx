@@ -89,7 +89,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
-    if (!processType || !outputType || !coilProcessed) {
+    const effectiveOutputType = processType === 'CTL' ? 'FG' : outputType;
+    if (!processType || !effectiveOutputType || !coilProcessed) {
       toast.error('Please select Process, Output Type, and Coil Processed option');
       return;
     }
