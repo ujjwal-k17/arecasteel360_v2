@@ -11,6 +11,7 @@ import { ChevronDown, ChevronRight, Plus, RefreshCw, Trash2 } from 'lucide-react
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
 import InventoryFieldSelect from './InventoryFieldSelect';
+import { isFieldValueValid } from '@/lib/field-validation';
 
 interface SKUGroup {
   key: string;
