@@ -17,6 +17,7 @@ export default function InTransitTab() {
   const { data: batches, isLoading } = useBatches();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
+  const deleteBatch = useDeleteBatch();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
