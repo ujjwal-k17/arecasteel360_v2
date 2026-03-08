@@ -42,7 +42,8 @@ export default function InTransitTab() {
       })));
       toast.success(`${rows.length} batches imported`);
     } catch (err) {
-      toast.error('Failed to parse file');
+      console.error('Import error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to parse file');
     }
     e.target.value = '';
   };
