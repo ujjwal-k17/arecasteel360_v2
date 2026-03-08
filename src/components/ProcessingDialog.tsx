@@ -23,12 +23,13 @@ interface Props {
 
 export default function ProcessingDialog({ batch, allActions, processingRecords, open, onClose }: Props) {
   const insertProcessing = useInsertProcessing();
-  const batchStatus = (batch as any).batch_status || (batch as any).form || 'Pack coil';
+  const _batchStatus = (batch as any).batch_status || (batch as any).form || 'Pack coil';
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
   const coilWidth = batch.width || 0;
 
   const [processType, setProcessType] = useState('');
   const [outputType, setOutputType] = useState('');
+  const [coilProcessed, setCoilProcessed] = useState<'full' | 'partial' | ''>('');
   const [inputQty, setInputQty] = useState('');
   const [numSizes, setNumSizes] = useState('');
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
@@ -37,8 +38,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [showScrap, setShowScrap] = useState(false);
   const [showDefective, setShowDefective] = useState(false);
 
-  const isPackCoil = batchStatus === 'Pack coil' || batchStatus === 'Pack Coil';
-  const effectiveInputQty = isPackCoil ? usableQty : (inputQty ? Number(inputQty) : 0);
+  const effectiveInputQty = coilProcessed === 'full' ? usableQty : (inputQty ? Number(inputQty) : 0);
 
   // Auto-calculate slit quantities when widths change
   const autoCalcSlitWidths = useMemo(() => {
@@ -89,11 +89,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
-    if (!processType || !outputType) {
-      toast.error('Please select Process and Output Type');
+    if (!processType || !outputType || !coilProcessed) {
+      toast.error('Please select Process, Output Type, and Coil Processed option');
       return;
     }
-    if (!isPackCoil && (!inputQty || Number(inputQty) <= 0)) {
+    if (coilProcessed === 'partial' && (!inputQty || Number(inputQty) <= 0)) {
       toast.error('Please enter input quantity');
       return;
     }
@@ -197,16 +197,30 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </Select>
             </div>
 
-            {/* Input Quantity */}
+            {/* Coil Processed - Full or Partial */}
             <div>
-              <Label className="text-xs">Input Quantity (Kg)</Label>
-              <div className="text-xs text-muted-foreground mb-1">Usable Qty: {usableQty.toFixed(2)} Kg</div>
-              {isPackCoil ? (
-                <Input type="number" value={usableQty.toFixed(2)} disabled className="bg-muted" />
-              ) : (
-                <Input type="number" value={inputQty} onChange={e => setInputQty(e.target.value)} placeholder={`Max: ${usableQty.toFixed(2)}`} />
-              )}
+              <Label className="text-xs">Coil Processed</Label>
+              <Select value={coilProcessed} onValueChange={v => { setCoilProcessed(v as 'full' | 'partial'); if (v === 'full') setInputQty(''); }}>
+                <SelectTrigger><SelectValue placeholder="Select Full or Partial" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full">Full</SelectItem>
+                  <SelectItem value="partial">Partial</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Input Quantity */}
+            {coilProcessed && (
+              <div>
+                <Label className="text-xs">Processing Quantity (Kg)</Label>
+                <div className="text-xs text-muted-foreground mb-1">Usable Qty: {usableQty.toFixed(2)} Kg</div>
+                {coilProcessed === 'full' ? (
+                  <Input type="number" value={usableQty.toFixed(2)} disabled className="bg-muted" />
+                ) : (
+                  <Input type="number" value={inputQty} onChange={e => setInputQty(e.target.value)} placeholder={`Max: ${usableQty.toFixed(2)}`} />
+                )}
+              </div>
+            )}
 
             {/* Slit-specific inputs */}
             {processType === 'Slit' && (
