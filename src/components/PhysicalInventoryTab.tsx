@@ -125,6 +125,12 @@ export default function PhysicalInventoryTab() {
 
   const handleBulkRevert = async () => {
     if (selectedBatchIds.size === 0) return;
+    // Check if any selected batch has actions
+    const idsWithActions = Array.from(selectedBatchIds).filter(id => allActions.some(a => a.batch_id === id));
+    if (idsWithActions.length > 0) {
+      toast.error('Cannot move batches with recorded actions back to In-Transit');
+      return;
+    }
     if (!confirm(`Move ${selectedBatchIds.size} selected batch(es) back to In-Transit?`)) return;
     try {
       const { supabase } = await import('@/integrations/supabase/client');
@@ -325,7 +331,9 @@ export default function PhysicalInventoryTab() {
                                         <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('defective'); }}>Defective</Button>
                                         <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('scrap'); }}>Scrap</Button>
                                         <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setExpandedBatchActions(isExpanded ? null : b.id); }}><Eye className="h-3.5 w-3.5" /></Button>
-                                        <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); handleRevertToTransit(b.id, b.batch_number); }}><Undo2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                                        {batchActions.length === 0 && (
+                                          <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); handleRevertToTransit(b.id, b.batch_number); }}><Undo2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                                        )}
                                       </div>
                                     </TableCell>
                                   </TableRow>

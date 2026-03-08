@@ -16,7 +16,8 @@ import { isFieldValueValid } from '@/lib/field-validation';
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 
 export default function InTransitTab() {
-  const { data: batches, isLoading } = useBatches('in-transit');
+  const [statusFilter, setStatusFilter] = useState<string>('in-transit');
+  const { data: batches, isLoading } = useBatches(statusFilter);
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
   const deleteBatch = useDeleteBatch();
@@ -161,7 +162,25 @@ export default function InTransitTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1 border rounded-md overflow-hidden">
+          <Button
+            variant={statusFilter === 'in-transit' ? 'default' : 'ghost'}
+            size="sm"
+            className="rounded-none text-xs"
+            onClick={() => { setStatusFilter('in-transit'); setSelectedIds(new Set()); }}
+          >
+            In-Transit
+          </Button>
+          <Button
+            variant={statusFilter === 'received' ? 'default' : 'ghost'}
+            size="sm"
+            className="rounded-none text-xs"
+            onClick={() => { setStatusFilter('received'); setSelectedIds(new Set()); }}
+          >
+            Received
+          </Button>
+        </div>
         <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); toast.success('Refreshed'); }} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
