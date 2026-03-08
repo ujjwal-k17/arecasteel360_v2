@@ -29,6 +29,25 @@ interface SKUGroup {
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_weight', 'gsm'];
 
+const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
+  'batch_number', 'material', 'make', 'thickness', 'width', 'length',
+  'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number',
+  'purchase_date', 'purchase_from',
+];
+
+function isBatchComplete(b: Batch): boolean {
+  return REQUIRED_IMPORT_FIELDS.every(f => {
+    const v = b[f];
+    return v !== null && v !== undefined && v !== '' && v !== 0;
+  });
+}
+
+function getMissingFields(b: Batch): string[] {
+  return REQUIRED_IMPORT_FIELDS
+    .filter(f => { const v = b[f]; return v === null || v === undefined || v === '' || v === 0; })
+    .map(f => String(f).replace(/_/g, ' '));
+}
+
 export default function PhysicalInventoryTab() {
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
