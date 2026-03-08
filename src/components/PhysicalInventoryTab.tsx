@@ -39,6 +39,7 @@ export default function PhysicalInventoryTab() {
   const [addMode, setAddMode] = useState<'new' | 'import' | null>(null);
   const [actionBatch, setActionBatch] = useState<Batch | null>(null);
   const [actionType, setActionType] = useState<'sales' | 'defective' | 'scrap' | null>(null);
+  const [selectedImportIds, setSelectedImportIds] = useState<Set<string>>(new Set());
 
   const [newBatch, setNewBatch] = useState({
     batch_number: '', material: '', make: '', thickness: '', width: '', length: '',
@@ -97,16 +98,26 @@ export default function PhysicalInventoryTab() {
     } catch { toast.error('Failed to add batch'); }
   };
 
-  const handleImportFromTransit = async (batch: Batch) => {
+  const handleImportFromTransit = async (ids: string[]) => {
     try {
-      const { error } = await (await import('@/integrations/supabase/client')).supabase
-        .from('batches').update({ status: 'received' }).eq('id', batch.id);
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase
+        .from('batches').update({ status: 'received' }).in('id', ids);
       if (error) throw error;
-      toast.success('Batch moved to physical inventory');
+      toast.success(`${ids.length} batch(es) moved to physical inventory`);
       setShowAddDialog(false);
       setAddMode(null);
-      window.location.reload();
+      setSelectedImportIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
     } catch { toast.error('Failed'); }
+  };
+
+  const toggleImportSelection = (id: string) => {
+    setSelectedImportIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const updateNewBatch = (key: string, value: string) => {
@@ -247,15 +258,21 @@ export default function PhysicalInventoryTab() {
             </div>
           ) : addMode === 'import' ? (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Select an in-transit batch to move to physical inventory:</p>
+              <p className="text-sm text-muted-foreground">Select batches to move to physical inventory:</p>
               {inTransitBatches.length === 0 && <p className="text-sm text-muted-foreground">No in-transit batches available.</p>}
               {inTransitBatches.map(b => (
-                <div key={b.id} className="flex items-center justify-between p-2 border rounded hover:bg-muted/30 cursor-pointer" onClick={() => handleImportFromTransit(b)}>
-                  <span className="text-sm font-medium">{b.batch_number} — {b.material} {b.make}</span>
+                <div key={b.id} className={`flex items-center gap-2 p-2 border rounded cursor-pointer ${selectedImportIds.has(b.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted/30'}`} onClick={() => toggleImportSelection(b.id)}>
+                  <input type="checkbox" checked={selectedImportIds.has(b.id)} readOnly className="accent-primary" />
+                  <span className="text-sm font-medium flex-1">{b.batch_number} — {b.material} {b.make}</span>
                   <span className="text-xs text-muted-foreground font-mono-num">{b.net_weight} Kg</span>
                 </div>
               ))}
-              <Button variant="ghost" className="mt-2" onClick={() => setAddMode(null)}>← Back</Button>
+              <div className="flex items-center gap-2 mt-3">
+                <Button variant="ghost" onClick={() => { setAddMode(null); setSelectedImportIds(new Set()); }}>← Back</Button>
+                <Button disabled={selectedImportIds.size === 0} onClick={() => handleImportFromTransit(Array.from(selectedImportIds))}>
+                  Import {selectedImportIds.size > 0 ? `(${selectedImportIds.size})` : ''}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
