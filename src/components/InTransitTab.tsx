@@ -145,7 +145,12 @@ export default function InTransitTab() {
       <Input
         className="h-7 w-24 text-xs"
         value={val}
-        onChange={e => setEditValues(v => ({ ...v, [field]: e.target.value }))}
+        onChange={e => {
+          const newVal = e.target.value;
+          if (isFieldValueValid(field, newVal)) {
+            setEditValues(v => ({ ...v, [field]: newVal }));
+          }
+        }}
       />
     );
   };
