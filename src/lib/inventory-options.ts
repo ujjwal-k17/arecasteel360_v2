@@ -1,3 +1,7 @@
+export const FORMS = [
+  'Pack coil', 'Packet', 'Sheet', 'Slit Coil', 'Loose Coil',
+];
+
 export const MATERIALS = [
   'HR', 'HR Chq', 'HRPO', 'CR', 'GP', 'GPSP', 'PPGI', 'PPGL', 'BGL', 'Structure', 'Others',
 ];

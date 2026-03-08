@@ -223,6 +223,7 @@ export default function InTransitTab() {
     { field: 'batch_number', label: 'Batch No' },
     { field: 'material', label: 'Material' },
     { field: 'make', label: 'Make' },
+    { field: 'form', label: 'Form' },
     { field: 'thickness', label: 'Thickness' },
     { field: 'width', label: 'Width' },
     { field: 'length', label: 'Length' },
