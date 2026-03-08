@@ -14,7 +14,7 @@ export default function WIPInventoryTab() {
 
   const items = wipItems || [];
 
-  const cols = ['Material', 'Make', 'Process', 'Dimensions', 'Coating', 'Grade', 'Qty (Kg)', 'Order ID', 'Action'];
+  const cols = ['Material', 'Make', 'Process', 'Dimensions', 'Coating', 'Grade', 'Qty (Kg)', 'Action'];
 
   const formatDimensions = (item: any) => {
     const t = item.thickness ?? '-';
@@ -54,7 +54,6 @@ export default function WIPInventoryTab() {
                   <TableCell className="text-sm">{item.coating || '-'}</TableCell>
                   <TableCell className="text-sm">{item.grade || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{item.qty ?? '-'}</TableCell>
-                  <TableCell className="text-sm">{item.order_id || '-'}</TableCell>
                   <TableCell>
                     {canProcess ? (
                       <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setProcessingItem(item)}>
