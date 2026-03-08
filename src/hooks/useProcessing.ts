@@ -243,7 +243,17 @@ export function useWIPProcessing() {
         }
       }
 
-      await supabase.from('wip_items' as any).update({ status: 'processed' }).eq('id', params.wipItemId);
+      // Calculate remaining qty
+      const totalUsed = params.outputItems.reduce((s, i) => s + i.qty_kg, 0) + defectiveTotal;
+      const remainingQty = (params.wipItem.qty || 0) - totalUsed;
+
+      if (remainingQty > 0.01) {
+        // Partial processing: reduce qty, keep active
+        await supabase.from('wip_items' as any).update({ qty: Math.round(remainingQty * 100) / 100 }).eq('id', params.wipItemId);
+      } else {
+        // Fully processed
+        await supabase.from('wip_items' as any).update({ status: 'processed' }).eq('id', params.wipItemId);
+      }
 
       return procRec;
     },
