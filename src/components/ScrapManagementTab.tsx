@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAllActions } from '@/hooks/useBatches';
+import { useQueryClient } from '@tanstack/react-query';
 import { useScrapSales, useInsertScrapSale } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ScrapManagementTab() {
   const { data: actions } = useAllActions();
+  const queryClient = useQueryClient();
   const { data: scrapSales } = useScrapSales();
   const insertScrapSale = useInsertScrapSale();
   const [sellDialog, setSellDialog] = useState<{ scrapType: string; material: string } | null>(null);
@@ -54,7 +57,13 @@ export default function ScrapManagementTab() {
   };
 
   return (
-    <Tabs defaultValue="inventory">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['inventory_actions'] }); queryClient.invalidateQueries({ queryKey: ['scrap_sales'] }); toast.success('Refreshed'); }} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
+      </div>
+      <Tabs defaultValue="inventory">
       <TabsList>
         <TabsTrigger value="inventory">Scrap Inventory</TabsTrigger>
         <TabsTrigger value="sold">Sold Scrap</TabsTrigger>
@@ -140,5 +149,6 @@ export default function ScrapManagementTab() {
         </DialogContent>
       </Dialog>
     </Tabs>
+    </div>
   );
 }

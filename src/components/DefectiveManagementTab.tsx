@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useAllBatches, useAllActions, getSKUKey, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDefectiveSales, useInsertDefectiveSale } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DefectiveManagementTab() {
   const { data: batches } = useAllBatches();
+  const queryClient = useQueryClient();
   const { data: actions } = useAllActions();
   const { data: defSales } = useDefectiveSales();
   const insertDefSale = useInsertDefectiveSale();
@@ -61,6 +64,11 @@ export default function DefectiveManagementTab() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); queryClient.invalidateQueries({ queryKey: ['inventory_actions'] }); queryClient.invalidateQueries({ queryKey: ['defective_sales'] }); toast.success('Refreshed'); }} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
+      </div>
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>

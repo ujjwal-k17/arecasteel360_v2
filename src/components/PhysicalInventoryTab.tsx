@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
 import InventoryFieldSelect from './InventoryFieldSelect';
@@ -30,6 +31,7 @@ const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_wei
 export default function PhysicalInventoryTab() {
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
+  const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -148,6 +150,9 @@ export default function PhysicalInventoryTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); queryClient.invalidateQueries({ queryKey: ['inventory_actions'] }); toast.success('Refreshed'); }} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
         <Button onClick={() => { setShowAddDialog(true); setAddMode(null); }} className="gap-2">
           <Plus className="h-4 w-4" /> Add New Item
         </Button>

@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react';
 import { useBatches, useInsertBatches, useUpdateBatch } from '@/hooks/useBatches';
+import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Edit2, Check, X } from 'lucide-react';
+import { Upload, Download, Edit2, Check, X, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 
@@ -16,6 +17,7 @@ export default function InTransitTab() {
   const { data: batches, isLoading } = useBatches();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
+  const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
@@ -110,6 +112,9 @@ export default function InTransitTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); toast.success('Refreshed'); }} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
         <Button onClick={() => fileRef.current?.click()} className="gap-2">
           <Upload className="h-4 w-4" /> Import Excel
