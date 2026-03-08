@@ -141,5 +141,5 @@ export function calcUsableBalanceQty(batch: Batch, actions: InventoryAction[]): 
 
 // SKU key
 export function getSKUKey(b: Batch): string {
-  return [b.make, b.grade, b.thickness, b.width, b.gsm, b.colour].filter(Boolean).join(' × ');
+  return [b.make, b.grade, b.thickness, b.width, b.gsm].filter(Boolean).join(' × ');
 }
