@@ -129,6 +129,22 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         batch,
       });
 
+      // Auto-insert trim qty as scrap for Slit process
+      if (processType === 'Slit' && trimQty > 0.01) {
+        const { supabase } = await import('@/integrations/supabase/client');
+        await supabase.from('inventory_actions').insert({
+          batch_id: batch.id,
+          action_type: 'scrap',
+          scrap_type: 'Trimming',
+          net_weight: Math.round(trimQty * 100) / 100,
+          gross_weight: null,
+          order_id: null,
+          sales_date: null,
+          invoice_number: null,
+          defect_type: null,
+        } as any);
+      }
+
       toast.success(`Processing recorded for batch ${batch.batch_number}`);
       onClose();
     } catch {
