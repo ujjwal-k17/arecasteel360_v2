@@ -234,6 +234,7 @@ export default function PhysicalInventoryTab() {
       const scrapWt = batchActions.filter(a => a.action_type === 'scrap').reduce((s, a) => s + (a.net_weight || 0), 0);
       return {
         'Batch No': b.batch_number, 'Material': b.material || '', 'Make': b.make || '',
+        'Form': (b as any).form || '',
         'Thickness': b.thickness ?? '', 'Width': b.width ?? '', 'Length': b.length ?? '',
         'Coating': b.coating || '', 'Grade': b.grade || '',
         'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',

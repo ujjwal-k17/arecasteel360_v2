@@ -142,6 +142,7 @@ export default function InTransitTab() {
     if (filteredBatches.length === 0) { toast.info('No data to download'); return; }
     const rows = filteredBatches.map(b => ({
       'Batch No': b.batch_number, 'Material': b.material || '', 'Make': b.make || '',
+      'Form': (b as any).form || '',
       'Thickness': b.thickness ?? '', 'Width': b.width ?? '', 'Length': b.length ?? '',
       'Coating': b.coating || '', 'Grade': b.grade || '',
       'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
