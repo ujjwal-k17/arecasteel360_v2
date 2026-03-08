@@ -172,11 +172,17 @@ export default function PhysicalInventoryTab() {
 
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
 
+  const isNewBatchValid = () => {
+    return Object.values(newBatch).every(v => v !== '');
+  };
+
   const handleAddNew = async () => {
+    if (!isNewBatchValid()) { toast.error('All fields are mandatory'); return; }
     if (existingBatchNumbers.has(newBatch.batch_number)) { toast.error(`Batch number "${newBatch.batch_number}" already exists`); return; }
     try {
       await insertBatches.mutateAsync([{
         batch_number: newBatch.batch_number, material: newBatch.material || null, make: newBatch.make || null,
+        form: newBatch.form || null,
         thickness: newBatch.thickness ? Number(newBatch.thickness) : null, width: newBatch.width ? Number(newBatch.width) : null,
         length: newBatch.length || null, coating: newBatch.coating || null, grade: newBatch.grade || null,
         gross_weight: newBatch.gross_weight ? Number(newBatch.gross_weight) : null,
@@ -185,7 +191,7 @@ export default function PhysicalInventoryTab() {
         purchase_from: newBatch.purchase_from || null, status: 'received',
       }]);
       toast.success('Batch added'); setShowAddDialog(false); setAddMode(null);
-      setNewBatch({ batch_number: '', material: '', make: '', thickness: '', width: '', length: '', coating: '', grade: '', gross_weight: '', net_weight: '', coil_number: '', purchase_date: '', purchase_from: '' });
+      setNewBatch({ batch_number: '', material: '', make: '', form: '', thickness: '', width: '', length: '', coating: '', grade: '', gross_weight: '', net_weight: '', coil_number: '', purchase_date: '', purchase_from: '' });
     } catch { toast.error('Failed to add batch'); }
   };
 
