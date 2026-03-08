@@ -49,6 +49,9 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="dashboard">
+            <DashboardTab />
+          </TabsContent>
           <TabsContent value="in-transit">
             <InTransitTab />
           </TabsContent>
