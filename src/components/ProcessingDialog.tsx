@@ -42,6 +42,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
   const [coilMode, setCoilMode] = useState<'full' | 'partial' | ''>('');
   const [partialQty, setPartialQty] = useState('');
+  const [trimOption, setTrimOption] = useState<'yes' | 'no' | ''>('');
 
   // Inline scrap & defective state
   const [scrapEntries, setScrapEntries] = useState<Record<string, string>>(
