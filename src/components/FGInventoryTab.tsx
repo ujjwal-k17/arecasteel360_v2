@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useFGItems } from '@/hooks/useProcessing';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
@@ -25,6 +26,44 @@ export default function FGInventoryTab() {
   const { data: fgItems } = useFGItems();
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Fetch batch numbers for source lookup
+  const { data: batches } = useQuery({
+    queryKey: ['batches_lookup'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('batches').select('id, batch_number');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch WIP items for source_type=wip lookup (WIP→FG traceability)
+  const { data: wipItemsRaw } = useQuery({
+    queryKey: ['wip_items_lookup'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('wip_items' as any).select('id, source_batch_id');
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const batchMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of batches || []) {
+      map.set(b.id, b.batch_number);
+    }
+    return map;
+  }, [batches]);
+
+  const wipBatchMap = useMemo(() => {
+    // Map wip_item id -> batch_number (via source_batch_id)
+    const map = new Map<string, string>();
+    for (const w of wipItemsRaw || []) {
+      const bn = batchMap.get(w.source_batch_id);
+      if (bn) map.set(w.id, bn);
+    }
+    return map;
+  }, [wipItemsRaw, batchMap]);
 
   const items = fgItems || [];
 
@@ -79,12 +118,19 @@ export default function FGInventoryTab() {
     return `${t ?? '-'} x ${w ?? '-'} x ${isSlit ? 'Coil' : (l ?? '-')}`;
   };
 
+  const getBatchNumber = (item: any): string => {
+    if (item.source_type === 'wip') {
+      return wipBatchMap.get(item.source_id) || '-';
+    }
+    return batchMap.get(item.source_id) || '-';
+  };
+
   const cols = ['', 'Material', 'Make', 'Process', 'Dimensions', 'Coating', 'Grade', 'Qty (Kg)', '# Pcs'];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['fg_items'] }); toast.success('Refreshed'); }} className="gap-2">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['fg_items'] }); queryClient.invalidateQueries({ queryKey: ['batches_lookup'] }); queryClient.invalidateQueries({ queryKey: ['wip_items_lookup'] }); toast.success('Refreshed'); }} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
       </div>
@@ -126,8 +172,10 @@ export default function FGInventoryTab() {
                   {isOpen && g.items.map((item: any) => (
                     <TableRow key={item.id} className="bg-background">
                       <TableCell />
-                      <TableCell className="text-xs text-muted-foreground">{item.material || '-'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{item.make || '-'}</TableCell>
+                      <TableCell colSpan={2} className="text-xs">
+                        <span className="text-muted-foreground">Batch: </span>
+                        <span className="font-medium">{getBatchNumber(item)}</span>
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
                       <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">
                         {formatDimensions(item.thickness, item.width, item.length, item.process)}
