@@ -112,6 +112,9 @@ export default function InTransitTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); toast.success('Refreshed'); }} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
         <Button onClick={() => fileRef.current?.click()} className="gap-2">
           <Upload className="h-4 w-4" /> Import Excel
