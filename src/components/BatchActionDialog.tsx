@@ -25,6 +25,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
   const [orderId, setOrderId] = useState('');
   const [salesDate, setSalesDate] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [salesForm, setSalesForm] = useState((batch as any).form || '');
   const [netWeight, setNetWeight] = useState('');
   const [grossWeight, setGrossWeight] = useState('');
 
