@@ -347,7 +347,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           {/* Process Type */}
           <div>
             <Label className="text-xs">Process</Label>
-            <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); if (v === 'Slit') setOutputType(''); else setOutputType('FG'); }}>
+            <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); setTrimOption(''); if (v === 'Slit') setOutputType(''); else setOutputType('FG'); }}>
               <SelectTrigger><SelectValue placeholder="Select process" /></SelectTrigger>
               <SelectContent>
                 {PROCESSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
