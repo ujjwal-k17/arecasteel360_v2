@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
@@ -8,10 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 import { isFieldValueValid } from '@/lib/field-validation';
+import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
+import * as XLSX from 'xlsx';
+import { differenceInDays, parseISO } from 'date-fns';
 
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 
@@ -28,6 +32,58 @@ export default function InTransitTab() {
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Column filters
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  // Date range filter
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const setFilter = (field: string, value: string) => {
+    setFilters(prev => {
+      const next = { ...prev };
+      if (value === '__all__' || !value) delete next[field];
+      else next[field] = value;
+      return next;
+    });
+  };
+
+  // Filtered batches
+  const filteredBatches = useMemo(() => {
+    if (!batches) return [];
+    return batches.filter(b => {
+      for (const [field, val] of Object.entries(filters)) {
+        const bVal = String((b as any)[field] ?? '');
+        if (bVal !== val) return false;
+      }
+      if (dateFrom && b.purchase_date && b.purchase_date < dateFrom) return false;
+      if (dateTo && b.purchase_date && b.purchase_date > dateTo) return false;
+      if ((dateFrom || dateTo) && !b.purchase_date) return false;
+      return true;
+    });
+  }, [batches, filters, dateFrom, dateTo]);
+
+  // Total in-transit net weight
+  const totalNetWeight = useMemo(() => filteredBatches.reduce((s, b) => s + (b.net_weight || 0), 0), [filteredBatches]);
+
+  // Unique values for column filters
+  const uniqueValues = useMemo(() => {
+    if (!batches) return {} as Record<string, string[]>;
+    const fields = ['material', 'make', 'coating', 'grade', 'colour', 'purchase_from'];
+    const result: Record<string, string[]> = {};
+    fields.forEach(f => {
+      const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
+      result[f] = vals;
+    });
+    return result;
+  }, [batches]);
+
+  const calcTransitDays = (purchaseDate: string | null): number | null => {
+    if (!purchaseDate) return null;
+    try {
+      return differenceInDays(new Date(), parseISO(purchaseDate));
+    } catch { return null; }
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -37,11 +93,10 @@ export default function InTransitTab() {
   };
 
   const toggleSelectAll = () => {
-    if (!batches) return;
-    if (selectedIds.size === batches.length) {
+    if (selectedIds.size === filteredBatches.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(batches.map(b => b.id)));
+      setSelectedIds(new Set(filteredBatches.map(b => b.id)));
     }
   };
 
@@ -61,32 +116,17 @@ export default function InTransitTab() {
     try {
       const rows = await parseExcelFile(file);
       if (rows.length === 0) { toast.error('No valid rows found'); return; }
-
       const existingBatchNumbers = new Set((batches || []).map(b => b.batch_number));
       const newRows = rows.filter(r => !existingBatchNumbers.has(r.batch_number));
       const duplicateCount = rows.length - newRows.length;
-
-      if (newRows.length === 0) {
-        toast.info(`All ${rows.length} batches already exist — skipped`);
-        return;
-      }
-
+      if (newRows.length === 0) { toast.info(`All ${rows.length} batches already exist — skipped`); return; }
       await insertBatches.mutateAsync(newRows.map(r => ({
-        batch_number: r.batch_number,
-        material: r.material || null,
-        make: r.make || null,
-        thickness: r.thickness || null,
-        width: r.width || null,
+        batch_number: r.batch_number, material: r.material || null, make: r.make || null,
+        thickness: r.thickness || null, width: r.width || null,
         length: r.length != null ? String(r.length) : null,
-        coating: r.coating || null,
-        grade: r.grade || null,
-        gsm: r.gsm || null,
-        colour: r.colour || null,
-        gross_weight: r.gross_weight || null,
-        net_weight: r.net_weight || null,
-        coil_number: r.coil_number || null,
-        purchase_date: r.purchase_date || null,
-        purchase_from: r.purchase_from || null,
+        coating: r.coating || null, grade: r.grade || null, gsm: r.gsm || null,
+        colour: r.colour || null, gross_weight: r.gross_weight || null, net_weight: r.net_weight || null,
+        coil_number: r.coil_number || null, purchase_date: r.purchase_date || null, purchase_from: r.purchase_from || null,
       })));
       toast.success(`${newRows.length} batches imported${duplicateCount > 0 ? `, ${duplicateCount} duplicates skipped` : ''}`);
     } catch (err) {
@@ -96,22 +136,33 @@ export default function InTransitTab() {
     e.target.value = '';
   };
 
-  const startEdit = (batch: any) => {
-    setEditingId(batch.id);
-    setEditValues({ ...batch });
+  const handleDownloadExcel = () => {
+    if (filteredBatches.length === 0) { toast.info('No data to download'); return; }
+    const rows = filteredBatches.map(b => ({
+      'Batch No': b.batch_number, 'Material': b.material || '', 'Make': b.make || '',
+      'Thickness': b.thickness ?? '', 'Width': b.width ?? '', 'Length': b.length ?? '',
+      'Coating': b.coating || '', 'Grade': b.grade || '', 'Colour': b.colour || '',
+      'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
+      'Coil No': b.coil_number || '', 'Purchase Date': b.purchase_date || '',
+      'Purchase From': b.purchase_from || '',
+      'Transit Days': calcTransitDays(b.purchase_date) ?? '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'In-Transit');
+    XLSX.writeFile(wb, `in_transit_${statusFilter}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success('Downloaded');
   };
+
+  const startEdit = (batch: any) => { setEditingId(batch.id); setEditValues({ ...batch }); };
 
   const saveEdit = async () => {
     if (!editingId) return;
     try {
       const { id: _id, created_at: _ca, updated_at: _ua, ...updateFields } = editValues as any;
       await updateBatch.mutateAsync({ id: editingId, ...updateFields } as any);
-      toast.success('Batch updated');
-      setEditingId(null);
-    } catch (err) {
-      console.error('Update error:', err);
-      toast.error('Failed to update');
-    }
+      toast.success('Batch updated'); setEditingId(null);
+    } catch { toast.error('Failed to update'); }
   };
 
   const toggleStatus = async (batch: any) => {
@@ -121,82 +172,116 @@ export default function InTransitTab() {
   };
 
   const isReceived = statusFilter === 'received';
-  const cols = isReceived
-    ? ['', 'Batch No', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Colour', 'Gross Wt (Kg)', 'Net Wt (Kg)', 'Coil No', 'Purchase Date', 'Purchase From', 'Status']
-    : ['', 'Batch No', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Colour', 'Gross Wt (Kg)', 'Net Wt (Kg)', 'Coil No', 'Purchase Date', 'Purchase From', 'Status', 'Actions'];
   const fields = ['batch_number', 'material', 'make', 'thickness', 'width', 'length', 'coating', 'grade', 'colour', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
+  const filterableFields = ['material', 'make', 'coating', 'grade', 'colour', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
     const val = String((editValues as any)[field] ?? '');
     const material = String((editValues as any).material ?? '');
-
     if (DROPDOWN_FIELDS.includes(field)) {
       return (
-        <InventoryFieldSelect
-          field={field}
-          value={val}
-          material={material}
+        <InventoryFieldSelect field={field} value={val} material={material}
           onChange={v => setEditValues(prev => {
             const next = { ...prev, [field]: v };
-            if (field === 'material') {
-              next.coating = '';
-              next.grade = '';
-            }
+            if (field === 'material') { next.coating = ''; next.grade = ''; }
             return next;
           })}
           className="h-7 w-32 text-xs"
         />
       );
     }
-
     return (
-      <Input
-        className="h-7 w-24 text-xs"
-        value={val}
-        onChange={e => {
-          const newVal = e.target.value;
-          if (isFieldValueValid(field, newVal)) {
-            setEditValues(v => ({ ...v, [field]: newVal }));
-          }
-        }}
+      <Input className="h-7 w-24 text-xs" value={val}
+        onChange={e => { if (isFieldValueValid(field, e.target.value)) setEditValues(v => ({ ...v, [field]: e.target.value })); }}
       />
     );
   };
 
+  const renderColumnHeader = (field: string, label: string) => {
+    if (filterableFields.includes(field)) {
+      const options = uniqueValues[field] || [];
+      return (
+        <div className="space-y-1">
+          <span className="text-xs font-semibold whitespace-nowrap">{label}</span>
+          <Select value={filters[field] || '__all__'} onValueChange={v => setFilter(field, v)}>
+            <SelectTrigger className="h-6 text-[10px] w-full min-w-[70px]">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All</SelectItem>
+              {options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+    return <span className="text-xs font-semibold whitespace-nowrap">{label}</span>;
+  };
+
+  const colDefs = [
+    { field: 'batch_number', label: 'Batch No' },
+    { field: 'material', label: 'Material' },
+    { field: 'make', label: 'Make' },
+    { field: 'thickness', label: 'Thickness' },
+    { field: 'width', label: 'Width' },
+    { field: 'length', label: 'Length' },
+    { field: 'coating', label: 'Coating' },
+    { field: 'grade', label: 'Grade' },
+    { field: 'colour', label: 'Colour' },
+    { field: 'gross_weight', label: 'Gross Wt (Kg)' },
+    { field: 'net_weight', label: 'Net Wt (Kg)' },
+    { field: 'coil_number', label: 'Coil No' },
+    { field: 'purchase_date', label: 'Purchase Date' },
+    { field: 'purchase_from', label: 'Purchase From' },
+  ];
+
   return (
     <div className="space-y-4">
+      {/* Top bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1 border rounded-md overflow-hidden">
-          <Button
-            variant={statusFilter === 'in-transit' ? 'default' : 'ghost'}
-            size="sm"
-            className="rounded-none text-xs"
-            onClick={() => { setStatusFilter('in-transit'); setSelectedIds(new Set()); }}
-          >
-            In-Transit
-          </Button>
-          <Button
-            variant={statusFilter === 'received' ? 'default' : 'ghost'}
-            size="sm"
-            className="rounded-none text-xs"
-            onClick={() => { setStatusFilter('received'); setSelectedIds(new Set()); }}
-          >
-            Received
-          </Button>
+          <Button variant={statusFilter === 'in-transit' ? 'default' : 'ghost'} size="sm" className="rounded-none text-xs"
+            onClick={() => { setStatusFilter('in-transit'); setSelectedIds(new Set()); }}>In-Transit</Button>
+          <Button variant={statusFilter === 'received' ? 'default' : 'ghost'} size="sm" className="rounded-none text-xs"
+            onClick={() => { setStatusFilter('received'); setSelectedIds(new Set()); }}>Received</Button>
         </div>
         <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); toast.success('Refreshed'); }} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
-        <Button onClick={() => fileRef.current?.click()} className="gap-2">
-          <Upload className="h-4 w-4" /> Import Excel
-        </Button>
-        <Button variant="outline" onClick={generateTemplate} className="gap-2">
-          <Download className="h-4 w-4" /> Download Template
-        </Button>
+        <Button onClick={() => fileRef.current?.click()} className="gap-2"><Upload className="h-4 w-4" /> Import Excel</Button>
+        <Button variant="outline" onClick={generateTemplate} className="gap-2"><Download className="h-4 w-4" /> Download Template</Button>
         {selectedIds.size > 0 && (
           <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
             <Trash2 className="h-4 w-4" /> Delete Selected ({selectedIds.size})
+          </Button>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Input type="date" className="h-8 w-36 text-xs" value={dateFrom} onChange={e => setDateFrom(e.target.value)} placeholder="From" />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input type="date" className="h-8 w-36 text-xs" value={dateTo} onChange={e => setDateTo(e.target.value)} placeholder="To" />
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2 h-8">
+            <Download className="h-3.5 w-3.5" /> Excel
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary bar */}
+      <div className="flex items-center gap-4 text-sm">
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">Total Net Weight:</span>{' '}
+          <span className="font-semibold font-mono-num">{totalNetWeight.toFixed(2)} Kg</span>
+        </div>
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">Batches:</span>{' '}
+          <span className="font-semibold">{filteredBatches.length}</span>
+        </div>
+        {Object.keys(filters).length > 0 && (
+          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setFilters({})}>
+            <X className="h-3 w-3 mr-1" /> Clear Filters
           </Button>
         )}
       </div>
@@ -210,62 +295,72 @@ export default function InTransitTab() {
               <TableRow className="bg-muted/50">
                 <TableHead className="w-10">
                   <Checkbox
-                    checked={batches && batches.length > 0 && selectedIds.size === batches.length}
+                    checked={filteredBatches.length > 0 && selectedIds.size === filteredBatches.length}
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                {cols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+                {colDefs.map(c => (
+                  <TableHead key={c.field}>{renderColumnHeader(c.field, c.label)}</TableHead>
+                ))}
+                <TableHead><span className="text-xs font-semibold whitespace-nowrap">Transit Days</span></TableHead>
+                <TableHead><span className="text-xs font-semibold whitespace-nowrap">Status</span></TableHead>
+                {!isReceived && <TableHead><span className="text-xs font-semibold whitespace-nowrap">Actions</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {batches?.length === 0 && (
-                <TableRow><TableCell colSpan={cols.length} className="text-center text-muted-foreground py-8">No batches yet. Import an Excel file to get started.</TableCell></TableRow>
+              {filteredBatches.length === 0 && (
+                <TableRow><TableCell colSpan={colDefs.length + 4} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
               )}
-              {batches?.map(b => (
-                <TableRow key={b.id} className={selectedIds.has(b.id) ? 'bg-primary/5' : ''}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(b.id)}
-                      onCheckedChange={() => toggleSelect(b.id)}
-                    />
-                  </TableCell>
-                  {fields.map(f => (
-                    <TableCell key={f} className="whitespace-nowrap text-sm">
-                      {editingId === b.id ? (
-                        renderEditCell(f)
-                      ) : (
-                        <span className={['gross_weight', 'net_weight', 'thickness', 'width', 'length', 'gsm'].includes(f) ? 'font-mono-num' : ''}>
-                          {(b as any)[f] ?? '-'}
-                        </span>
-                      )}
+              {filteredBatches.map(b => {
+                const transitDays = calcTransitDays(b.purchase_date);
+                return (
+                  <TableRow key={b.id} className={selectedIds.has(b.id) ? 'bg-primary/5' : ''}>
+                    <TableCell>
+                      <Checkbox checked={selectedIds.has(b.id)} onCheckedChange={() => toggleSelect(b.id)} />
                     </TableCell>
-                  ))}
-                   <TableCell>
-                     <Badge
-                       variant={b.status === 'received' ? 'default' : 'secondary'}
-                       className={`${!isReceived ? 'cursor-pointer' : ''} ${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
-                       onClick={() => !isReceived && toggleStatus(b)}
-                     >
-                       {b.status === 'received' ? 'Received' : 'In-Transit'}
-                     </Badge>
-                   </TableCell>
-                   {!isReceived && (
-                     <TableCell>
-                       {editingId === b.id ? (
-                         <div className="flex gap-1">
-                           <Button size="sm" variant="ghost" onClick={saveEdit}><Check className="h-3.5 w-3.5 text-success" /></Button>
-                           <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
-                         </div>
-                       ) : (
-                         <div className="flex gap-1">
-                           <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
-                           <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                         </div>
-                       )}
-                     </TableCell>
-                   )}
-                 </TableRow>
-               ))}
+                    {fields.map(f => (
+                      <TableCell key={f} className="whitespace-nowrap text-sm">
+                        {editingId === b.id ? renderEditCell(f) : (
+                          <span className={['gross_weight', 'net_weight', 'thickness', 'width', 'length', 'gsm'].includes(f) ? 'font-mono-num' : ''}>
+                            {(b as any)[f] ?? '-'}
+                          </span>
+                        )}
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-sm font-mono-num">
+                      {transitDays !== null ? (
+                        <Badge variant={transitDays > 7 ? 'destructive' : transitDays > 3 ? 'secondary' : 'default'} className="text-xs">
+                          {transitDays}d
+                        </Badge>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={b.status === 'received' ? 'default' : 'secondary'}
+                        className={`${!isReceived ? 'cursor-pointer' : ''} ${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
+                        onClick={() => !isReceived && toggleStatus(b)}
+                      >
+                        {b.status === 'received' ? 'Received' : 'In-Transit'}
+                      </Badge>
+                    </TableCell>
+                    {!isReceived && (
+                      <TableCell>
+                        {editingId === b.id ? (
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" onClick={saveEdit}><Check className="h-3.5 w-3.5 text-success" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                            <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
