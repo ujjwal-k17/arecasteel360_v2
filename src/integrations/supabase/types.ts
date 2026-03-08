@@ -14,7 +14,193 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      batches: {
+        Row: {
+          batch_number: string
+          coating: string | null
+          coil_number: string | null
+          colour: string | null
+          created_at: string
+          grade: string | null
+          gross_weight: number | null
+          gsm: number | null
+          id: string
+          length: number | null
+          make: string | null
+          material: string | null
+          net_weight: number | null
+          purchase_date: string | null
+          purchase_from: string | null
+          status: string
+          thickness: number | null
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          batch_number: string
+          coating?: string | null
+          coil_number?: string | null
+          colour?: string | null
+          created_at?: string
+          grade?: string | null
+          gross_weight?: number | null
+          gsm?: number | null
+          id?: string
+          length?: number | null
+          make?: string | null
+          material?: string | null
+          net_weight?: number | null
+          purchase_date?: string | null
+          purchase_from?: string | null
+          status?: string
+          thickness?: number | null
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          batch_number?: string
+          coating?: string | null
+          coil_number?: string | null
+          colour?: string | null
+          created_at?: string
+          grade?: string | null
+          gross_weight?: number | null
+          gsm?: number | null
+          id?: string
+          length?: number | null
+          make?: string | null
+          material?: string | null
+          net_weight?: number | null
+          purchase_date?: string | null
+          purchase_from?: string | null
+          status?: string
+          thickness?: number | null
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
+      defective_sales: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          id: string
+          invoice_number: string | null
+          order_id: string | null
+          quantity: number | null
+          sales_date: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_number?: string | null
+          order_id?: string | null
+          quantity?: number | null
+          sales_date?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_number?: string | null
+          order_id?: string | null
+          quantity?: number | null
+          sales_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "defective_sales_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_actions: {
+        Row: {
+          action_type: string
+          batch_id: string
+          created_at: string
+          defect_type: string | null
+          gross_weight: number | null
+          id: string
+          invoice_number: string | null
+          net_weight: number | null
+          order_id: string | null
+          sales_date: string | null
+          scrap_type: string | null
+        }
+        Insert: {
+          action_type: string
+          batch_id: string
+          created_at?: string
+          defect_type?: string | null
+          gross_weight?: number | null
+          id?: string
+          invoice_number?: string | null
+          net_weight?: number | null
+          order_id?: string | null
+          sales_date?: string | null
+          scrap_type?: string | null
+        }
+        Update: {
+          action_type?: string
+          batch_id?: string
+          created_at?: string
+          defect_type?: string | null
+          gross_weight?: number | null
+          id?: string
+          invoice_number?: string | null
+          net_weight?: number | null
+          order_id?: string | null
+          sales_date?: string | null
+          scrap_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_actions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scrap_sales: {
+        Row: {
+          amount_received: number | null
+          created_at: string
+          id: string
+          material: string | null
+          qty_sold: number | null
+          sales_date: string | null
+          scrap_type: string
+          weight_slip_url: string | null
+        }
+        Insert: {
+          amount_received?: number | null
+          created_at?: string
+          id?: string
+          material?: string | null
+          qty_sold?: number | null
+          sales_date?: string | null
+          scrap_type: string
+          weight_slip_url?: string | null
+        }
+        Update: {
+          amount_received?: number | null
+          created_at?: string
+          id?: string
+          material?: string | null
+          qty_sold?: number | null
+          sales_date?: string | null
+          scrap_type?: string
+          weight_slip_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
