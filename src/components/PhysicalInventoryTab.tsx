@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, useDeleteBatch, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, useDeleteBatch, useBulkDeleteBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,7 @@ export default function PhysicalInventoryTab() {
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const deleteBatch = useDeleteBatch();
+  const bulkDelete = useBulkDeleteBatches();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addMode, setAddMode] = useState<'new' | 'import' | null>(null);
@@ -41,6 +43,7 @@ export default function PhysicalInventoryTab() {
   const [actionType, setActionType] = useState<'sales' | 'defective' | 'scrap' | null>(null);
   const [selectedImportIds, setSelectedImportIds] = useState<Set<string>>(new Set());
   const [importSearch, setImportSearch] = useState('');
+  const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
 
   const [newBatch, setNewBatch] = useState({
     batch_number: '', material: '', make: '', thickness: '', width: '', length: '',
@@ -71,6 +74,35 @@ export default function PhysicalInventoryTab() {
       coating: first.coating, grade: first.grade, totalNetWeight, totalBalanceQty,
     });
   });
+
+  const toggleBatchSelect = (id: string) => {
+    setSelectedBatchIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllInSKU = (group: SKUGroup) => {
+    const allSelected = group.batches.every(b => selectedBatchIds.has(b.id));
+    setSelectedBatchIds(prev => {
+      const next = new Set(prev);
+      group.batches.forEach(b => {
+        if (allSelected) next.delete(b.id); else next.add(b.id);
+      });
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedBatchIds.size === 0) return;
+    if (!confirm(`Delete ${selectedBatchIds.size} selected batch(es)?`)) return;
+    try {
+      await bulkDelete.mutateAsync(Array.from(selectedBatchIds));
+      toast.success(`${selectedBatchIds.size} batch(es) deleted`);
+      setSelectedBatchIds(new Set());
+    } catch { toast.error('Failed to delete'); }
+  };
 
   const handleAddNew = async () => {
     try {
@@ -124,7 +156,6 @@ export default function PhysicalInventoryTab() {
   const updateNewBatch = (key: string, value: string) => {
     setNewBatch(prev => {
       const next = { ...prev, [key]: value };
-      // Reset dependent fields when material changes
       if (key === 'material') {
         next.coating = '';
         next.grade = '';
@@ -158,7 +189,7 @@ export default function PhysicalInventoryTab() {
   };
 
   const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Physical Inv (Kg)', 'Total Inv (Kg)'];
-  const batchCols = ['Material', 'Make', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  const batchCols = ['', 'Material', 'Make', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
@@ -169,6 +200,11 @@ export default function PhysicalInventoryTab() {
         <Button onClick={() => { setShowAddDialog(true); setAddMode(null); }} className="gap-2">
           <Plus className="h-4 w-4" /> Add New Item
         </Button>
+        {selectedBatchIds.size > 0 && (
+          <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
+            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
+          </Button>
+        )}
       </div>
 
       {/* SKU Summary */}
@@ -204,12 +240,24 @@ export default function PhysicalInventoryTab() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              {batchCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+                              <TableHead className="w-10">
+                                <Checkbox
+                                  checked={g.batches.length > 0 && g.batches.every(b => selectedBatchIds.has(b.id))}
+                                  onCheckedChange={() => toggleSelectAllInSKU(g)}
+                                />
+                              </TableHead>
+                              {batchCols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {g.batches.map(b => (
-                              <TableRow key={b.id}>
+                              <TableRow key={b.id} className={selectedBatchIds.has(b.id) ? 'bg-primary/5' : ''}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedBatchIds.has(b.id)}
+                                    onCheckedChange={() => toggleBatchSelect(b.id)}
+                                  />
+                                </TableCell>
                                 <TableCell className="text-sm">{b.material || '-'}</TableCell>
                                 <TableCell className="text-sm">{b.make || '-'}</TableCell>
                                 <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
