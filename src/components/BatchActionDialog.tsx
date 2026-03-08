@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { FORMS } from '@/lib/inventory-options';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 const SCRAP_TYPES = ['End Pcs', 'Trimming', 'Metal Cover', 'Non metal cover', 'Short qty'];
@@ -24,6 +25,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
   const [orderId, setOrderId] = useState('');
   const [salesDate, setSalesDate] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [salesForm, setSalesForm] = useState((batch as any).form || '');
   const [netWeight, setNetWeight] = useState('');
   const [grossWeight, setGrossWeight] = useState('');
 
@@ -99,6 +101,15 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
             <div><Label className="text-xs">Order ID</Label><Input value={orderId} onChange={e => setOrderId(e.target.value)} /></div>
             <div><Label className="text-xs">Sales Date</Label><Input type="date" value={salesDate} onChange={e => setSalesDate(e.target.value)} /></div>
             <div><Label className="text-xs">Invoice Number</Label><Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} /></div>
+            <div>
+              <Label className="text-xs">Form</Label>
+              <Select value={salesForm} onValueChange={setSalesForm}>
+                <SelectTrigger><SelectValue placeholder="Select form" /></SelectTrigger>
+                <SelectContent>
+                  {FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label className="text-xs">Net Weight (Kg)</Label><Input type="number" value={netWeight} onChange={e => setNetWeight(e.target.value)} /></div>
             <div><Label className="text-xs">Gross Weight (Kg)</Label><Input type="number" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} /></div>
           </div>
