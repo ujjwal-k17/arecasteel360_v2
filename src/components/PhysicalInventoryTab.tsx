@@ -272,7 +272,7 @@ export default function PhysicalInventoryTab() {
               ))}
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <Button variant="ghost" onClick={() => { setAddMode(null); setSelectedImportIds(new Set()); }}>← Back</Button>
+                <Button variant="ghost" onClick={() => { setAddMode(null); setSelectedImportIds(new Set()); setImportSearch(''); }}>← Back</Button>
                 <Button disabled={selectedImportIds.size === 0} onClick={() => handleImportFromTransit(Array.from(selectedImportIds))}>
                   Import {selectedImportIds.size > 0 ? `(${selectedImportIds.size})` : ''}
                 </Button>
