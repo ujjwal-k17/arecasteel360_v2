@@ -50,8 +50,7 @@ export default function WIPInventoryTab() {
                   <TableCell className="text-sm">{item.material || '-'}</TableCell>
                   <TableCell className="text-sm">{item.make || '-'}</TableCell>
                   <TableCell className="text-sm">{item.process || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num">{item.width ?? '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num">{item.length ?? '-'}</TableCell>
+                  <TableCell className="text-sm font-mono-num whitespace-nowrap">{formatDimensions(item)}</TableCell>
                   <TableCell className="text-sm">{item.coating || '-'}</TableCell>
                   <TableCell className="text-sm">{item.grade || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{item.qty ?? '-'}</TableCell>
