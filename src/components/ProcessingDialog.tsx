@@ -199,7 +199,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </Select>
             </div>
             )}
-            </div>
 
             {/* Coil Processed - Full or Partial */}
             <div>
