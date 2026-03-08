@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, useDeleteBatch, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
