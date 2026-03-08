@@ -23,7 +23,7 @@ interface Props {
 
 export default function ProcessingDialog({ batch, allActions, processingRecords, open, onClose }: Props) {
   const insertProcessing = useInsertProcessing();
-  const batchStatus = (batch as any).batch_status || (batch as any).form || 'Pack coil';
+  const _batchStatus = (batch as any).batch_status || (batch as any).form || 'Pack coil';
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
   const coilWidth = batch.width || 0;
 
