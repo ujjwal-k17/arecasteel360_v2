@@ -1,0 +1,1 @@
+ALTER TABLE public.processing_records ADD COLUMN source_type text NOT NULL DEFAULT 'coil';

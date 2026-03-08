@@ -186,6 +186,7 @@ export function useWIPProcessing() {
           output_type: 'FG',
           input_qty: totalQty,
           order_id: params.orderId || null,
+          source_type: 'wip',
         })
         .select()
         .single();
