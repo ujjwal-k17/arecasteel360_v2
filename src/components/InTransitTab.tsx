@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2, Filter } from 'lucide-react';
+import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 import { isFieldValueValid } from '@/lib/field-validation';
@@ -32,9 +32,7 @@ export default function InTransitTab() {
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Column filters
   const [filters, setFilters] = useState<Record<string, string>>({});
-  // Date range filter
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -47,7 +45,6 @@ export default function InTransitTab() {
     });
   };
 
-  // Filtered batches
   const filteredBatches = useMemo(() => {
     if (!batches) return [];
     return batches.filter(b => {
@@ -62,13 +59,11 @@ export default function InTransitTab() {
     });
   }, [batches, filters, dateFrom, dateTo]);
 
-  // Total in-transit net weight
   const totalNetWeight = useMemo(() => filteredBatches.reduce((s, b) => s + (b.net_weight || 0), 0), [filteredBatches]);
 
-  // Unique values for column filters
   const uniqueValues = useMemo(() => {
     if (!batches) return {} as Record<string, string[]>;
-    const fields = ['material', 'make', 'coating', 'grade', 'colour', 'purchase_from'];
+    const fields = ['material', 'make', 'coating', 'grade', 'purchase_from'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
       const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
@@ -77,10 +72,17 @@ export default function InTransitTab() {
     return result;
   }, [batches]);
 
-  const calcTransitDays = (purchaseDate: string | null): number | null => {
-    if (!purchaseDate) return null;
+  const isReceived = statusFilter === 'received';
+
+  const calcTransitDays = (batch: any): number | null => {
+    if (!batch.purchase_date) return null;
     try {
-      return differenceInDays(new Date(), parseISO(purchaseDate));
+      if (isReceived && batch.updated_at) {
+        // For received: updated_at (when moved to received) minus purchase_date
+        return differenceInDays(new Date(batch.updated_at), parseISO(batch.purchase_date));
+      }
+      // For in-transit: today minus purchase_date
+      return differenceInDays(new Date(), parseISO(batch.purchase_date));
     } catch { return null; }
   };
 
@@ -125,7 +127,7 @@ export default function InTransitTab() {
         thickness: r.thickness || null, width: r.width || null,
         length: r.length != null ? String(r.length) : null,
         coating: r.coating || null, grade: r.grade || null, gsm: r.gsm || null,
-        colour: r.colour || null, gross_weight: r.gross_weight || null, net_weight: r.net_weight || null,
+        gross_weight: r.gross_weight || null, net_weight: r.net_weight || null,
         coil_number: r.coil_number || null, purchase_date: r.purchase_date || null, purchase_from: r.purchase_from || null,
       })));
       toast.success(`${newRows.length} batches imported${duplicateCount > 0 ? `, ${duplicateCount} duplicates skipped` : ''}`);
@@ -141,11 +143,11 @@ export default function InTransitTab() {
     const rows = filteredBatches.map(b => ({
       'Batch No': b.batch_number, 'Material': b.material || '', 'Make': b.make || '',
       'Thickness': b.thickness ?? '', 'Width': b.width ?? '', 'Length': b.length ?? '',
-      'Coating': b.coating || '', 'Grade': b.grade || '', 'Colour': b.colour || '',
+      'Coating': b.coating || '', 'Grade': b.grade || '',
       'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
       'Coil No': b.coil_number || '', 'Purchase Date': b.purchase_date || '',
       'Purchase From': b.purchase_from || '',
-      'Transit Days': calcTransitDays(b.purchase_date) ?? '',
+      'Transit Days': calcTransitDays(b) ?? '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -171,9 +173,8 @@ export default function InTransitTab() {
     toast.success(`Status changed to ${newStatus}`);
   };
 
-  const isReceived = statusFilter === 'received';
-  const fields = ['batch_number', 'material', 'make', 'thickness', 'width', 'length', 'coating', 'grade', 'colour', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
-  const filterableFields = ['material', 'make', 'coating', 'grade', 'colour', 'purchase_from'];
+  const fields = ['batch_number', 'material', 'make', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
+  const filterableFields = ['material', 'make', 'coating', 'grade', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
     const val = String((editValues as any)[field] ?? '');
@@ -227,7 +228,6 @@ export default function InTransitTab() {
     { field: 'length', label: 'Length' },
     { field: 'coating', label: 'Coating' },
     { field: 'grade', label: 'Grade' },
-    { field: 'colour', label: 'Colour' },
     { field: 'gross_weight', label: 'Gross Wt (Kg)' },
     { field: 'net_weight', label: 'Net Wt (Kg)' },
     { field: 'coil_number', label: 'Coil No' },
@@ -248,10 +248,14 @@ export default function InTransitTab() {
         <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); toast.success('Refreshed'); }} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
-        <Button onClick={() => fileRef.current?.click()} className="gap-2"><Upload className="h-4 w-4" /> Import Excel</Button>
-        <Button variant="outline" onClick={generateTemplate} className="gap-2"><Download className="h-4 w-4" /> Download Template</Button>
-        {selectedIds.size > 0 && (
+        {!isReceived && (
+          <>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+            <Button onClick={() => fileRef.current?.click()} className="gap-2"><Upload className="h-4 w-4" /> Import Excel</Button>
+            <Button variant="outline" onClick={generateTemplate} className="gap-2"><Download className="h-4 w-4" /> Download Template</Button>
+          </>
+        )}
+        {!isReceived && selectedIds.size > 0 && (
           <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
             <Trash2 className="h-4 w-4" /> Delete Selected ({selectedIds.size})
           </Button>
@@ -293,12 +297,14 @@ export default function InTransitTab() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={filteredBatches.length > 0 && selectedIds.size === filteredBatches.length}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </TableHead>
+                {!isReceived && (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={filteredBatches.length > 0 && selectedIds.size === filteredBatches.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                )}
                 {colDefs.map(c => (
                   <TableHead key={c.field}>{renderColumnHeader(c.field, c.label)}</TableHead>
                 ))}
@@ -309,15 +315,17 @@ export default function InTransitTab() {
             </TableHeader>
             <TableBody>
               {filteredBatches.length === 0 && (
-                <TableRow><TableCell colSpan={colDefs.length + 4} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={colDefs.length + (isReceived ? 2 : 4)} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
               )}
               {filteredBatches.map(b => {
-                const transitDays = calcTransitDays(b.purchase_date);
+                const transitDays = calcTransitDays(b);
                 return (
                   <TableRow key={b.id} className={selectedIds.has(b.id) ? 'bg-primary/5' : ''}>
-                    <TableCell>
-                      <Checkbox checked={selectedIds.has(b.id)} onCheckedChange={() => toggleSelect(b.id)} />
-                    </TableCell>
+                    {!isReceived && (
+                      <TableCell>
+                        <Checkbox checked={selectedIds.has(b.id)} onCheckedChange={() => toggleSelect(b.id)} />
+                      </TableCell>
+                    )}
                     {fields.map(f => (
                       <TableCell key={f} className="whitespace-nowrap text-sm">
                         {editingId === b.id ? renderEditCell(f) : (
