@@ -124,10 +124,13 @@ export function useInsertAction() {
   });
 }
 
-// Updated formulas:
-// Processed Qty = all material removed: sales + scrap + defective + pack_coil_sale + processing input
-// Usable = GW + 80 - Processed Qty
-// Balance = GW + 80 - Processed Qty + Defective Qty (defective is physically present)
+// Formulas:
+// If Pack Coil Sale > 0:
+//   Usable Inventory = Gross Weight + 80 - Gross Weight - 80 = 0
+//   Balance Qty      = Gross Weight + 80 - Gross Weight - 80 = 0
+// If not:
+//   Usable Inventory = Gross Weight + 80 - Processed Qty (incl. scrap & defective)
+//   Balance Qty      = Gross Weight + 80 - Processed Qty (incl. scrap & defective) + Defective Qty
 
 export function isPackCoilSold(batch: Batch, actions: InventoryAction[]): boolean {
   return actions.some(a => a.batch_id === batch.id && a.action_type === 'pack_coil_sale');
@@ -145,17 +148,19 @@ export function calcProcessedQty(batch: Batch, actions: InventoryAction[], proce
 }
 
 export function calcUsableBalanceQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
-  if (isPackCoilSold(batch, actions)) return 0;
-  return (batch.gross_weight || 0) + 80 - calcProcessedQty(batch, actions, processingRecords);
+  const gw = batch.gross_weight || 0;
+  if (isPackCoilSold(batch, actions)) return gw + 80 - gw - 80; // = 0
+  return gw + 80 - calcProcessedQty(batch, actions, processingRecords);
 }
 
 export function calcBalanceQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
-  if (isPackCoilSold(batch, actions)) return 0;
+  const gw = batch.gross_weight || 0;
+  if (isPackCoilSold(batch, actions)) return gw + 80 - gw - 80; // = 0
   const batchActions = actions.filter(a => a.batch_id === batch.id);
   const defectiveQty = batchActions
     .filter(a => a.action_type === 'defective')
     .reduce((sum, a) => sum + (a.net_weight || 0), 0);
-  return calcUsableBalanceQty(batch, actions, processingRecords) + defectiveQty;
+  return gw + 80 - calcProcessedQty(batch, actions, processingRecords) + defectiveQty;
 }
 
 // SKU key
