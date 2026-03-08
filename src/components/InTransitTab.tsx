@@ -63,7 +63,7 @@ export default function InTransitTab() {
 
   const uniqueValues = useMemo(() => {
     if (!batches) return {} as Record<string, string[]>;
-    const fields = ['material', 'make', 'coating', 'grade', 'purchase_from'];
+    const fields = ['material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
       const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
