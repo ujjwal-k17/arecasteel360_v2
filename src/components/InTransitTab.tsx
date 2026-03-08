@@ -168,7 +168,10 @@ export default function InTransitTab() {
                         <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
                       </div>
                     ) : (
-                      <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                        <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
