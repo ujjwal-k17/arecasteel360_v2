@@ -392,8 +392,8 @@ export default function CoilsInventoryTab() {
                                       <div className="flex gap-1">
                                         <Button
                                           size="sm" variant="outline" className="text-xs h-7"
-                                          disabled={isSold}
-                                          title={isSold ? 'Already sold' : ''}
+                                          disabled={isSold || status === 'loose'}
+                                          title={isSold ? 'Already sold' : status === 'loose' ? 'Loose coil — not available for pack sale' : ''}
                                           onClick={(e) => { e.stopPropagation(); setPackCoilBatch(b); }}
                                         >
                                           Pack Coil Sale

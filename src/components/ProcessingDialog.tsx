@@ -172,6 +172,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 <span className="text-xs">{batch.material || '-'}</span>
                 <span className="text-muted-foreground text-xs">Grade:</span>
                 <span className="text-xs">{batch.grade || '-'}</span>
+                <span className="text-muted-foreground text-xs">Coating:</span>
+                <span className="text-xs">{batch.coating || '-'}</span>
                 <span className="text-muted-foreground text-xs">Usable Qty:</span>
                 <span className="text-xs font-mono-num font-semibold">{usableQty.toFixed(2)} Kg</span>
               </div>
@@ -180,7 +182,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             {/* Process Type */}
             <div>
               <Label className="text-xs">Process</Label>
-              <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); if (v === 'CTL') setOutputType('FG'); else setOutputType(''); }}>
+              <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); if (v === 'Slit') setOutputType(''); else setOutputType('FG'); }}>
                 <SelectTrigger><SelectValue placeholder="Select process" /></SelectTrigger>
                 <SelectContent>
                   {PROCESSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -188,8 +190,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </Select>
             </div>
 
-            {/* Output Type - hidden for CTL (always FG) */}
-            {processType !== 'CTL' && (
+            {/* Output Type - only for Slit */}
+            {processType === 'Slit' && (
             <div>
               <Label className="text-xs">Output Type</Label>
               <Select value={outputType} onValueChange={setOutputType}>
