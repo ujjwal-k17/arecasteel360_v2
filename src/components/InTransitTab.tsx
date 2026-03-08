@@ -29,7 +29,18 @@ export default function InTransitTab() {
     try {
       const rows = await parseExcelFile(file);
       if (rows.length === 0) { toast.error('No valid rows found'); return; }
-      await insertBatches.mutateAsync(rows.map(r => ({
+
+      // Get existing batch numbers to filter duplicates
+      const existingBatchNumbers = new Set((batches || []).map(b => b.batch_number));
+      const newRows = rows.filter(r => !existingBatchNumbers.has(r.batch_number));
+      const duplicateCount = rows.length - newRows.length;
+
+      if (newRows.length === 0) {
+        toast.info(`All ${rows.length} batches already exist — skipped`);
+        return;
+      }
+
+      await insertBatches.mutateAsync(newRows.map(r => ({
         batch_number: r.batch_number,
         material: r.material || null,
         make: r.make || null,
@@ -46,7 +57,7 @@ export default function InTransitTab() {
         purchase_date: r.purchase_date || null,
         purchase_from: r.purchase_from || null,
       })));
-      toast.success(`${rows.length} batches imported`);
+      toast.success(`${newRows.length} batches imported${duplicateCount > 0 ? `, ${duplicateCount} duplicates skipped` : ''}`);
     } catch (err) {
       console.error('Import error:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to parse file');
