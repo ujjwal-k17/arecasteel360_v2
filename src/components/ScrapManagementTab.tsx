@@ -57,7 +57,13 @@ export default function ScrapManagementTab() {
   };
 
   return (
-    <Tabs defaultValue="inventory">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['inventory_actions'] }); queryClient.invalidateQueries({ queryKey: ['scrap_sales'] }); toast.success('Refreshed'); }} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
+      </div>
+      <Tabs defaultValue="inventory">
       <TabsList>
         <TabsTrigger value="inventory">Scrap Inventory</TabsTrigger>
         <TabsTrigger value="sold">Sold Scrap</TabsTrigger>
