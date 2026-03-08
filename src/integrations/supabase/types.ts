@@ -283,6 +283,7 @@ export type Database = {
           order_id: string | null
           output_type: string
           process_type: string
+          source_type: string
         }
         Insert: {
           batch_id: string
@@ -292,6 +293,7 @@ export type Database = {
           order_id?: string | null
           output_type: string
           process_type: string
+          source_type?: string
         }
         Update: {
           batch_id?: string
@@ -301,6 +303,7 @@ export type Database = {
           order_id?: string | null
           output_type?: string
           process_type?: string
+          source_type?: string
         }
         Relationships: [
           {
