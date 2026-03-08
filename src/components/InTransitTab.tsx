@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Edit2, Check, X, RefreshCw } from 'lucide-react';
+import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 
