@@ -60,7 +60,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     return defectEntries.reduce((sum, d) => sum + (Number(d.weight) || 0), 0);
   }, [defectEntries]);
 
-  const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal;
+  const looseCoilSaleTotal = Number(looseCoilSaleQty) || 0;
+  const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal + looseCoilSaleTotal;
 
   // Processing qty depends on Full/Partial selection
   const baseProcessingQty = Math.max(0, usableQty - inlineDeductions);
