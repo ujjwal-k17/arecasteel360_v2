@@ -16,7 +16,7 @@ import { isFieldValueValid } from '@/lib/field-validation';
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 
 export default function InTransitTab() {
-  const { data: batches, isLoading } = useBatches();
+  const { data: batches, isLoading } = useBatches('in-transit');
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
   const deleteBatch = useDeleteBatch();
