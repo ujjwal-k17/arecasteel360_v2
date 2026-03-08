@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAllActions } from '@/hooks/useBatches';
+import { useQueryClient } from '@tanstack/react-query';
 import { useScrapSales, useInsertScrapSale } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
