@@ -40,6 +40,7 @@ export default function PhysicalInventoryTab() {
   const [actionBatch, setActionBatch] = useState<Batch | null>(null);
   const [actionType, setActionType] = useState<'sales' | 'defective' | 'scrap' | null>(null);
   const [selectedImportIds, setSelectedImportIds] = useState<Set<string>>(new Set());
+  const [importSearch, setImportSearch] = useState('');
 
   const [newBatch, setNewBatch] = useState({
     batch_number: '', material: '', make: '', thickness: '', width: '', length: '',
