@@ -11,7 +11,15 @@ export default function FGInventoryTab() {
 
   const items = fgItems || [];
 
-  const cols = ['Material', 'Make', 'Process', 'Width', 'Length', 'Coating', 'Grade', 'Qty (Kg)', '# Pcs', 'Order ID'];
+  const cols = ['Material', 'Make', 'Process', 'Dimensions', 'Coating', 'Grade', 'Qty (Kg)', '# Pcs', 'Order ID'];
+
+  const formatDimensions = (item: any) => {
+    const t = item.thickness ?? '-';
+    const w = item.width ?? '-';
+    const isSlit = (item.process || '').toLowerCase().includes('slit');
+    const l = isSlit ? 'Coil' : (item.length ?? '-');
+    return `${t} x ${w} x ${l}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -37,8 +45,7 @@ export default function FGInventoryTab() {
                 <TableCell className="text-sm">{item.material || '-'}</TableCell>
                 <TableCell className="text-sm">{item.make || '-'}</TableCell>
                 <TableCell className="text-sm">{item.process || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{item.width ?? '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{item.length ?? '-'}</TableCell>
+                <TableCell className="text-sm font-mono-num whitespace-nowrap">{formatDimensions(item)}</TableCell>
                 <TableCell className="text-sm">{item.coating || '-'}</TableCell>
                 <TableCell className="text-sm">{item.grade || '-'}</TableCell>
                 <TableCell className="text-sm font-mono-num font-semibold">{item.qty ?? '-'}</TableCell>
