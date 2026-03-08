@@ -1,0 +1,1 @@
+ALTER TABLE public.fg_items ADD COLUMN thickness numeric DEFAULT NULL;

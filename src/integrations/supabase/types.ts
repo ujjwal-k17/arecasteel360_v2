@@ -140,6 +140,7 @@ export type Database = {
           qty: number | null
           source_id: string | null
           source_type: string | null
+          thickness: number | null
           width: number | null
         }
         Insert: {
@@ -157,6 +158,7 @@ export type Database = {
           qty?: number | null
           source_id?: string | null
           source_type?: string | null
+          thickness?: number | null
           width?: number | null
         }
         Update: {
@@ -174,6 +176,7 @@ export type Database = {
           qty?: number | null
           source_id?: string | null
           source_type?: string | null
+          thickness?: number | null
           width?: number | null
         }
         Relationships: [
