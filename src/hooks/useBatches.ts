@@ -79,6 +79,22 @@ export function useUpdateBatch() {
   });
 }
 
+export function useDeleteBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Delete related actions first
+      await supabase.from('inventory_actions').delete().eq('batch_id', id);
+      const { error } = await supabase.from('batches').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['batches'] });
+      qc.invalidateQueries({ queryKey: ['inventory_actions'] });
+    },
+  });
+}
+
 export function useInsertAction() {
   const qc = useQueryClient();
   return useMutation({

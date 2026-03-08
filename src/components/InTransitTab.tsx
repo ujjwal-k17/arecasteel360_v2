@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useBatches, useInsertBatches, useUpdateBatch } from '@/hooks/useBatches';
+import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Edit2, Check, X, RefreshCw } from 'lucide-react';
+import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 
@@ -17,6 +17,7 @@ export default function InTransitTab() {
   const { data: batches, isLoading } = useBatches();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
+  const deleteBatch = useDeleteBatch();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -167,7 +168,10 @@ export default function InTransitTab() {
                         <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
                       </div>
                     ) : (
-                      <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                        <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
