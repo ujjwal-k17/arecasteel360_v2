@@ -246,8 +246,8 @@ export default function PhysicalInventoryTab() {
           <Plus className="h-4 w-4" /> Add New Item
         </Button>
         {selectedBatchIds.size > 0 && (
-          <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
-            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
+          <Button variant="secondary" size="sm" onClick={handleBulkRevert} className="gap-2">
+            <Undo2 className="h-4 w-4" /> Move to In-Transit ({selectedBatchIds.size})
           </Button>
         )}
       </div>
