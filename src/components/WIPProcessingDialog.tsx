@@ -78,6 +78,16 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
     }
   };
 
+  const estWeights = useMemo(() => {
+    return ctlLengths.map(s => {
+      const t = wipItem.thickness || 0;
+      const w = wipItem.width || 0;
+      const l = Number(s.length) || 0;
+      const pcs = Number(s.pcs) || 0;
+      return t * w * l * pcs * 0.00000785;
+    });
+  }, [ctlLengths, wipItem.thickness, wipItem.width]);
+
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
@@ -86,9 +96,23 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="bg-muted/50 rounded-md p-3 text-sm">
-            <span className="text-muted-foreground">Available Qty:</span>{' '}
-            <span className="font-semibold font-mono-num">{wipItem.qty} Kg</span>
+          {/* Coil Details */}
+          <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
+            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Coil Details</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <span className="text-muted-foreground text-xs">Dimensions:</span>
+              <span className="text-xs font-mono-num">{wipItem.thickness ?? '-'} × {wipItem.width ?? '-'} mm</span>
+              <span className="text-muted-foreground text-xs">Material:</span>
+              <span className="text-xs">{wipItem.material || '-'}</span>
+              <span className="text-muted-foreground text-xs">Grade:</span>
+              <span className="text-xs">{wipItem.grade || '-'}</span>
+              <span className="text-muted-foreground text-xs">Coating:</span>
+              <span className="text-xs">{wipItem.coating || '-'}</span>
+              <span className="text-muted-foreground text-xs">Make:</span>
+              <span className="text-xs">{wipItem.make || '-'}</span>
+              <span className="text-muted-foreground text-xs">Available Qty:</span>
+              <span className="text-xs font-mono-num font-semibold">{wipItem.qty} Kg</span>
+            </div>
           </div>
 
           {/* Defective Section — Multiple entries */}
