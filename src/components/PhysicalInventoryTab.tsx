@@ -31,7 +31,7 @@ const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_weight', 'gsm'];
 
 const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
-  'batch_number', 'material', 'make', 'thickness', 'width', 'length',
+  'batch_number', 'material', 'make', 'thickness', 'width',
   'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number',
   'purchase_date', 'purchase_from',
 ];
