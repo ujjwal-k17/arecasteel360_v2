@@ -38,8 +38,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [showScrap, setShowScrap] = useState(false);
   const [showDefective, setShowDefective] = useState(false);
 
-  const isPackCoil = batchStatus === 'Pack coil' || batchStatus === 'Pack Coil';
-  const effectiveInputQty = isPackCoil ? usableQty : (inputQty ? Number(inputQty) : 0);
+  const effectiveInputQty = coilProcessed === 'full' ? usableQty : (inputQty ? Number(inputQty) : 0);
 
   // Auto-calculate slit quantities when widths change
   const autoCalcSlitWidths = useMemo(() => {
