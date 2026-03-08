@@ -64,6 +64,11 @@ export default function DefectiveManagementTab() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); queryClient.invalidateQueries({ queryKey: ['inventory_actions'] }); queryClient.invalidateQueries({ queryKey: ['defective_sales'] }); toast.success('Refreshed'); }} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
+      </div>
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
