@@ -149,5 +149,6 @@ export default function ScrapManagementTab() {
         </DialogContent>
       </Dialog>
     </Tabs>
+    </div>
   );
 }
