@@ -332,17 +332,34 @@ export default function PhysicalInventoryTab() {
             </div>
           ) : addMode === 'import' ? (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Select batches to move to physical inventory:</p>
+              <p className="text-sm text-muted-foreground">Select batches to move to physical inventory. Only batches with all required fields filled can be imported.</p>
               <Input placeholder="Search batch number..." value={importSearch} onChange={e => setImportSearch(e.target.value)} className="h-8 text-sm" />
               {inTransitBatches.length === 0 && <p className="text-sm text-muted-foreground">No in-transit batches available.</p>}
               <div className="max-h-60 overflow-y-auto space-y-1">
-              {inTransitBatches.filter(b => !importSearch || b.batch_number.toLowerCase().includes(importSearch.toLowerCase())).map(b => (
-                <div key={b.id} className={`flex items-center gap-2 p-2 border rounded cursor-pointer ${selectedImportIds.has(b.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted/30'}`} onClick={() => toggleImportSelection(b.id)}>
-                  <input type="checkbox" checked={selectedImportIds.has(b.id)} readOnly className="accent-primary" />
-                  <span className="text-sm font-medium flex-1">{b.batch_number} — {b.material} {b.make}</span>
-                  <span className="text-xs text-muted-foreground font-mono-num">{b.net_weight} Kg</span>
-                </div>
-              ))}
+              {inTransitBatches.filter(b => !importSearch || b.batch_number.toLowerCase().includes(importSearch.toLowerCase())).map(b => {
+                const complete = isBatchComplete(b);
+                const missing = getMissingFields(b);
+                const isDuplicate = existingBatchNumbers.has(b.batch_number);
+                return (
+                  <div
+                    key={b.id}
+                    className={`flex items-center gap-2 p-2 border rounded ${
+                      isDuplicate ? 'opacity-50 cursor-not-allowed border-destructive/30' :
+                      !complete ? 'opacity-70 cursor-not-allowed border-warning/30' :
+                      selectedImportIds.has(b.id) ? 'bg-primary/10 border-primary cursor-pointer' : 'hover:bg-muted/30 cursor-pointer'
+                    }`}
+                    onClick={() => { if (complete && !isDuplicate) toggleImportSelection(b.id); }}
+                  >
+                    <input type="checkbox" checked={selectedImportIds.has(b.id)} readOnly className="accent-primary" disabled={!complete || isDuplicate} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium">{b.batch_number} — {b.material} {b.make}</span>
+                      {isDuplicate && <p className="text-xs text-destructive">Duplicate — already in inventory</p>}
+                      {!complete && !isDuplicate && <p className="text-xs text-warning">Missing: {missing.join(', ')}</p>}
+                    </div>
+                    <span className="text-xs text-muted-foreground font-mono-num">{b.net_weight} Kg</span>
+                  </div>
+                );
+              })}
               </div>
               <div className="flex items-center gap-2 mt-3">
                 <Button variant="ghost" onClick={() => { setAddMode(null); setSelectedImportIds(new Set()); setImportSearch(''); }}>← Back</Button>
