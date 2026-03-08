@@ -17,11 +17,8 @@ export function isFieldValueValid(field: string, value: string): boolean {
       if (!/^-?\d*\.?\d{0,3}$/.test(value)) return false;
       return !isNaN(Number(value));
     }
-    case 'length': {
-      // Allow "C" / "c" or a numeric value
-      if (/^[cC]$/.test(value)) return true;
-      return /^\d*\.?\d*$/.test(value) && !isNaN(Number(value));
-    }
+    case 'length':
+      return true;
     case 'gross_weight':
     case 'net_weight': {
       // Integer only – no decimal point allowed
