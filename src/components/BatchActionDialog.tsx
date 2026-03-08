@@ -101,6 +101,15 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
             <div><Label className="text-xs">Order ID</Label><Input value={orderId} onChange={e => setOrderId(e.target.value)} /></div>
             <div><Label className="text-xs">Sales Date</Label><Input type="date" value={salesDate} onChange={e => setSalesDate(e.target.value)} /></div>
             <div><Label className="text-xs">Invoice Number</Label><Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} /></div>
+            <div>
+              <Label className="text-xs">Form</Label>
+              <Select value={salesForm} onValueChange={setSalesForm}>
+                <SelectTrigger><SelectValue placeholder="Select form" /></SelectTrigger>
+                <SelectContent>
+                  {FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label className="text-xs">Net Weight (Kg)</Label><Input type="number" value={netWeight} onChange={e => setNetWeight(e.target.value)} /></div>
             <div><Label className="text-xs">Gross Weight (Kg)</Label><Input type="number" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} /></div>
           </div>
