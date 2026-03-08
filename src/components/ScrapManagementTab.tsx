@@ -8,8 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface ScrapBatchDetail {
+  batchNumber: string;
+  material: string;
+  scrapType: string;
+  netWeight: number;
+  createdAt: string;
+}
 
 export default function ScrapManagementTab() {
   const { data: actions } = useAllActions();
@@ -18,15 +26,27 @@ export default function ScrapManagementTab() {
   const insertScrapSale = useInsertScrapSale();
   const [sellDialog, setSellDialog] = useState<{ scrapType: string; material: string } | null>(null);
   const [saleForm, setSaleForm] = useState({ qty_sold: '', sales_date: '', amount_received: '' });
+  const [expandedScrapKey, setExpandedScrapKey] = useState<string | null>(null);
+  const [expandedSoldKey, setExpandedSoldKey] = useState<string | null>(null);
 
   // Aggregate scrap by type x material
   const scrapActions = (actions as any[] || []).filter((a: any) => a.action_type === 'scrap');
-  const scrapMap = new Map<string, { scrapType: string; material: string; totalWeight: number }>();
+
+  // Batch-level details for each scrap type x material
+  const scrapMap = new Map<string, { scrapType: string; material: string; totalWeight: number; batches: ScrapBatchDetail[] }>();
   scrapActions.forEach((a: any) => {
     const material = a.batches?.material || 'Unknown';
     const key = `${a.scrap_type}|${material}`;
-    if (!scrapMap.has(key)) scrapMap.set(key, { scrapType: a.scrap_type, material, totalWeight: 0 });
-    scrapMap.get(key)!.totalWeight += a.net_weight || 0;
+    if (!scrapMap.has(key)) scrapMap.set(key, { scrapType: a.scrap_type, material, totalWeight: 0, batches: [] });
+    const entry = scrapMap.get(key)!;
+    entry.totalWeight += a.net_weight || 0;
+    entry.batches.push({
+      batchNumber: a.batches?.batch_number || 'N/A',
+      material,
+      scrapType: a.scrap_type,
+      netWeight: a.net_weight || 0,
+      createdAt: a.created_at,
+    });
   });
 
   // Subtract sold scrap
@@ -38,6 +58,18 @@ export default function ScrapManagementTab() {
   });
 
   const scrapRows = Array.from(scrapMap.values()).filter(r => r.totalWeight > 0);
+
+  // Group sold scrap by scrap_type x material, then by date
+  const soldGroupMap = new Map<string, { scrapType: string; material: string; totalQty: number; totalAmount: number; sales: typeof scrapSales }>();
+  (scrapSales || []).forEach(s => {
+    const key = `${s.scrap_type}|${s.material || 'Unknown'}`;
+    if (!soldGroupMap.has(key)) soldGroupMap.set(key, { scrapType: s.scrap_type, material: s.material || 'Unknown', totalQty: 0, totalAmount: 0, sales: [] });
+    const entry = soldGroupMap.get(key)!;
+    entry.totalQty += s.qty_sold || 0;
+    entry.totalAmount += s.amount_received || 0;
+    (entry.sales as any[]).push(s);
+  });
+  const soldGroups = Array.from(soldGroupMap.values());
 
   const handleSell = async () => {
     if (!sellDialog) return;
@@ -64,91 +96,157 @@ export default function ScrapManagementTab() {
         </Button>
       </div>
       <Tabs defaultValue="inventory">
-      <TabsList>
-        <TabsTrigger value="inventory">Scrap Inventory</TabsTrigger>
-        <TabsTrigger value="sold">Sold Scrap</TabsTrigger>
-      </TabsList>
+        <TabsList>
+          <TabsTrigger value="inventory">Scrap Inventory</TabsTrigger>
+          <TabsTrigger value="sold">Sold Scrap</TabsTrigger>
+        </TabsList>
 
-      <TabsContent value="inventory" className="mt-4">
-        <div className="overflow-x-auto rounded-md border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="text-xs font-semibold">Scrap Type</TableHead>
-                <TableHead className="text-xs font-semibold">Material</TableHead>
-                <TableHead className="text-xs font-semibold">Qty (Kg)</TableHead>
-                <TableHead className="text-xs font-semibold">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {scrapRows.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No scrap data yet.</TableCell></TableRow>
-              )}
-              {scrapRows.map(r => (
-                <TableRow key={`${r.scrapType}-${r.material}`}>
-                  <TableCell className="text-sm">{r.scrapType}</TableCell>
-                  <TableCell className="text-sm">{r.material}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{r.totalWeight.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setSellDialog({ scrapType: r.scrapType, material: r.material })}>
-                      Sell
-                    </Button>
-                  </TableCell>
+        <TabsContent value="inventory" className="mt-4">
+          <div className="overflow-x-auto rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="text-xs font-semibold">Scrap Type</TableHead>
+                  <TableHead className="text-xs font-semibold">Material</TableHead>
+                  <TableHead className="text-xs font-semibold">Qty (Kg)</TableHead>
+                  <TableHead className="text-xs font-semibold">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="sold" className="mt-4">
-        <div className="overflow-x-auto rounded-md border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="text-xs font-semibold">Scrap Type</TableHead>
-                <TableHead className="text-xs font-semibold">Material</TableHead>
-                <TableHead className="text-xs font-semibold">Qty Sold (Kg)</TableHead>
-                <TableHead className="text-xs font-semibold">Sales Date</TableHead>
-                <TableHead className="text-xs font-semibold">Amount Received</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(!scrapSales || scrapSales.length === 0) && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No sold scrap records.</TableCell></TableRow>
-              )}
-              {scrapSales?.map(s => (
-                <TableRow key={s.id}>
-                  <TableCell className="text-sm">{s.scrap_type}</TableCell>
-                  <TableCell className="text-sm">{s.material || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num">{s.qty_sold ?? '-'}</TableCell>
-                  <TableCell className="text-sm">{s.sales_date || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num">₹{s.amount_received ?? '-'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </TabsContent>
-
-      {/* Sell Dialog */}
-      <Dialog open={!!sellDialog} onOpenChange={() => setSellDialog(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Sell Scrap — {sellDialog?.scrapType}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div><Label className="text-xs">Qty Sold (Net Weight Kg)</Label><Input type="number" value={saleForm.qty_sold} onChange={e => setSaleForm(v => ({ ...v, qty_sold: e.target.value }))} /></div>
-            <div><Label className="text-xs">Sales Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
-            <div><Label className="text-xs">Amount Received (₹)</Label><Input type="number" value={saleForm.amount_received} onChange={e => setSaleForm(v => ({ ...v, amount_received: e.target.value }))} /></div>
+              </TableHeader>
+              <TableBody>
+                {scrapRows.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No scrap data yet.</TableCell></TableRow>
+                )}
+                {scrapRows.map(r => {
+                  const key = `${r.scrapType}|${r.material}`;
+                  const isExpanded = expandedScrapKey === key;
+                  return (
+                    <>
+                      <TableRow key={key} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedScrapKey(isExpanded ? null : key)}>
+                        <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                        <TableCell className="text-sm">{r.scrapType}</TableCell>
+                        <TableCell className="text-sm">{r.material}</TableCell>
+                        <TableCell className="text-sm font-mono-num font-semibold">{r.totalWeight.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog({ scrapType: r.scrapType, material: r.material }); }}>Sell</Button>
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow key={`${key}-detail`}>
+                          <TableCell colSpan={5} className="p-0">
+                            <div className="bg-muted/10 border-t px-6 py-2">
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-xs">Batch No</TableHead>
+                                    <TableHead className="text-xs">Material</TableHead>
+                                    <TableHead className="text-xs">Net Wt (Kg)</TableHead>
+                                    <TableHead className="text-xs">Date</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {r.batches.map((bd, i) => (
+                                    <TableRow key={i}>
+                                      <TableCell className="text-xs">{bd.batchNumber}</TableCell>
+                                      <TableCell className="text-xs">{bd.material}</TableCell>
+                                      <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
+                                      <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setSellDialog(null)}>Cancel</Button>
-            <Button onClick={handleSell}>Record Sale</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Tabs>
+        </TabsContent>
+
+        <TabsContent value="sold" className="mt-4">
+          <div className="overflow-x-auto rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="text-xs font-semibold">Scrap Type</TableHead>
+                  <TableHead className="text-xs font-semibold">Material</TableHead>
+                  <TableHead className="text-xs font-semibold">Total Qty Sold (Kg)</TableHead>
+                  <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {soldGroups.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No sold scrap records.</TableCell></TableRow>
+                )}
+                {soldGroups.map(g => {
+                  const key = `${g.scrapType}|${g.material}`;
+                  const isExpanded = expandedSoldKey === key;
+                  return (
+                    <>
+                      <TableRow key={key} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedSoldKey(isExpanded ? null : key)}>
+                        <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                        <TableCell className="text-sm">{g.scrapType}</TableCell>
+                        <TableCell className="text-sm">{g.material}</TableCell>
+                        <TableCell className="text-sm font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-sm font-mono-num font-semibold">₹{g.totalAmount.toFixed(2)}</TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow key={`${key}-detail`}>
+                          <TableCell colSpan={5} className="p-0">
+                            <div className="bg-muted/10 border-t px-6 py-2">
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">Date-wise sales</p>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-xs">Sales Date</TableHead>
+                                    <TableHead className="text-xs">Qty Sold (Kg)</TableHead>
+                                    <TableHead className="text-xs">Amount (₹)</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {(g.sales as any[]).sort((a: any, b: any) => (b.sales_date || '').localeCompare(a.sales_date || '')).map((s: any) => (
+                                    <TableRow key={s.id}>
+                                      <TableCell className="text-xs">{s.sales_date || '-'}</TableCell>
+                                      <TableCell className="text-xs font-mono-num">{s.qty_sold ?? '-'}</TableCell>
+                                      <TableCell className="text-xs font-mono-num">₹{s.amount_received ?? '-'}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        {/* Sell Dialog */}
+        <Dialog open={!!sellDialog} onOpenChange={() => setSellDialog(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Sell Scrap — {sellDialog?.scrapType}</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><Label className="text-xs">Qty Sold (Net Weight Kg)</Label><Input type="number" value={saleForm.qty_sold} onChange={e => setSaleForm(v => ({ ...v, qty_sold: e.target.value }))} /></div>
+              <div><Label className="text-xs">Sales Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
+              <div><Label className="text-xs">Amount Received (₹)</Label><Input type="number" value={saleForm.amount_received} onChange={e => setSaleForm(v => ({ ...v, amount_received: e.target.value }))} /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setSellDialog(null)}>Cancel</Button>
+              <Button onClick={handleSell}>Record Sale</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </Tabs>
     </div>
   );
 }
