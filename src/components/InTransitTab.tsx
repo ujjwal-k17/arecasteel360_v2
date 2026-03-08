@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react';
-import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch } from '@/hooks/useBatches';
+import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,10 +19,39 @@ export default function InTransitTab() {
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
   const deleteBatch = useDeleteBatch();
+  const bulkDelete = useBulkDeleteBatches();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!batches) return;
+    if (selectedIds.size === batches.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(batches.map(b => b.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected batch(es)?`)) return;
+    try {
+      await bulkDelete.mutateAsync(Array.from(selectedIds));
+      toast.success(`${selectedIds.size} batch(es) deleted`);
+      setSelectedIds(new Set());
+    } catch { toast.error('Failed to delete'); }
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -30,7 +60,6 @@ export default function InTransitTab() {
       const rows = await parseExcelFile(file);
       if (rows.length === 0) { toast.error('No valid rows found'); return; }
 
-      // Get existing batch numbers to filter duplicates
       const existingBatchNumbers = new Set((batches || []).map(b => b.batch_number));
       const newRows = rows.filter(r => !existingBatchNumbers.has(r.batch_number));
       const duplicateCount = rows.length - newRows.length;
@@ -85,7 +114,7 @@ export default function InTransitTab() {
     toast.success(`Status changed to ${newStatus}`);
   };
 
-  const cols = ['Batch No', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'GSM', 'Colour', 'Gross Wt (Kg)', 'Net Wt (Kg)', 'Coil No', 'Purchase Date', 'Purchase From', 'Status', 'Actions'];
+  const cols = ['', 'Batch No', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'GSM', 'Colour', 'Gross Wt (Kg)', 'Net Wt (Kg)', 'Coil No', 'Purchase Date', 'Purchase From', 'Status', 'Actions'];
   const fields = ['batch_number', 'material', 'make', 'thickness', 'width', 'length', 'coating', 'grade', 'gsm', 'colour', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
@@ -100,7 +129,6 @@ export default function InTransitTab() {
           material={material}
           onChange={v => setEditValues(prev => {
             const next = { ...prev, [field]: v };
-            // Reset dependent fields when material changes
             if (field === 'material') {
               next.coating = '';
               next.grade = '';
@@ -134,6 +162,11 @@ export default function InTransitTab() {
         <Button variant="outline" onClick={generateTemplate} className="gap-2">
           <Download className="h-4 w-4" /> Download Template
         </Button>
+        {selectedIds.size > 0 && (
+          <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
+            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedIds.size})
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -143,7 +176,13 @@ export default function InTransitTab() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                {cols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={batches && batches.length > 0 && selectedIds.size === batches.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+                {cols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,7 +190,13 @@ export default function InTransitTab() {
                 <TableRow><TableCell colSpan={cols.length} className="text-center text-muted-foreground py-8">No batches yet. Import an Excel file to get started.</TableCell></TableRow>
               )}
               {batches?.map(b => (
-                <TableRow key={b.id}>
+                <TableRow key={b.id} className={selectedIds.has(b.id) ? 'bg-primary/5' : ''}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(b.id)}
+                      onCheckedChange={() => toggleSelect(b.id)}
+                    />
+                  </TableCell>
                   {fields.map(f => (
                     <TableCell key={f} className="whitespace-nowrap text-sm">
                       {editingId === b.id ? (
