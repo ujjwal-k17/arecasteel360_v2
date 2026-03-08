@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
+import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL, FORMS } from '@/lib/inventory-options';
 
 interface Props {
   field: string;
