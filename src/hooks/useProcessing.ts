@@ -92,6 +92,7 @@ export function useInsertProcessing() {
             process: params.processType === 'Slit' ? 'Slit Coil' : params.processType,
             width: item.width ?? batch.width,
             length: item.length ?? null,
+            thickness: batch.thickness,
             coating: batch.coating,
             grade: batch.grade,
             qty: item.qty_kg,
