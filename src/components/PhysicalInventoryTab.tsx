@@ -98,16 +98,26 @@ export default function PhysicalInventoryTab() {
     } catch { toast.error('Failed to add batch'); }
   };
 
-  const handleImportFromTransit = async (batch: Batch) => {
+  const handleImportFromTransit = async (ids: string[]) => {
     try {
-      const { error } = await (await import('@/integrations/supabase/client')).supabase
-        .from('batches').update({ status: 'received' }).eq('id', batch.id);
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase
+        .from('batches').update({ status: 'received' }).in('id', ids);
       if (error) throw error;
-      toast.success('Batch moved to physical inventory');
+      toast.success(`${ids.length} batch(es) moved to physical inventory`);
       setShowAddDialog(false);
       setAddMode(null);
-      window.location.reload();
+      setSelectedImportIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
     } catch { toast.error('Failed'); }
+  };
+
+  const toggleImportSelection = (id: string) => {
+    setSelectedImportIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const updateNewBatch = (key: string, value: string) => {
