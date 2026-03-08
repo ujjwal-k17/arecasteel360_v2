@@ -57,7 +57,9 @@ export default function PhysicalInventoryTab() {
   const insertBatches = useInsertBatches();
   const deleteBatch = useDeleteBatch();
   const bulkDelete = useBulkDeleteBatches();
+  const updateBatch = useUpdateBatch();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
+  const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addMode, setAddMode] = useState<'new' | 'import' | null>(null);
   const [actionBatch, setActionBatch] = useState<Batch | null>(null);
