@@ -89,7 +89,7 @@ export default function PhysicalInventoryTab() {
   const inTransitBatches = (batches || []).filter(b => b.status === 'in-transit');
 
   const uniqueValues = useMemo(() => {
-    const fields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
+    const fields = ['material', 'make', 'form', 'thickness', 'width', 'coating', 'grade'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
       const vals = [...new Set(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
