@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 export default function DefectiveManagementTab() {
   const { data: batches } = useAllBatches();
+  const queryClient = useQueryClient();
   const { data: actions } = useAllActions();
   const { data: defSales } = useDefectiveSales();
   const insertDefSale = useInsertDefectiveSale();
