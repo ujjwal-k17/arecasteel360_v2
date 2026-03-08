@@ -11,7 +11,15 @@ export default function FGInventoryTab() {
 
   const items = fgItems || [];
 
-  const cols = ['Material', 'Make', 'Process', 'Width', 'Length', 'Coating', 'Grade', 'Qty (Kg)', '# Pcs', 'Order ID'];
+  const cols = ['Material', 'Make', 'Process', 'Dimensions', 'Coating', 'Grade', 'Qty (Kg)', '# Pcs', 'Order ID'];
+
+  const formatDimensions = (item: any) => {
+    const t = item.thickness ?? '-';
+    const w = item.width ?? '-';
+    const isSlit = (item.process || '').toLowerCase().includes('slit');
+    const l = isSlit ? 'Coil' : (item.length ?? '-');
+    return `${t} x ${w} x ${l}`;
+  };
 
   return (
     <div className="space-y-4">
