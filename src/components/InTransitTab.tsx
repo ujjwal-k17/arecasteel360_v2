@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
+import { isFieldValueValid } from '@/lib/field-validation';
 
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 
