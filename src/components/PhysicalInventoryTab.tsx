@@ -123,7 +123,13 @@ export default function PhysicalInventoryTab() {
     } catch { toast.error('Failed to delete'); }
   };
 
+  const existingBatchNumbers = new Set((batches || []).map(b => b.batch_number));
+
   const handleAddNew = async () => {
+    if (existingBatchNumbers.has(newBatch.batch_number)) {
+      toast.error(`Batch number "${newBatch.batch_number}" already exists`);
+      return;
+    }
     try {
       await insertBatches.mutateAsync([{
         batch_number: newBatch.batch_number,
