@@ -55,7 +55,6 @@ export default function PhysicalInventoryTab() {
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
-  const updateBatch = useUpdateBatch();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
