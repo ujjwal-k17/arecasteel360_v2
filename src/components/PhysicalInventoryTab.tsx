@@ -79,7 +79,7 @@ export default function PhysicalInventoryTab() {
   };
 
   const [newBatch, setNewBatch] = useState({
-    batch_number: '', material: '', make: '', thickness: '', width: '', length: '',
+    batch_number: '', material: '', make: '', form: '', thickness: '', width: '', length: '',
     coating: '', grade: '', gross_weight: '', net_weight: '',
     coil_number: '', purchase_date: '', purchase_from: '',
   });
