@@ -55,8 +55,7 @@ export default function PhysicalInventoryTab() {
   const { data: actions } = useAllActions();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
-  const deleteBatch = useDeleteBatch();
-  const bulkDelete = useBulkDeleteBatches();
+  const updateBatch = useUpdateBatch();
   const updateBatch = useUpdateBatch();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
