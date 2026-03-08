@@ -116,6 +116,7 @@ export function useInsertProcessing() {
           make: batch.make,
           process: params.processType,
           width: batch.width,
+          thickness: batch.thickness,
           coating: batch.coating,
           grade: batch.grade,
           qty: params.inputQty,
