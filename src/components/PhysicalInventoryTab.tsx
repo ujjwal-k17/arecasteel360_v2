@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronRight, Eye, EyeOff, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
 import InventoryFieldSelect from './InventoryFieldSelect';
