@@ -279,6 +279,21 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </div>
             )}
 
+            {/* Scrap & Defective buttons */}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowScrap(true)} className="text-xs">
+                Record Scrap
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowDefective(true)} className="text-xs">
+                Record Defective
+              </Button>
+              {scrapDefectiveQty > 0 && (
+                <span className="text-xs text-muted-foreground self-center ml-2">
+                  Scrap/Defective: {scrapDefectiveQty.toFixed(2)} Kg
+                </span>
+              )}
+            </div>
+
             {/* Validation warning */}
             {exceedsUsable && (
               <div className="bg-destructive/10 text-destructive text-xs rounded-md p-2 font-medium">
