@@ -173,8 +173,8 @@ export default function InTransitTab() {
     toast.success(`Status changed to ${newStatus}`);
   };
 
-  const fields = ['batch_number', 'material', 'make', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
-  const filterableFields = ['material', 'make', 'coating', 'grade', 'purchase_from'];
+  const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
+  const filterableFields = ['material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
     const val = String((editValues as any)[field] ?? '');
