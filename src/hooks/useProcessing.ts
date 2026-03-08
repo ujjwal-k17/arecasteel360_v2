@@ -176,10 +176,11 @@ export function useWIPProcessing() {
       wipItemId: string;
       wipItem: any;
       outputItems: { length: number; qty_kg: number; num_pcs: number }[];
-      defective?: { length: number; num_pcs: number; weight: number };
+      defectives?: { type: string; weight: number }[];
       orderId?: string;
     }) => {
-      const totalQty = params.outputItems.reduce((s, i) => s + i.qty_kg, 0) + (params.defective?.weight || 0);
+      const defectiveTotal = (params.defectives || []).reduce((s, d) => s + d.weight, 0);
+      const totalQty = params.outputItems.reduce((s, i) => s + i.qty_kg, 0) + defectiveTotal;
       const { data: procRec, error: procErr } = await supabase
         .from('processing_records' as any)
         .insert({
@@ -225,18 +226,21 @@ export function useWIPProcessing() {
         await supabase.from('fg_items' as any).insert(fgItems);
       }
 
-      if (params.defective && params.defective.weight > 0) {
-        await supabase.from('inventory_actions').insert({
-          batch_id: params.wipItem.source_batch_id,
-          action_type: 'defective',
-          defect_type: 'WIP CTL Defective',
-          net_weight: params.defective.weight,
-          gross_weight: null,
-          order_id: params.orderId || null,
-          sales_date: null,
-          invoice_number: null,
-          scrap_type: null,
-        } as any);
+      // Insert multiple defective entries
+      for (const d of (params.defectives || [])) {
+        if (d.weight > 0) {
+          await supabase.from('inventory_actions').insert({
+            batch_id: params.wipItem.source_batch_id,
+            action_type: 'defective',
+            defect_type: d.type,
+            net_weight: d.weight,
+            gross_weight: null,
+            order_id: null,
+            sales_date: null,
+            invoice_number: null,
+            scrap_type: null,
+          } as any);
+        }
       }
 
       await supabase.from('wip_items' as any).update({ status: 'processed' }).eq('id', params.wipItemId);
