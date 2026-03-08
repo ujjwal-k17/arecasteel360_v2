@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, useDeleteBatch, useBulkDeleteBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useAllBatches, useAllActions, useUpdateBatch, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronRight, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
 import InventoryFieldSelect from './InventoryFieldSelect';
@@ -54,9 +54,9 @@ export default function PhysicalInventoryTab() {
   const { data: actions } = useAllActions();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
-  const deleteBatch = useDeleteBatch();
-  const bulkDelete = useBulkDeleteBatches();
+  const updateBatch = useUpdateBatch();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
+  const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addMode, setAddMode] = useState<'new' | 'import' | null>(null);
   const [actionBatch, setActionBatch] = useState<Batch | null>(null);
@@ -114,14 +114,26 @@ export default function PhysicalInventoryTab() {
     });
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedBatchIds.size === 0) return;
-    if (!confirm(`Delete ${selectedBatchIds.size} selected batch(es)?`)) return;
+  const handleRevertToTransit = async (id: string, batchNumber: string) => {
+    if (!confirm(`Move batch ${batchNumber} back to In-Transit?`)) return;
     try {
-      await bulkDelete.mutateAsync(Array.from(selectedBatchIds));
-      toast.success(`${selectedBatchIds.size} batch(es) deleted`);
+      await updateBatch.mutateAsync({ id, status: 'in-transit' });
+      toast.success(`Batch ${batchNumber} moved back to In-Transit`);
+      setSelectedBatchIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+    } catch { toast.error('Failed to move batch'); }
+  };
+
+  const handleBulkRevert = async () => {
+    if (selectedBatchIds.size === 0) return;
+    if (!confirm(`Move ${selectedBatchIds.size} selected batch(es) back to In-Transit?`)) return;
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase.from('batches').update({ status: 'in-transit' }).in('id', Array.from(selectedBatchIds));
+      if (error) throw error;
+      toast.success(`${selectedBatchIds.size} batch(es) moved back to In-Transit`);
       setSelectedBatchIds(new Set());
-    } catch { toast.error('Failed to delete'); }
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+    } catch { toast.error('Failed to move batches'); }
   };
 
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
@@ -232,8 +244,8 @@ export default function PhysicalInventoryTab() {
           <Plus className="h-4 w-4" /> Add New Item
         </Button>
         {selectedBatchIds.size > 0 && (
-          <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="gap-2">
-            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
+          <Button variant="secondary" size="sm" onClick={handleBulkRevert} className="gap-2">
+            <Undo2 className="h-4 w-4" /> Move to In-Transit ({selectedBatchIds.size})
           </Button>
         )}
       </div>
@@ -281,38 +293,85 @@ export default function PhysicalInventoryTab() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {g.batches.map(b => (
-                              <TableRow key={b.id} className={selectedBatchIds.has(b.id) ? 'bg-primary/5' : ''}>
-                                <TableCell>
-                                  <Checkbox
-                                    checked={selectedBatchIds.has(b.id)}
-                                    onCheckedChange={() => toggleBatchSelect(b.id)}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-sm">{b.material || '-'}</TableCell>
-                                <TableCell className="text-sm">{b.make || '-'}</TableCell>
-                                <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
-                                <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
-                                <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
-                                <TableCell className="text-sm">{b.coating || '-'}</TableCell>
-                                <TableCell className="text-sm">{b.grade || '-'}</TableCell>
-                                <TableCell className="text-sm font-mono-num">{b.gross_weight ?? '-'}</TableCell>
-                                <TableCell className="text-sm font-mono-num">{b.net_weight ?? '-'}</TableCell>
-                                <TableCell className="text-sm">{b.coil_number || '-'}</TableCell>
-                                <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
-                                <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
-                                <TableCell className="text-sm font-mono-num font-semibold">{calcBalanceQty(b, allActions).toFixed(2)}</TableCell>
-                                <TableCell className="text-sm font-mono-num font-semibold">{calcUsableBalanceQty(b, allActions).toFixed(2)}</TableCell>
-                                <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('sales'); }}>Sales</Button>
-                                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('defective'); }}>Defective</Button>
-                                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('scrap'); }}>Scrap</Button>
-                                    <Button size="sm" variant="ghost" className="text-xs h-7" onClick={async (e) => { e.stopPropagation(); if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {g.batches.map(b => {
+                              const batchActions = allActions.filter(a => a.batch_id === b.id);
+                              const isExpanded = expandedBatchActions === b.id;
+                              return (
+                                <>
+                                  <TableRow key={b.id} className={selectedBatchIds.has(b.id) ? 'bg-primary/5' : ''}>
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={selectedBatchIds.has(b.id)}
+                                        onCheckedChange={() => toggleBatchSelect(b.id)}
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-sm">{b.material || '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.make || '-'}</TableCell>
+                                    <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
+                                    <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
+                                    <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.coating || '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.grade || '-'}</TableCell>
+                                    <TableCell className="text-sm font-mono-num">{b.gross_weight ?? '-'}</TableCell>
+                                    <TableCell className="text-sm font-mono-num">{b.net_weight ?? '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.coil_number || '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
+                                    <TableCell className="text-sm font-mono-num font-semibold">{calcBalanceQty(b, allActions).toFixed(2)}</TableCell>
+                                    <TableCell className="text-sm font-mono-num font-semibold">{calcUsableBalanceQty(b, allActions).toFixed(2)}</TableCell>
+                                    <TableCell>
+                                      <div className="flex gap-1">
+                                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('sales'); }}>Sales</Button>
+                                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('defective'); }}>Defective</Button>
+                                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('scrap'); }}>Scrap</Button>
+                                        <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setExpandedBatchActions(isExpanded ? null : b.id); }}><Eye className="h-3.5 w-3.5" /></Button>
+                                        <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); handleRevertToTransit(b.id, b.batch_number); }}><Undo2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                  {isExpanded && batchActions.length > 0 && (
+                                    <TableRow key={`${b.id}-actions`}>
+                                      <TableCell colSpan={batchCols.length} className="p-0">
+                                        <div className="bg-muted/10 border-t border-b px-8 py-2">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Actions for {b.batch_number}</p>
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow>
+                                                <TableHead className="text-xs">Type</TableHead>
+                                                <TableHead className="text-xs">Net Wt (Kg)</TableHead>
+                                                <TableHead className="text-xs">Gross Wt (Kg)</TableHead>
+                                                <TableHead className="text-xs">Order ID</TableHead>
+                                                <TableHead className="text-xs">Invoice</TableHead>
+                                                <TableHead className="text-xs">Date</TableHead>
+                                                <TableHead className="text-xs">Detail</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {batchActions.map(a => (
+                                                <TableRow key={a.id}>
+                                                  <TableCell className="text-xs capitalize">{a.action_type}</TableCell>
+                                                  <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
+                                                  <TableCell className="text-xs font-mono-num">{a.gross_weight ?? '-'}</TableCell>
+                                                  <TableCell className="text-xs">{a.order_id || '-'}</TableCell>
+                                                  <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
+                                                  <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
+                                                  <TableCell className="text-xs">{a.defect_type || a.scrap_type || '-'}</TableCell>
+                                                </TableRow>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                  {isExpanded && batchActions.length === 0 && (
+                                    <TableRow key={`${b.id}-no-actions`}>
+                                      <TableCell colSpan={batchCols.length} className="text-center text-xs text-muted-foreground py-2">No actions recorded for this batch.</TableCell>
+                                    </TableRow>
+                                  )}
+                                </>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
