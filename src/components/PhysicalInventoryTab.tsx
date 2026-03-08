@@ -30,7 +30,7 @@ interface SKUGroup {
   totalUsableQty: number;
 }
 
-const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
+const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade', 'form'];
 const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_weight'];
 
 const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
