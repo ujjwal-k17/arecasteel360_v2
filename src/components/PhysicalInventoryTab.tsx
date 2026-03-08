@@ -217,6 +217,7 @@ export default function PhysicalInventoryTab() {
                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('sales'); }}>Sales</Button>
                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('defective'); }}>Defective</Button>
                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setActionBatch(b); setActionType('scrap'); }}>Scrap</Button>
+                                    <Button size="sm" variant="ghost" className="text-xs h-7" onClick={async (e) => { e.stopPropagation(); if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                                   </div>
                                 </TableCell>
                               </TableRow>
