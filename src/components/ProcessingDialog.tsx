@@ -124,18 +124,22 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
+    const isLooseCoilSaleOnly = looseCoilSaleTotal > 0 && !processType && !coilMode;
     const effectiveOutputType = processType === 'Slit' ? outputType : 'FG';
-    if (!processType || !effectiveOutputType) {
-      toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
-      return;
-    }
-    if (!coilMode) {
-      toast.error('Please select Full Coil or Partial Coil');
-      return;
-    }
-    if (processingQty <= 0) {
-      toast.error('Processing quantity must be greater than 0');
-      return;
+
+    if (!isLooseCoilSaleOnly) {
+      if (!processType || !effectiveOutputType) {
+        toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
+        return;
+      }
+      if (!coilMode) {
+        toast.error('Please select Full Coil or Partial Coil');
+        return;
+      }
+      if (processingQty <= 0) {
+        toast.error('Processing quantity must be greater than 0');
+        return;
+      }
     }
     if (exceedsUsable) {
       toast.error(`Total (${totalCommitted.toFixed(2)} Kg) exceeds usable qty (${usableQty.toFixed(2)} Kg)`);
