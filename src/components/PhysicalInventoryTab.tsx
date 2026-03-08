@@ -33,6 +33,7 @@ export default function PhysicalInventoryTab() {
   const { data: actions } = useAllActions();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
+  const deleteBatch = useDeleteBatch();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addMode, setAddMode] = useState<'new' | 'import' | null>(null);
