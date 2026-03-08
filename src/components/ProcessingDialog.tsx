@@ -123,7 +123,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       await insertProcessing.mutateAsync({
         batchId: batch.id,
         processType,
-        outputType,
+        outputType: effectiveOutputType,
         inputQty: effectiveInputQty,
         orderId: '',
         outputItems,
