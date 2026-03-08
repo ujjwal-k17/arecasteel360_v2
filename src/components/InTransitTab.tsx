@@ -76,7 +76,7 @@ export default function InTransitTab() {
         make: r.make || null,
         thickness: r.thickness || null,
         width: r.width || null,
-        length: r.length || null,
+        length: r.length != null ? String(r.length) : null,
         coating: r.coating || null,
         grade: r.grade || null,
         gsm: r.gsm || null,
@@ -103,7 +103,7 @@ export default function InTransitTab() {
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      const { id, created_at, updated_at, ...updateFields } = editValues as any;
+      const { id: _id, created_at: _ca, updated_at: _ua, ...updateFields } = editValues as any;
       await updateBatch.mutateAsync({ id: editingId, ...updateFields } as any);
       toast.success('Batch updated');
       setEditingId(null);
