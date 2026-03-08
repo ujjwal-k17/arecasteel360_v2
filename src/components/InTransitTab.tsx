@@ -17,7 +17,7 @@ import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL, FORMS } from 
 import * as XLSX from 'xlsx';
 import { differenceInDays, parseISO } from 'date-fns';
 
-const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
+const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade', 'form'];
 
 export default function InTransitTab() {
   const [statusFilter, setStatusFilter] = useState<string>('in-transit');
