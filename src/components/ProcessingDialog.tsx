@@ -188,8 +188,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </Select>
             </div>
 
-            {/* Output Type - hidden for CTL (always FG) */}
-            {processType !== 'CTL' && (
+            {/* Output Type - only for Slit */}
+            {processType === 'Slit' && (
             <div>
               <Label className="text-xs">Output Type</Label>
               <Select value={outputType} onValueChange={setOutputType}>
