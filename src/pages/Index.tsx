@@ -24,8 +24,11 @@ const Index = () => {
       </header>
 
       <main className="container py-6">
-        <Tabs defaultValue="in-transit">
+        <Tabs defaultValue="dashboard">
           <TabsList className="mb-6 h-10 flex-wrap">
+            <TabsTrigger value="dashboard" className="gap-2 text-sm">
+              <LayoutDashboard className="h-4 w-4" /> Dashboard
+            </TabsTrigger>
             <TabsTrigger value="in-transit" className="gap-2 text-sm">
               <Package className="h-4 w-4" /> In-Transit
             </TabsTrigger>
