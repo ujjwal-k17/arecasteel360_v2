@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useBatches, useInsertBatches, useUpdateBatch } from '@/hooks/useBatches';
+import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
