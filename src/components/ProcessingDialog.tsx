@@ -49,6 +49,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     Object.fromEntries(SCRAP_TYPES_NO_TRIM.map(t => [t, '']))
   );
   const [defectEntries, setDefectEntries] = useState<DefectEntry[]>([{ type: '', weight: '' }]);
+  const [looseCoilSaleQty, setLooseCoilSaleQty] = useState('');
 
   // Calculate inline scrap + defective totals
   const inlineScrapTotal = useMemo(() => {
