@@ -103,7 +103,7 @@ export default function InTransitTab() {
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      const { id, created_at, updated_at, ...updateFields } = editValues as any;
+      const { id: _id, created_at: _ca, updated_at: _ua, ...updateFields } = editValues as any;
       await updateBatch.mutateAsync({ id: editingId, ...updateFields } as any);
       toast.success('Batch updated');
       setEditingId(null);

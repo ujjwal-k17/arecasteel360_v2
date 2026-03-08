@@ -21,7 +21,6 @@ interface SKUGroup {
   thickness: number | null;
   width: number | null;
   length: string | null;
-  length: number | null;
   coating: string | null;
   grade: string | null;
   totalNetWeight: number;
