@@ -354,6 +354,7 @@ export default function PhysicalInventoryTab() {
                                     <TableCell><Checkbox checked={selectedBatchIds.has(b.id)} onCheckedChange={() => toggleBatchSelect(b.id)} /></TableCell>
                                     <TableCell className="text-sm">{b.material || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.make || '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.form || '-'}</TableCell>
                                     <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
