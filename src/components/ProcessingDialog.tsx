@@ -29,6 +29,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
 
   const [processType, setProcessType] = useState('');
   const [outputType, setOutputType] = useState('');
+  const [coilProcessed, setCoilProcessed] = useState<'full' | 'partial' | ''>('');
   const [inputQty, setInputQty] = useState('');
   const [numSizes, setNumSizes] = useState('');
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
