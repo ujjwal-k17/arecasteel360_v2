@@ -250,9 +250,9 @@ export default function PhysicalInventoryTab() {
     toast.success('Downloaded');
   };
 
-  const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
-  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Physical Inv (Kg)', 'Usable Qty (Kg)', 'Total Inv (Kg)'];
-  const batchCols = ['', 'Material', 'Make', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  const filterFields = ['material', 'make', 'form', 'thickness', 'width', 'coating', 'grade'];
+  const skuCols = ['', 'Material', 'Make', 'Form', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Physical Inv (Kg)', 'Usable Qty (Kg)', 'Total Inv (Kg)'];
+  const batchCols = ['', 'Material', 'Make', 'Form', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
