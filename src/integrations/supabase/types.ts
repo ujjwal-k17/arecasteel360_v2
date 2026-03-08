@@ -25,7 +25,7 @@ export type Database = {
           gross_weight: number | null
           gsm: number | null
           id: string
-          length: number | null
+          length: string | null
           make: string | null
           material: string | null
           net_weight: number | null
@@ -46,7 +46,7 @@ export type Database = {
           gross_weight?: number | null
           gsm?: number | null
           id?: string
-          length?: number | null
+          length?: string | null
           make?: string | null
           material?: string | null
           net_weight?: number | null
@@ -67,7 +67,7 @@ export type Database = {
           gross_weight?: number | null
           gsm?: number | null
           id?: string
-          length?: number | null
+          length?: string | null
           make?: string | null
           material?: string | null
           net_weight?: number | null

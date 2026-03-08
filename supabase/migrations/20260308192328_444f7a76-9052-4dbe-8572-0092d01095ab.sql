@@ -1,0 +1,1 @@
+ALTER TABLE public.batches ALTER COLUMN length TYPE text USING length::text;
