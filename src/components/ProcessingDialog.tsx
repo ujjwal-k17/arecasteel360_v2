@@ -89,7 +89,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
-    if (!processType || !outputType || !coilProcessed) {
+    const effectiveOutputType = processType === 'CTL' ? 'FG' : outputType;
+    if (!processType || !effectiveOutputType || !coilProcessed) {
       toast.error('Please select Process, Output Type, and Coil Processed option');
       return;
     }
@@ -122,7 +123,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       await insertProcessing.mutateAsync({
         batchId: batch.id,
         processType,
-        outputType,
+        outputType: effectiveOutputType,
         inputQty: effectiveInputQty,
         orderId: '',
         outputItems,
@@ -179,7 +180,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             {/* Process Type */}
             <div>
               <Label className="text-xs">Process</Label>
-              <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); }}>
+              <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); if (v === 'CTL') setOutputType('FG'); else setOutputType(''); }}>
                 <SelectTrigger><SelectValue placeholder="Select process" /></SelectTrigger>
                 <SelectContent>
                   {PROCESSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -187,7 +188,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </Select>
             </div>
 
-            {/* Output Type */}
+            {/* Output Type - hidden for CTL (always FG) */}
+            {processType !== 'CTL' && (
             <div>
               <Label className="text-xs">Output Type</Label>
               <Select value={outputType} onValueChange={setOutputType}>
@@ -197,6 +199,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 </SelectContent>
               </Select>
             </div>
+            )}
 
             {/* Coil Processed - Full or Partial */}
             <div>
