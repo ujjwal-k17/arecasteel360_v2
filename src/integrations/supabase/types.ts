@@ -17,6 +17,7 @@ export type Database = {
       batches: {
         Row: {
           batch_number: string
+          batch_status: string | null
           coating: string | null
           coil_number: string | null
           colour: string | null
@@ -39,6 +40,7 @@ export type Database = {
         }
         Insert: {
           batch_number: string
+          batch_status?: string | null
           coating?: string | null
           coil_number?: string | null
           colour?: string | null
@@ -61,6 +63,7 @@ export type Database = {
         }
         Update: {
           batch_number?: string
+          batch_status?: string | null
           coating?: string | null
           coil_number?: string | null
           colour?: string | null
@@ -121,6 +124,68 @@ export type Database = {
           },
         ]
       }
+      fg_items: {
+        Row: {
+          coating: string | null
+          created_at: string
+          grade: string | null
+          id: string
+          length: number | null
+          make: string | null
+          material: string | null
+          num_pcs: number | null
+          order_id: string | null
+          process: string | null
+          processing_record_id: string | null
+          qty: number | null
+          source_id: string | null
+          source_type: string | null
+          width: number | null
+        }
+        Insert: {
+          coating?: string | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          length?: number | null
+          make?: string | null
+          material?: string | null
+          num_pcs?: number | null
+          order_id?: string | null
+          process?: string | null
+          processing_record_id?: string | null
+          qty?: number | null
+          source_id?: string | null
+          source_type?: string | null
+          width?: number | null
+        }
+        Update: {
+          coating?: string | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          length?: number | null
+          make?: string | null
+          material?: string | null
+          num_pcs?: number | null
+          order_id?: string | null
+          process?: string | null
+          processing_record_id?: string | null
+          qty?: number | null
+          source_id?: string | null
+          source_type?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fg_items_processing_record_id_fkey"
+            columns: ["processing_record_id"]
+            isOneToOne: false
+            referencedRelation: "processing_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_actions: {
         Row: {
           action_type: string
@@ -171,6 +236,82 @@ export type Database = {
           },
         ]
       }
+      processing_output_items: {
+        Row: {
+          created_at: string
+          id: string
+          length: number | null
+          num_pcs: number | null
+          processing_record_id: string
+          qty_kg: number | null
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          length?: number | null
+          num_pcs?: number | null
+          processing_record_id: string
+          qty_kg?: number | null
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          length?: number | null
+          num_pcs?: number | null
+          processing_record_id?: string
+          qty_kg?: number | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_output_items_processing_record_id_fkey"
+            columns: ["processing_record_id"]
+            isOneToOne: false
+            referencedRelation: "processing_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      processing_records: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          input_qty: number | null
+          order_id: string | null
+          output_type: string
+          process_type: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          input_qty?: number | null
+          order_id?: string | null
+          output_type: string
+          process_type: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          input_qty?: number | null
+          order_id?: string | null
+          output_type?: string
+          process_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_records_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scrap_sales: {
         Row: {
           amount_received: number | null
@@ -203,6 +344,75 @@ export type Database = {
           weight_slip_url?: string | null
         }
         Relationships: []
+      }
+      wip_items: {
+        Row: {
+          coating: string | null
+          created_at: string
+          grade: string | null
+          id: string
+          length: number | null
+          make: string | null
+          material: string | null
+          num_pcs: number | null
+          order_id: string | null
+          process: string | null
+          processing_record_id: string | null
+          qty: number | null
+          source_batch_id: string | null
+          status: string | null
+          width: number | null
+        }
+        Insert: {
+          coating?: string | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          length?: number | null
+          make?: string | null
+          material?: string | null
+          num_pcs?: number | null
+          order_id?: string | null
+          process?: string | null
+          processing_record_id?: string | null
+          qty?: number | null
+          source_batch_id?: string | null
+          status?: string | null
+          width?: number | null
+        }
+        Update: {
+          coating?: string | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          length?: number | null
+          make?: string | null
+          material?: string | null
+          num_pcs?: number | null
+          order_id?: string | null
+          process?: string | null
+          processing_record_id?: string | null
+          qty?: number | null
+          source_batch_id?: string | null
+          status?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wip_items_processing_record_id_fkey"
+            columns: ["processing_record_id"]
+            isOneToOne: false
+            referencedRelation: "processing_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wip_items_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -124,22 +124,35 @@ export function useInsertAction() {
   });
 }
 
-// Balance calculations
-export function calcBalanceQty(batch: Batch, actions: InventoryAction[]): number {
+// Updated formulas:
+// Processed Qty = all material removed: sales + scrap + defective + pack_coil_sale + processing input
+// Usable = GW + 80 - Processed Qty
+// Balance = GW + 80 - Processed Qty + Defective Qty (defective is physically present)
+
+export function calcProcessedQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
   const batchActions = actions.filter(a => a.batch_id === batch.id);
-  const salesScrap = batchActions
-    .filter(a => a.action_type === 'sales' || a.action_type === 'scrap')
+  const actionDeductions = batchActions
+    .filter(a => ['sales', 'scrap', 'defective', 'pack_coil_sale'].includes(a.action_type))
     .reduce((sum, a) => sum + (a.net_weight || 0), 0);
-  return (batch.gross_weight || 0) + 80 - salesScrap;
+  const processingInput = (processingRecords || [])
+    .filter((p: any) => p.batch_id === batch.id)
+    .reduce((sum: number, p: any) => sum + (p.input_qty || 0), 0);
+  return actionDeductions + processingInput;
 }
 
-export function calcUsableBalanceQty(batch: Batch, actions: InventoryAction[]): number {
+export function calcUsableBalanceQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
+  return (batch.gross_weight || 0) + 80 - calcProcessedQty(batch, actions, processingRecords);
+}
+
+export function calcBalanceQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
   const batchActions = actions.filter(a => a.batch_id === batch.id);
-  const totalDeductions = batchActions.reduce((sum, a) => sum + (a.net_weight || 0), 0);
-  return (batch.gross_weight || 0) + 80 - totalDeductions;
+  const defectiveQty = batchActions
+    .filter(a => a.action_type === 'defective')
+    .reduce((sum, a) => sum + (a.net_weight || 0), 0);
+  return calcUsableBalanceQty(batch, actions, processingRecords) + defectiveQty;
 }
 
 // SKU key
 export function getSKUKey(b: Batch): string {
-  return [b.make, b.grade, b.thickness, b.width, b.gsm].filter(Boolean).join(' × ');
+  return [b.make, b.grade, b.thickness, b.width, (b as any).gsm].filter(Boolean).join(' × ');
 }
