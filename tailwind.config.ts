@@ -7,10 +7,14 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: "1.5rem",
       screens: {
         "2xl": "1400px",
       },
+    },
+    fontFamily: {
+      sans: ["IBM Plex Sans", "system-ui", "sans-serif"],
+      mono: ["IBM Plex Mono", "monospace"],
     },
     extend: {
       colors: {
