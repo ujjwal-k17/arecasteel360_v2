@@ -89,11 +89,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
-    if (!processType || !outputType) {
-      toast.error('Please select Process and Output Type');
+    if (!processType || !outputType || !coilProcessed) {
+      toast.error('Please select Process, Output Type, and Coil Processed option');
       return;
     }
-    if (!isPackCoil && (!inputQty || Number(inputQty) <= 0)) {
+    if (coilProcessed === 'partial' && (!inputQty || Number(inputQty) <= 0)) {
       toast.error('Please enter input quantity');
       return;
     }
