@@ -25,6 +25,8 @@ export default function InventoryFieldSelect({ field, value, material, onChange,
     options = material ? (COATING_BY_MATERIAL[material] || []) : [];
   } else if (field === 'grade') {
     options = material ? (GRADE_BY_MATERIAL[material] || []) : [];
+  } else if (field === 'form') {
+    options = FORMS;
   }
 
   if (options.length === 0) {
