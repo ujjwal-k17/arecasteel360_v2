@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useWIPItems } from '@/hooks/useProcessing';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
@@ -25,6 +26,24 @@ export default function WIPInventoryTab() {
   const queryClient = useQueryClient();
   const [processingItem, setProcessingItem] = useState<any | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Fetch batch numbers for source_batch_id lookup
+  const { data: batches } = useQuery({
+    queryKey: ['batches_lookup'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('batches').select('id, batch_number');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const batchMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of batches || []) {
+      map.set(b.id, b.batch_number);
+    }
+    return map;
+  }, [batches]);
 
   const items = wipItems || [];
 
@@ -83,7 +102,7 @@ export default function WIPInventoryTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['wip_items'] }); toast.success('Refreshed'); }} className="gap-2">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['wip_items'] }); queryClient.invalidateQueries({ queryKey: ['batches_lookup'] }); toast.success('Refreshed'); }} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
       </div>
@@ -101,7 +120,6 @@ export default function WIPInventoryTab() {
             )}
             {skuGroups.map(g => {
               const isOpen = expanded.has(g.key);
-              const hasProcessable = g.items.some((i: any) => i.process === 'Slit Coil');
               return (
                 <>
                   <TableRow
@@ -127,11 +145,14 @@ export default function WIPInventoryTab() {
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {
                     const canProcess = item.process === 'Slit Coil';
+                    const batchNum = batchMap.get(item.source_batch_id) || '-';
                     return (
                       <TableRow key={item.id} className="bg-background">
                         <TableCell />
-                        <TableCell className="text-xs text-muted-foreground">{item.material || '-'}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.make || '-'}</TableCell>
+                        <TableCell colSpan={2} className="text-xs">
+                          <span className="text-muted-foreground">Batch: </span>
+                          <span className="font-medium">{batchNum}</span>
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
