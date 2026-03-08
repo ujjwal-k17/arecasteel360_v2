@@ -31,6 +31,7 @@ const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_wei
 export default function PhysicalInventoryTab() {
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
+  const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
