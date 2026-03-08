@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
+import InventoryFieldSelect from './InventoryFieldSelect';
 
 interface SKUGroup {
   key: string;
@@ -22,6 +23,9 @@ interface SKUGroup {
   totalNetWeight: number;
   totalBalanceQty: number;
 }
+
+const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
+const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_weight', 'gsm'];
 
 export default function PhysicalInventoryTab() {
   const { data: batches } = useAllBatches();
@@ -92,17 +96,50 @@ export default function PhysicalInventoryTab() {
 
   const handleImportFromTransit = async (batch: Batch) => {
     try {
-      await insertBatches.mutateAsync([]);
-      // Actually just update status
       const { error } = await (await import('@/integrations/supabase/client')).supabase
         .from('batches').update({ status: 'received' }).eq('id', batch.id);
       if (error) throw error;
       toast.success('Batch moved to physical inventory');
       setShowAddDialog(false);
       setAddMode(null);
-      // Refetch
       window.location.reload();
     } catch { toast.error('Failed'); }
+  };
+
+  const updateNewBatch = (key: string, value: string) => {
+    setNewBatch(prev => {
+      const next = { ...prev, [key]: value };
+      // Reset dependent fields when material changes
+      if (key === 'material') {
+        next.coating = '';
+        next.grade = '';
+      }
+      return next;
+    });
+  };
+
+  const renderNewBatchField = (key: string, val: string) => {
+    if (DROPDOWN_FIELDS.includes(key)) {
+      return (
+        <InventoryFieldSelect
+          field={key}
+          value={val}
+          material={newBatch.material}
+          onChange={v => updateNewBatch(key, v)}
+          className="col-span-2 h-8 text-sm"
+          placeholder={`Select ${key.replace(/_/g, ' ')}`}
+        />
+      );
+    }
+
+    return (
+      <Input
+        className="col-span-2 h-8 text-sm"
+        value={val}
+        onChange={e => updateNewBatch(key, e.target.value)}
+        type={NUMERIC_FIELDS.includes(key) ? 'number' : key === 'purchase_date' ? 'date' : 'text'}
+      />
+    );
   };
 
   const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Physical Inv (Kg)', 'Total Inv (Kg)'];
@@ -218,12 +255,7 @@ export default function PhysicalInventoryTab() {
               {Object.entries(newBatch).map(([key, val]) => (
                 <div key={key} className="grid grid-cols-3 items-center gap-2">
                   <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
-                  <Input
-                    className="col-span-2 h-8 text-sm"
-                    value={val}
-                    onChange={e => setNewBatch(v => ({ ...v, [key]: e.target.value }))}
-                    type={['thickness', 'width', 'length', 'gross_weight', 'net_weight', 'gsm'].includes(key) ? 'number' : key === 'purchase_date' ? 'date' : 'text'}
-                  />
+                  {renderNewBatchField(key, val)}
                 </div>
               ))}
               <DialogFooter>

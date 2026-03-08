@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Download, Edit2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
+import InventoryFieldSelect from './InventoryFieldSelect';
+
+const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade'];
 
 export default function InTransitTab() {
   const { data: batches, isLoading } = useBatches();
@@ -71,6 +74,39 @@ export default function InTransitTab() {
   const cols = ['Batch No', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'GSM', 'Colour', 'Gross Wt (Kg)', 'Net Wt (Kg)', 'Coil No', 'Purchase Date', 'Purchase From', 'Status', 'Actions'];
   const fields = ['batch_number', 'material', 'make', 'thickness', 'width', 'length', 'coating', 'grade', 'gsm', 'colour', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
 
+  const renderEditCell = (field: string) => {
+    const val = String((editValues as any)[field] ?? '');
+    const material = String((editValues as any).material ?? '');
+
+    if (DROPDOWN_FIELDS.includes(field)) {
+      return (
+        <InventoryFieldSelect
+          field={field}
+          value={val}
+          material={material}
+          onChange={v => setEditValues(prev => {
+            const next = { ...prev, [field]: v };
+            // Reset dependent fields when material changes
+            if (field === 'material') {
+              next.coating = '';
+              next.grade = '';
+            }
+            return next;
+          })}
+          className="h-7 w-32 text-xs"
+        />
+      );
+    }
+
+    return (
+      <Input
+        className="h-7 w-24 text-xs"
+        value={val}
+        onChange={e => setEditValues(v => ({ ...v, [field]: e.target.value }))}
+      />
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -102,11 +138,7 @@ export default function InTransitTab() {
                   {fields.map(f => (
                     <TableCell key={f} className="whitespace-nowrap text-sm">
                       {editingId === b.id ? (
-                        <Input
-                          className="h-7 w-24 text-xs"
-                          value={String((editValues as any)[f] ?? '')}
-                          onChange={e => setEditValues(v => ({ ...v, [f]: e.target.value }))}
-                        />
+                        renderEditCell(f)
                       ) : (
                         <span className={['gross_weight', 'net_weight', 'thickness', 'width', 'length', 'gsm'].includes(f) ? 'font-mono-num' : ''}>
                           {(b as any)[f] ?? '-'}
