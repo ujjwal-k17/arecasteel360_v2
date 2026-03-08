@@ -187,7 +187,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </Select>
             </div>
 
-            {/* Output Type */}
+            {/* Output Type - hidden for CTL (always FG) */}
+            {processType !== 'CTL' && (
             <div>
               <Label className="text-xs">Output Type</Label>
               <Select value={outputType} onValueChange={setOutputType}>
@@ -196,6 +197,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                   {OUTPUT_TYPES.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            )}
             </div>
 
             {/* Coil Processed - Full or Partial */}
