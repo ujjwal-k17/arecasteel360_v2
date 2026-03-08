@@ -1,5 +1,6 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle } from 'lucide-react';
+import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle, LayoutDashboard } from 'lucide-react';
+import DashboardTab from '@/components/DashboardTab';
 import InTransitTab from '@/components/InTransitTab';
 import CoilsInventoryTab from '@/components/CoilsInventoryTab';
 import ScrapManagementTab from '@/components/ScrapManagementTab';
