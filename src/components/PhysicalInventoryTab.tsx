@@ -321,6 +321,7 @@ export default function PhysicalInventoryTab() {
                   <TableCell>{expandedSKU === g.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                   <TableCell className="text-sm">{g.material || '-'}</TableCell>
                   <TableCell className="text-sm">{g.make || '-'}</TableCell>
+                  <TableCell className="text-sm">{g.batches[0]?.form || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.thickness ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.width ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
