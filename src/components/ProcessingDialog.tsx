@@ -9,11 +9,17 @@ import { useInsertProcessing } from '@/hooks/useProcessing';
 import { useInsertAction } from '@/hooks/useBatches';
 import type { Batch, InventoryAction } from '@/hooks/useBatches';
 import { calcUsableBalanceQty } from '@/hooks/useBatches';
+import { Plus, Trash2 } from 'lucide-react';
 
 const PROCESSES = ['Slit', 'CTL', 'Profile', 'GC'];
 const OUTPUT_TYPES = ['WIP', 'FG'];
 const SCRAP_TYPES_NO_TRIM = ['End Pcs', 'Metal Cover', 'Non metal cover', 'Short qty'];
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
+
+interface DefectEntry {
+  type: string;
+  weight: string;
+}
 
 interface Props {
   batch: Batch;
@@ -34,13 +40,14 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [numSizes, setNumSizes] = useState('');
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
+  const [coilMode, setCoilMode] = useState<'full' | 'partial' | ''>('');
+  const [partialQty, setPartialQty] = useState('');
 
   // Inline scrap & defective state
   const [scrapEntries, setScrapEntries] = useState<Record<string, string>>(
     Object.fromEntries(SCRAP_TYPES_NO_TRIM.map(t => [t, '']))
   );
-  const [defectType, setDefectType] = useState('');
-  const [defNetWeight, setDefNetWeight] = useState('');
+  const [defectEntries, setDefectEntries] = useState<DefectEntry[]>([{ type: '', weight: '' }]);
 
   // Calculate inline scrap + defective totals
   const inlineScrapTotal = useMemo(() => {
@@ -48,13 +55,23 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   }, [scrapEntries]);
 
   const inlineDefectiveTotal = useMemo(() => {
-    return Number(defNetWeight) || 0;
-  }, [defNetWeight]);
+    return defectEntries.reduce((sum, d) => sum + (Number(d.weight) || 0), 0);
+  }, [defectEntries]);
 
   const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal;
 
-  // Processing qty = usable qty - scrap - defective
-  const processingQty = Math.max(0, usableQty - inlineDeductions);
+  // Processing qty depends on Full/Partial selection
+  const baseProcessingQty = Math.max(0, usableQty - inlineDeductions);
+  const processingQty = coilMode === 'partial' && partialQty
+    ? Math.min(Number(partialQty) || 0, baseProcessingQty)
+    : baseProcessingQty;
+
+  // Defect entry helpers
+  const addDefectEntry = () => setDefectEntries(prev => [...prev, { type: '', weight: '' }]);
+  const removeDefectEntry = (i: number) => setDefectEntries(prev => prev.filter((_, idx) => idx !== i));
+  const updateDefectEntry = (i: number, field: keyof DefectEntry, val: string) => {
+    setDefectEntries(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d));
+  };
 
   // Auto-calculate slit quantities when widths change
   const autoCalcSlitWidths = useMemo(() => {
@@ -102,6 +119,10 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
       return;
     }
+    if (!coilMode) {
+      toast.error('Please select Full Coil or Partial Coil');
+      return;
+    }
     if (processingQty <= 0) {
       toast.error('Processing quantity must be greater than 0');
       return;
@@ -129,19 +150,21 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
-      // 2. Save inline defective entry
-      if (inlineDefectiveTotal > 0 && defectType) {
-        await insertAction.mutateAsync({
-          batch_id: batch.id,
-          action_type: 'defective',
-          defect_type: defectType,
-          net_weight: inlineDefectiveTotal,
-          gross_weight: null,
-          order_id: null,
-          sales_date: null,
-          invoice_number: null,
-          scrap_type: null,
-        });
+      // 2. Save inline defective entries (multiple)
+      for (const d of defectEntries) {
+        if (d.type && Number(d.weight) > 0) {
+          await insertAction.mutateAsync({
+            batch_id: batch.id,
+            action_type: 'defective',
+            defect_type: d.type,
+            net_weight: Number(d.weight),
+            gross_weight: null,
+            order_id: null,
+            sales_date: null,
+            invoice_number: null,
+            scrap_type: null,
+          });
+        }
       }
 
       // 3. Build output items
@@ -240,25 +263,65 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             )}
           </div>
 
-          {/* Inline Defective Section */}
+          {/* Inline Defective Section — Multiple entries */}
           <div className="border rounded-md p-3 space-y-2">
-            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Defective</p>
-            <div className="grid grid-cols-2 items-center gap-2">
-              <div>
-                <Label className="text-xs">Defect Type</Label>
-                <Select value={defectType} onValueChange={setDefectType}>
-                  <SelectTrigger className="h-8"><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>
-                    {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Net Weight (Kg)</Label>
-                <Input type="number" className="h-8" value={defNetWeight} onChange={e => setDefNetWeight(e.target.value)} placeholder="0" />
-              </div>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Defective</p>
+              <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={addDefectEntry}>
+                <Plus className="h-3 w-3" /> Add
+              </Button>
             </div>
+            {defectEntries.map((d, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                <div>
+                  <Label className="text-xs">Defect Type</Label>
+                  <Select value={d.type} onValueChange={v => updateDefectEntry(i, 'type', v)}>
+                    <SelectTrigger className="h-8"><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Net Weight (Kg)</Label>
+                  <Input type="number" className="h-8" value={d.weight} onChange={e => updateDefectEntry(i, 'weight', e.target.value)} placeholder="0" />
+                </div>
+                {defectEntries.length > 1 && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => removeDefectEntry(i)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {inlineDefectiveTotal > 0 && (
+              <div className="text-xs text-muted-foreground text-right">Total Defective: {inlineDefectiveTotal.toFixed(2)} Kg</div>
+            )}
           </div>
+
+          {/* Full Coil / Partial Coil */}
+          <div>
+            <Label className="text-xs">Coil Processing Mode</Label>
+            <Select value={coilMode} onValueChange={(v: 'full' | 'partial') => { setCoilMode(v); if (v === 'full') setPartialQty(''); }}>
+              <SelectTrigger><SelectValue placeholder="Select Full or Partial Coil" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full">Full Coil</SelectItem>
+                <SelectItem value="partial">Partial Coil</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {coilMode === 'partial' && (
+            <div>
+              <Label className="text-xs">Processing Qty (Kg)</Label>
+              <Input
+                type="number"
+                value={partialQty}
+                onChange={e => setPartialQty(e.target.value)}
+                placeholder={`Max ${baseProcessingQty.toFixed(2)}`}
+                max={baseProcessingQty}
+              />
+            </div>
+          )}
 
           {/* Processing Quantity (auto-calculated) */}
           <div className="bg-muted/30 rounded-md p-3 text-sm">
@@ -268,7 +331,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
             {inlineDeductions > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
-                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective)
+                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective){coilMode === 'partial' && partialQty ? ` → capped at ${partialQty}` : ''}
               </div>
             )}
           </div>
