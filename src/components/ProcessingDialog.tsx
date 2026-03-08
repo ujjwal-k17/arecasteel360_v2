@@ -49,6 +49,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     Object.fromEntries(SCRAP_TYPES_NO_TRIM.map(t => [t, '']))
   );
   const [defectEntries, setDefectEntries] = useState<DefectEntry[]>([{ type: '', weight: '' }]);
+  const [looseCoilSaleQty, setLooseCoilSaleQty] = useState('');
 
   // Calculate inline scrap + defective totals
   const inlineScrapTotal = useMemo(() => {
@@ -59,7 +60,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     return defectEntries.reduce((sum, d) => sum + (Number(d.weight) || 0), 0);
   }, [defectEntries]);
 
-  const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal;
+  const looseCoilSaleTotal = Number(looseCoilSaleQty) || 0;
+  const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal + looseCoilSaleTotal;
 
   // Processing qty depends on Full/Partial selection
   const baseProcessingQty = Math.max(0, usableQty - inlineDeductions);
@@ -175,7 +177,21 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
-      // 3. Build output items
+      // 2b. Save loose coil sale
+      if (looseCoilSaleTotal > 0) {
+        await insertAction.mutateAsync({
+          batch_id: batch.id,
+          action_type: 'loose_coil_sale',
+          net_weight: looseCoilSaleTotal,
+          gross_weight: null,
+          order_id: null,
+          sales_date: new Date().toISOString().slice(0, 10),
+          invoice_number: null,
+          defect_type: null,
+          scrap_type: null,
+        });
+      }
+
       let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
 
       if (processType === 'Slit') {
@@ -306,6 +322,21 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             )}
           </div>
 
+          {/* Loose Coil Sale Section */}
+          <div className="border rounded-md p-3 space-y-2">
+            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Loose Coil Sale</p>
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label className="text-xs">Sale Qty (Kg)</Label>
+              <Input
+                type="number"
+                className="h-8"
+                value={looseCoilSaleQty}
+                onChange={e => setLooseCoilSaleQty(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+          </div>
+
           {/* Full Coil / Partial Coil */}
           <div>
             <Label className="text-xs">Coil Processing Mode</Label>
@@ -339,7 +370,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
             {inlineDeductions > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
-                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective){coilMode === 'partial' && partialQty ? ` → capped at ${partialQty}` : ''}
+                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective + loose sale){coilMode === 'partial' && partialQty ? ` → capped at ${partialQty}` : ''}
               </div>
             )}
           </div>
