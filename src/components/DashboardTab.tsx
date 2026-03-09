@@ -25,6 +25,7 @@ export default function DashboardTab() {
   const { data: wipItems } = useWIPItems();
   const { data: fgItems } = useFGItems();
   const { data: scrapSales } = useScrapSales();
+  const { data: processingRecords } = useAllProcessingRecords();
 
   const { data: palletSkus } = useQuery({
     queryKey: ['pallet_skus'],
