@@ -1,0 +1,2 @@
+ALTER TABLE public.inventory_actions DROP CONSTRAINT inventory_actions_action_type_check;
+ALTER TABLE public.inventory_actions ADD CONSTRAINT inventory_actions_action_type_check CHECK (action_type = ANY (ARRAY['sales'::text, 'defective'::text, 'scrap'::text, 'pack_coil_sale'::text, 'loose_coil_sale'::text]));
