@@ -131,7 +131,8 @@ export function useInsertProcessing() {
           item.source_id = params.batchId;
           item.source_type = 'coil';
         }
-        await supabase.from(targetTable as any).insert([item]);
+        const { error: singleErr } = await supabase.from(targetTable as any).insert([item]);
+        if (singleErr) throw singleErr;
       }
 
       await supabase.from('batches').update({ batch_status: 'loose' } as any).eq('id', params.batchId);
