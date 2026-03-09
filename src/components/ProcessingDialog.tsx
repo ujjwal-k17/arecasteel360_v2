@@ -49,7 +49,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     Object.fromEntries(SCRAP_TYPES_NO_TRIM.map(t => [t, '']))
   );
   const [defectEntries, setDefectEntries] = useState<DefectEntry[]>([{ type: '', weight: '' }]);
-  const [looseCoilSaleQty, setLooseCoilSaleQty] = useState('');
+  // looseCoilSaleQty removed
 
   // Calculate inline scrap + defective totals
   const inlineScrapTotal = useMemo(() => {
@@ -60,8 +60,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     return defectEntries.reduce((sum, d) => sum + (Number(d.weight) || 0), 0);
   }, [defectEntries]);
 
-  const looseCoilSaleTotal = Number(looseCoilSaleQty) || 0;
-  const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal + looseCoilSaleTotal;
+  const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal;
 
   // Processing qty depends on Full/Partial selection
   const baseProcessingQty = Math.max(0, usableQty - inlineDeductions);
@@ -124,22 +123,19 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
-    const isLooseCoilSaleOnly = looseCoilSaleTotal > 0 && !processType && !coilMode;
     const effectiveOutputType = processType === 'Slit' ? outputType : 'FG';
 
-    if (!isLooseCoilSaleOnly) {
-      if (!processType || !effectiveOutputType) {
-        toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
-        return;
-      }
-      if (!coilMode) {
-        toast.error('Please select Full Coil or Partial Coil');
-        return;
-      }
-      if (processingQty <= 0) {
-        toast.error('Processing quantity must be greater than 0');
-        return;
-      }
+    if (!processType || !effectiveOutputType) {
+      toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
+      return;
+    }
+    if (!coilMode) {
+      toast.error('Please select Full Coil or Partial Coil');
+      return;
+    }
+    if (processingQty <= 0) {
+      toast.error('Processing quantity must be greater than 0');
+      return;
     }
     if (exceedsUsable) {
       toast.error(`Total (${totalCommitted.toFixed(2)} Kg) exceeds usable qty (${usableQty.toFixed(2)} Kg)`);
@@ -181,63 +177,45 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
-      // 2b. Save loose coil sale
-      if (looseCoilSaleTotal > 0) {
-        await insertAction.mutateAsync({
-          batch_id: batch.id,
-          action_type: 'loose_coil_sale',
-          net_weight: looseCoilSaleTotal,
-          gross_weight: null,
-          order_id: null,
-          sales_date: new Date().toISOString().slice(0, 10),
-          invoice_number: null,
-          defect_type: null,
-          scrap_type: null,
-        });
+      let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
+
+      if (processType === 'Slit') {
+        if (autoCalcSlitWidths.length === 0 || autoCalcSlitWidths.some(s => !s.width)) {
+          toast.error('Please fill all slit width entries');
+          return;
+        }
+        outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
+      } else if (processType === 'CTL') {
+        if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
+          toast.error('Please fill all CTL length entries');
+          return;
+        }
+        outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
       }
 
-      // 3-5. Only run processing if not loose-coil-sale-only
-      if (!isLooseCoilSaleOnly) {
-        let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
+      await insertProcessing.mutateAsync({
+        batchId: batch.id,
+        processType,
+        outputType: effectiveOutputType,
+        inputQty: processingQty,
+        orderId: '',
+        outputItems,
+        batch,
+      });
 
-        if (processType === 'Slit') {
-          if (autoCalcSlitWidths.length === 0 || autoCalcSlitWidths.some(s => !s.width)) {
-            toast.error('Please fill all slit width entries');
-            return;
-          }
-          outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
-        } else if (processType === 'CTL') {
-          if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
-            toast.error('Please fill all CTL length entries');
-            return;
-          }
-          outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
-        }
-
-        await insertProcessing.mutateAsync({
-          batchId: batch.id,
-          processType,
-          outputType: effectiveOutputType,
-          inputQty: processingQty,
-          orderId: '',
-          outputItems,
-          batch,
-        });
-
-        if (processType === 'Slit' && trimQty > 0.01) {
-          const { supabase } = await import('@/integrations/supabase/client');
-          await supabase.from('inventory_actions').insert({
-            batch_id: batch.id,
-            action_type: 'scrap',
-            scrap_type: 'Trimming',
-            net_weight: Math.round(trimQty * 100) / 100,
-            gross_weight: null,
-            order_id: null,
-            sales_date: null,
-            invoice_number: null,
-            defect_type: null,
-          } as any);
-        }
+      if (processType === 'Slit' && trimQty > 0.01) {
+        const { supabase } = await import('@/integrations/supabase/client');
+        await supabase.from('inventory_actions').insert({
+          batch_id: batch.id,
+          action_type: 'scrap',
+          scrap_type: 'Trimming',
+          net_weight: Math.round(trimQty * 100) / 100,
+          gross_weight: null,
+          order_id: null,
+          sales_date: null,
+          invoice_number: null,
+          defect_type: null,
+        } as any);
       }
 
       toast.success(`Processing recorded for batch ${batch.batch_number}`);
@@ -269,21 +247,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               <span className="text-xs">{batch.coating || '-'}</span>
               <span className="text-muted-foreground text-xs">Usable Qty:</span>
               <span className="text-xs font-mono-num font-semibold">{usableQty.toFixed(2)} Kg</span>
-            </div>
-          </div>
-
-          {/* Loose Coil Sale Section */}
-          <div className="border rounded-md p-3 space-y-2">
-            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Loose Coil Sale</p>
-            <div className="grid grid-cols-2 items-center gap-2">
-              <Label className="text-xs">Sale Qty (Kg)</Label>
-              <Input
-                type="number"
-                className="h-8"
-                value={looseCoilSaleQty}
-                onChange={e => setLooseCoilSaleQty(e.target.value)}
-                placeholder="0"
-              />
             </div>
           </div>
 
@@ -375,7 +338,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
             {inlineDeductions > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
-                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective + loose sale){coilMode === 'partial' && partialQty ? ` → capped at ${partialQty}` : ''}
+                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective){coilMode === 'partial' && partialQty ? ` → capped at ${partialQty}` : ''}
               </div>
             )}
           </div>
@@ -465,28 +428,42 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 <Label className="text-xs"># of Sizes</Label>
                 <Input type="number" value={numSizes} onChange={e => handleNumSizesChange(e.target.value)} className="w-24" />
               </div>
-              {ctlLengths.map((s, i) => (
-                <div key={i} className="grid grid-cols-3 gap-2">
-                  <div>
-                    <Label className="text-xs">CTL Length {i + 1} (mm)</Label>
-                    <Input type="number" value={s.length} onChange={e => {
-                      const arr = [...ctlLengths]; arr[i] = { ...arr[i], length: e.target.value }; setCtlLengths(arr);
-                    }} />
+              {ctlLengths.map((s, i) => {
+                const t = batch.thickness || 0;
+                const w = batch.width || 0;
+                const l = Number(s.length) || 0;
+                const pcs = Number(s.pcs) || 0;
+                const estWt = t * w * l * pcs * 0.00000785;
+                return (
+                  <div key={i} className="space-y-1">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <Label className="text-xs">CTL Length {i + 1} (mm)</Label>
+                        <Input type="number" value={s.length} onChange={e => {
+                          const arr = [...ctlLengths]; arr[i] = { ...arr[i], length: e.target.value }; setCtlLengths(arr);
+                        }} />
+                      </div>
+                      <div>
+                        <Label className="text-xs"># Pcs</Label>
+                        <Input type="number" value={s.pcs} onChange={e => {
+                          const arr = [...ctlLengths]; arr[i] = { ...arr[i], pcs: e.target.value }; setCtlLengths(arr);
+                        }} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Qty (Kg)</Label>
+                        <Input type="number" value={s.qty} onChange={e => {
+                          const arr = [...ctlLengths]; arr[i] = { ...arr[i], qty: e.target.value }; setCtlLengths(arr);
+                        }} />
+                      </div>
+                    </div>
+                    {estWt > 0 && (
+                      <div className="text-xs text-muted-foreground pl-1">
+                        Est. Weight: <span className="font-mono-num font-medium">{estWt.toFixed(2)} Kg</span>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-xs">Qty (Kg)</Label>
-                    <Input type="number" value={s.qty} onChange={e => {
-                      const arr = [...ctlLengths]; arr[i] = { ...arr[i], qty: e.target.value }; setCtlLengths(arr);
-                    }} />
-                  </div>
-                  <div>
-                    <Label className="text-xs"># Pcs</Label>
-                    <Input type="number" value={s.pcs} onChange={e => {
-                      const arr = [...ctlLengths]; arr[i] = { ...arr[i], pcs: e.target.value }; setCtlLengths(arr);
-                    }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
