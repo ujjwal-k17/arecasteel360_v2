@@ -243,8 +243,8 @@ export default function PhysicalInventoryTab() {
         'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
         'Coil No': b.coil_number || '', 'Purchase Date': b.purchase_date || '', 'Purchase From': b.purchase_from || '',
         'Sales (Kg)': salesWt || '', 'Defective (Kg)': defectiveWt || '', 'Scrap (Kg)': scrapWt || '',
-        'Balance Qty': calcBalanceQty(b, allActions).toFixed(2),
-        'Usable Qty': calcUsableBalanceQty(b, allActions).toFixed(2),
+        'Balance Qty': calcBalanceQty(b, allActions, allProcRecords).toFixed(2),
+        'Usable Qty': calcUsableBalanceQty(b, allActions, allProcRecords).toFixed(2),
       };
     });
     const ws = XLSX.utils.json_to_sheet(rows);
