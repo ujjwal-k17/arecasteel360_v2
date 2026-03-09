@@ -77,7 +77,8 @@ export function useInsertProcessing() {
           qty_kg: item.qty_kg,
           num_pcs: item.num_pcs ?? null,
         }));
-        await supabase.from('processing_output_items' as any).insert(items);
+        const { error: outErr } = await supabase.from('processing_output_items' as any).insert(items);
+        if (outErr) throw outErr;
       }
 
       const batch = params.batch;
