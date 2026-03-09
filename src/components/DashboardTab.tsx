@@ -140,26 +140,25 @@ export default function DashboardTab() {
 
   // Pallets
   const palletStats = useMemo(() => {
-    const skus = palletSkus || [];
     const purchases = palletPurchases || [];
     const consumptions = palletConsumptions || [];
-    const bySize = skus.map(sku => {
-      const skuPurchases = purchases.filter(p => p.pallet_sku_id === sku.id);
-      const skuConsumptions = consumptions.filter(c => c.pallet_sku_id === sku.id);
-      const totalPurchasedPcs = skuPurchases.reduce((s, p) => s + (p.num_pcs || 0), 0);
-      const totalPurchasedKg = skuPurchases.reduce((s, p) => s + (p.weight_kg || 0), 0);
-      const totalConsumedPcs = skuConsumptions.reduce((s, c) => s + (c.num_pcs || 0), 0);
-      const totalConsumedKg = skuConsumptions.reduce((s, c) => s + (c.weight_kg || 0), 0);
-      return {
-        size: sku.pallet_size,
-        stockPcs: totalPurchasedPcs - totalConsumedPcs,
-        stockKg: totalPurchasedKg - totalConsumedKg,
-      };
-    });
-    const totalStockPcs = bySize.reduce((s, b) => s + b.stockPcs, 0);
-    const totalStockKg = bySize.reduce((s, b) => s + b.stockKg, 0);
-    return { bySize, totalStockPcs, totalStockKg, skuCount: skus.length };
-  }, [palletSkus, palletPurchases, palletConsumptions]);
+    const totalPurchasedPcs = purchases.reduce((s, p) => s + (p.num_pcs || 0), 0);
+    const totalPurchasedKg = purchases.reduce((s, p) => s + (p.weight_kg || 0), 0);
+    const totalConsumedPcs = consumptions.reduce((s, c) => s + (c.num_pcs || 0), 0);
+    const totalConsumedKg = consumptions.reduce((s, c) => s + (c.weight_kg || 0), 0);
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const monthPurchases = purchases.filter(p => p.purchase_date >= monthStart);
+    const monthConsumptions = consumptions.filter(c => c.consumption_date >= monthStart);
+    return {
+      totalStockPcs: totalPurchasedPcs - totalConsumedPcs,
+      totalStockKg: totalPurchasedKg - totalConsumedKg,
+      monthPurchaseKg: monthPurchases.reduce((s, p) => s + (p.weight_kg || 0), 0),
+      monthPurchasePcs: monthPurchases.reduce((s, p) => s + (p.num_pcs || 0), 0),
+      monthConsumptionKg: monthConsumptions.reduce((s, c) => s + (c.weight_kg || 0), 0),
+      monthConsumptionPcs: monthConsumptions.reduce((s, c) => s + (c.num_pcs || 0), 0),
+    };
+  }, [palletPurchases, palletConsumptions]);
 
   const totalCoilsQty = coilsByMaterialMake.reduce((s, g) => s + g.totalQty, 0);
   const totalWipQty = wipByMaterialProcess.reduce((s, g) => s + g.totalQty, 0);
