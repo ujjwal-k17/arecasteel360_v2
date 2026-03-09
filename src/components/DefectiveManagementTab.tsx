@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAllBatches, useAllActions, getSKUKey, type Batch, type InventoryAction } from '@/hooks/useBatches';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useDefectiveSales, useInsertDefectiveSale } from '@/hooks/useScrapSales';
+import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -17,6 +18,8 @@ interface DefectiveBatchDetail {
   netWeight: number;
   defectType: string;
   createdAt: string;
+  source: 'coil' | 'fg';
+  skuKey: string;
 }
 
 export default function DefectiveManagementTab() {
@@ -25,43 +28,81 @@ export default function DefectiveManagementTab() {
   const { data: actions } = useAllActions();
   const { data: defSales } = useDefectiveSales();
   const insertDefSale = useInsertDefectiveSale();
-  const [sellDialog, setSellDialog] = useState<{ skuKey: string; batchIds: string[] } | null>(null);
+  const [sellDialog, setSellDialog] = useState<{ defectType: string; batchIds: string[] } | null>(null);
   const [saleForm, setSaleForm] = useState({ order_id: '', invoice_number: '', sales_date: '', quantity: '' });
-  const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
+  const [expandedType, setExpandedType] = useState<string | null>(null);
+
+  // FG defectives
+  const { data: fgDefectives } = useQuery({
+    queryKey: ['fg_defectives'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fg_defectives' as any).select('*, fg_items(*)');
+      if (error) throw error;
+      return data as any[];
+    },
+  });
 
   const allActions = (actions as InventoryAction[]) || [];
   const defectiveActions = allActions.filter(a => a.action_type === 'defective');
 
-  // Aggregate defective by SKU with batch details
-  const skuDefMap = new Map<string, { skuKey: string; totalWeight: number; batchIds: string[]; batchDetails: DefectiveBatchDetail[] }>();
-  defectiveActions.forEach(a => {
-    const batch = (batches || []).find(b => b.id === a.batch_id);
-    if (!batch) return;
-    const key = getSKUKey(batch);
-    if (!skuDefMap.has(key)) skuDefMap.set(key, { skuKey: key, totalWeight: 0, batchIds: [], batchDetails: [] });
-    const entry = skuDefMap.get(key)!;
-    entry.totalWeight += a.net_weight || 0;
-    if (!entry.batchIds.includes(a.batch_id)) entry.batchIds.push(a.batch_id);
-    entry.batchDetails.push({
-      batchNumber: batch.batch_number,
-      batchId: a.batch_id,
-      netWeight: a.net_weight || 0,
-      defectType: a.defect_type || '-',
-      createdAt: a.created_at,
+  // Group all defective entries by defect type
+  const defectTypeMap = useMemo(() => {
+    const map = new Map<string, { defectType: string; totalWeight: number; batchIds: string[]; details: DefectiveBatchDetail[] }>();
+
+    // Coil defectives
+    defectiveActions.forEach(a => {
+      const batch = (batches || []).find(b => b.id === a.batch_id);
+      if (!batch) return;
+      const defType = a.defect_type || 'Unknown';
+      if (!map.has(defType)) map.set(defType, { defectType: defType, totalWeight: 0, batchIds: [], details: [] });
+      const entry = map.get(defType)!;
+      entry.totalWeight += a.net_weight || 0;
+      if (!entry.batchIds.includes(a.batch_id)) entry.batchIds.push(a.batch_id);
+      entry.details.push({
+        batchNumber: batch.batch_number,
+        batchId: a.batch_id,
+        netWeight: a.net_weight || 0,
+        defectType: defType,
+        createdAt: a.created_at,
+        source: 'coil',
+        skuKey: getSKUKey(batch),
+      });
     });
-  });
 
-  // Subtract sold
-  (defSales || []).forEach((s: any) => {
-    if (s.batch_id && s.batches) {
-      const key = getSKUKey(s.batches);
-      if (skuDefMap.has(key)) {
-        skuDefMap.get(key)!.totalWeight -= s.quantity || 0;
+    // FG defectives
+    (fgDefectives || []).forEach((d: any) => {
+      const defType = d.defect_type || 'Unknown';
+      if (!map.has(defType)) map.set(defType, { defectType: defType, totalWeight: 0, batchIds: [], details: [] });
+      const entry = map.get(defType)!;
+      entry.totalWeight += d.quantity || 0;
+      const fgItem = d.fg_items;
+      entry.details.push({
+        batchNumber: fgItem ? `FG-${fgItem.process || ''}` : 'FG Item',
+        batchId: d.fg_item_id,
+        netWeight: d.quantity || 0,
+        defectType: defType,
+        createdAt: d.created_at,
+        source: 'fg',
+        skuKey: fgItem ? `${fgItem.material || '-'} | ${fgItem.thickness ?? '-'}x${fgItem.width ?? '-'}` : '-',
+      });
+    });
+
+    // Subtract sold from coil defectives
+    (defSales || []).forEach((s: any) => {
+      if (s.batch_id && s.batches) {
+        // Try to find defect type from the batch's defective actions
+        const batchDefActions = defectiveActions.filter(a => a.batch_id === s.batch_id);
+        if (batchDefActions.length > 0) {
+          const defType = batchDefActions[0].defect_type || 'Unknown';
+          if (map.has(defType)) {
+            map.get(defType)!.totalWeight -= s.quantity || 0;
+          }
+        }
       }
-    }
-  });
+    });
 
-  const defRows = Array.from(skuDefMap.values()).filter(r => r.totalWeight > 0);
+    return Array.from(map.values()).filter(r => r.totalWeight > 0.01);
+  }, [defectiveActions, batches, fgDefectives, defSales]);
 
   const handleSell = async () => {
     if (!sellDialog) return;
@@ -80,13 +121,14 @@ export default function DefectiveManagementTab() {
   };
 
   const handleDownloadExcel = () => {
-    const rows: { SKU: string; 'Batch Number': string; 'Defect Type': string; 'Net Weight (Kg)': string; Date: string }[] = [];
-    defRows.forEach(r => {
-      r.batchDetails.forEach(bd => {
+    const rows: { 'Defect Type': string; Source: string; SKU: string; 'Batch/Item': string; 'Net Weight (Kg)': string; Date: string }[] = [];
+    defectTypeMap.forEach(r => {
+      r.details.forEach(bd => {
         rows.push({
-          SKU: r.skuKey,
-          'Batch Number': bd.batchNumber,
           'Defect Type': bd.defectType,
+          Source: bd.source === 'coil' ? 'Coil' : 'FG',
+          SKU: bd.skuKey,
+          'Batch/Item': bd.batchNumber,
           'Net Weight (Kg)': bd.netWeight.toFixed(2),
           Date: bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '',
         });
@@ -103,7 +145,7 @@ export default function DefectiveManagementTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); queryClient.invalidateQueries({ queryKey: ['inventory_actions'] }); queryClient.invalidateQueries({ queryKey: ['defective_sales'] }); toast.success('Refreshed'); }} className="gap-2">
+        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['batches'] }); queryClient.invalidateQueries({ queryKey: ['inventory_actions'] }); queryClient.invalidateQueries({ queryKey: ['defective_sales'] }); queryClient.invalidateQueries({ queryKey: ['fg_defectives'] }); toast.success('Refreshed'); }} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
         <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2">
@@ -115,22 +157,22 @@ export default function DefectiveManagementTab() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-8"></TableHead>
-              <TableHead className="text-xs font-semibold">SKU</TableHead>
-              <TableHead className="text-xs font-semibold">Defective Qty (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold">Defect Type</TableHead>
+              <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {defRows.length === 0 && (
+            {defectTypeMap.length === 0 && (
               <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No defective material recorded.</TableCell></TableRow>
             )}
-            {defRows.map(r => {
-              const isExpanded = expandedSKU === r.skuKey;
+            {defectTypeMap.map(r => {
+              const isExpanded = expandedType === r.defectType;
               return (
                 <>
-                  <TableRow key={r.skuKey} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedSKU(isExpanded ? null : r.skuKey)}>
+                  <TableRow key={r.defectType} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedType(isExpanded ? null : r.defectType)}>
                     <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
-                    <TableCell className="text-sm font-medium">{r.skuKey}</TableCell>
+                    <TableCell className="text-sm font-medium">{r.defectType}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{r.totalWeight.toFixed(2)}</TableCell>
                     <TableCell>
                       <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(r); }}>
@@ -139,24 +181,26 @@ export default function DefectiveManagementTab() {
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
-                    <TableRow key={`${r.skuKey}-detail`}>
+                    <TableRow key={`${r.defectType}-detail`}>
                       <TableCell colSpan={4} className="p-0">
                         <div className="bg-muted/10 border-t px-6 py-2">
-                          <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">Details</p>
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="text-xs">Batch No</TableHead>
-                                <TableHead className="text-xs">Defect Type</TableHead>
+                                <TableHead className="text-xs">Source</TableHead>
+                                <TableHead className="text-xs">Batch / Item</TableHead>
+                                <TableHead className="text-xs">SKU</TableHead>
                                 <TableHead className="text-xs">Net Wt (Kg)</TableHead>
                                 <TableHead className="text-xs">Date</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {r.batchDetails.map((bd, i) => (
+                              {r.details.map((bd, i) => (
                                 <TableRow key={i}>
+                                  <TableCell className="text-xs">{bd.source === 'coil' ? 'Coil' : 'FG'}</TableCell>
                                   <TableCell className="text-xs">{bd.batchNumber}</TableCell>
-                                  <TableCell className="text-xs">{bd.defectType}</TableCell>
+                                  <TableCell className="text-xs">{bd.skuKey}</TableCell>
                                   <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
                                   <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
                                 </TableRow>

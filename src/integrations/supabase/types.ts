@@ -124,6 +124,38 @@ export type Database = {
           },
         ]
       }
+      fg_defectives: {
+        Row: {
+          created_at: string
+          defect_type: string
+          fg_item_id: string
+          id: string
+          quantity: number | null
+        }
+        Insert: {
+          created_at?: string
+          defect_type: string
+          fg_item_id: string
+          id?: string
+          quantity?: number | null
+        }
+        Update: {
+          created_at?: string
+          defect_type?: string
+          fg_item_id?: string
+          id?: string
+          quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fg_defectives_fg_item_id_fkey"
+            columns: ["fg_item_id"]
+            isOneToOne: false
+            referencedRelation: "fg_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fg_items: {
         Row: {
           coating: string | null
@@ -185,6 +217,44 @@ export type Database = {
             columns: ["processing_record_id"]
             isOneToOne: false
             referencedRelation: "processing_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fg_sales: {
+        Row: {
+          created_at: string
+          fg_item_id: string
+          id: string
+          invoice_number: string | null
+          order_id: string | null
+          quantity: number | null
+          sales_date: string | null
+        }
+        Insert: {
+          created_at?: string
+          fg_item_id: string
+          id?: string
+          invoice_number?: string | null
+          order_id?: string | null
+          quantity?: number | null
+          sales_date?: string | null
+        }
+        Update: {
+          created_at?: string
+          fg_item_id?: string
+          id?: string
+          invoice_number?: string | null
+          order_id?: string | null
+          quantity?: number | null
+          sales_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fg_sales_fg_item_id_fkey"
+            columns: ["fg_item_id"]
+            isOneToOne: false
+            referencedRelation: "fg_items"
             referencedColumns: ["id"]
           },
         ]
