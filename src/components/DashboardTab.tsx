@@ -71,7 +71,9 @@ export default function DashboardTab() {
     return { count: transit.length, totalQty, avgDays };
   }, [allBatches]);
 
-  // Coils
+  // Coils — use usable balance qty (accounts for processing, sales, scrap, defective)
+  const allActionsTyped = allActions as InventoryAction[];
+  const allProcRecords = processingRecords || [];
   const coilsByMaterialMake = useMemo(() => {
     const received = allBatches.filter(b => b.status === 'received');
     const map = new Map<string, { material: string; make: string; count: number; totalQty: number }>();
@@ -80,10 +82,10 @@ export default function DashboardTab() {
       if (!map.has(key)) map.set(key, { material: b.material || '-', make: b.make || '-', count: 0, totalQty: 0 });
       const g = map.get(key)!;
       g.count++;
-      g.totalQty += b.net_weight || 0;
+      g.totalQty += calcUsableBalanceQty(b, allActionsTyped, allProcRecords);
     }
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
-  }, [allBatches]);
+  }, [allBatches, allActionsTyped, allProcRecords]);
 
   // WIP
   const wipByMaterialProcess = useMemo(() => {
