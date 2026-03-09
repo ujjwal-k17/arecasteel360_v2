@@ -40,8 +40,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [numSizes, setNumSizes] = useState('');
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
-  const [coilMode, setCoilMode] = useState<'full' | 'partial' | ''>('');
-  const [partialQty, setPartialQty] = useState('');
   const [trimOption, setTrimOption] = useState<'yes' | 'no' | ''>('');
 
   // Inline scrap & defective state
@@ -62,11 +60,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
 
   const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal;
 
-  // Processing qty depends on Full/Partial selection
-  const baseProcessingQty = Math.max(0, usableQty - inlineDeductions);
-  const processingQty = coilMode === 'partial' && partialQty
-    ? Math.min(Number(partialQty) || 0, baseProcessingQty)
-    : baseProcessingQty;
+  // Processing qty: always full coil minus deductions
+  const processingQty = Math.max(0, usableQty - inlineDeductions);
 
   // Defect entry helpers
   const addDefectEntry = () => setDefectEntries(prev => [...prev, { type: '', weight: '' }]);
@@ -127,10 +122,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
 
     if (!processType || !effectiveOutputType) {
       toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
-      return;
-    }
-    if (!coilMode) {
-      toast.error('Please select Full Coil or Partial Coil');
       return;
     }
     if (processingQty <= 0) {
@@ -305,30 +296,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             )}
           </div>
 
-          {/* Full Coil / Partial Coil */}
-          <div>
-            <Label className="text-xs">Coil Processing Mode</Label>
-            <Select value={coilMode} onValueChange={(v: 'full' | 'partial') => { setCoilMode(v); if (v === 'full') setPartialQty(''); }}>
-              <SelectTrigger><SelectValue placeholder="Select Full or Partial Coil" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full">Full Coil</SelectItem>
-                <SelectItem value="partial">Partial Coil</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {coilMode === 'partial' && (
-            <div>
-              <Label className="text-xs">Processing Qty (Kg)</Label>
-              <Input
-                type="number"
-                value={partialQty}
-                onChange={e => setPartialQty(e.target.value)}
-                placeholder={`Max ${baseProcessingQty.toFixed(2)}`}
-                max={baseProcessingQty}
-              />
-            </div>
-          )}
 
           {/* Processing Quantity (auto-calculated) */}
           <div className="bg-muted/30 rounded-md p-3 text-sm">
@@ -338,7 +305,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
             {inlineDeductions > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
-                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective){coilMode === 'partial' && partialQty ? ` → capped at ${partialQty}` : ''}
+                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective)
               </div>
             )}
           </div>
