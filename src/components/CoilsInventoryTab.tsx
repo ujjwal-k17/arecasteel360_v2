@@ -318,7 +318,7 @@ export default function CoilsInventoryTab() {
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50">
+            <TableRow className="bg-[hsl(var(--sku-row))]">
               {skuCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
             </TableRow>
           </TableHeader>
@@ -328,7 +328,7 @@ export default function CoilsInventoryTab() {
             )}
             {skuGroups.map(g => (
               <>
-                <TableRow key={g.key} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedSKU(expandedSKU === g.key ? null : g.key)}>
+                <TableRow key={g.key} className="cursor-pointer bg-[hsl(var(--sku-row))] hover:bg-[hsl(var(--sku-row))/0.7] font-medium" onClick={() => setExpandedSKU(expandedSKU === g.key ? null : g.key)}>
                   <TableCell>{expandedSKU === g.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                   <TableCell className="text-sm">{g.material || '-'}</TableCell>
                   <TableCell className="text-sm">{g.make || '-'}</TableCell>
@@ -343,7 +343,7 @@ export default function CoilsInventoryTab() {
                 {expandedSKU === g.key && (
                   <TableRow key={`${g.key}-detail`}>
                     <TableCell colSpan={skuCols.length} className="p-0">
-                      <div className="bg-muted/20 p-3">
+                      <div className="bg-[hsl(var(--batch-row))] p-3">
                         <Table>
                           <TableHeader>
                             <TableRow>

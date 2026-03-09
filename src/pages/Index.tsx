@@ -23,33 +23,33 @@ const Index = () => {
 
       <main className="container py-6">
         <Tabs defaultValue="dashboard">
-          <TabsList className="mb-6 h-10 flex-wrap">
-            <TabsTrigger value="dashboard" className="gap-2 text-sm">
+          <TabsList className="mb-6 h-auto gap-1 bg-transparent p-0 flex flex-wrap">
+            <TabsTrigger value="dashboard" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
               <LayoutDashboard className="h-4 w-4" /> Dashboard
             </TabsTrigger>
-            <TabsTrigger value="in-transit" className="gap-2 text-sm">
+            <TabsTrigger value="in-transit" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
               <Package className="h-4 w-4" /> In-Transit
             </TabsTrigger>
-            <TabsTrigger value="coils" className="gap-2 text-sm">
+            <TabsTrigger value="coils" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
               <Warehouse className="h-4 w-4" /> Coils Inventory
             </TabsTrigger>
-            <TabsTrigger value="wip" className="gap-2 text-sm">
+            <TabsTrigger value="wip" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
               <Layers className="h-4 w-4" /> WIP Inventory
             </TabsTrigger>
-            <TabsTrigger value="fg" className="gap-2 text-sm">
+            <TabsTrigger value="fg" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
               <CheckCircle className="h-4 w-4" /> FG Inventory
             </TabsTrigger>
-            <TabsTrigger value="scrap" className="gap-2 text-sm">
-              <Trash2 className="h-4 w-4" /> Scrap Management
+            <TabsTrigger value="scrap" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+              <Trash2 className="h-4 w-4" /> Scrap
             </TabsTrigger>
-            <TabsTrigger value="defective" className="gap-2 text-sm">
-              <AlertTriangle className="h-4 w-4" /> Defective Material
+            <TabsTrigger value="defective" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+              <AlertTriangle className="h-4 w-4" /> Defective
             </TabsTrigger>
-            <TabsTrigger value="sales-data" className="gap-2 text-sm">
+            <TabsTrigger value="sales-data" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
               <BarChart3 className="h-4 w-4" /> Sales Data
             </TabsTrigger>
-            <TabsTrigger value="pallets" className="gap-2 text-sm">
-              <Boxes className="h-4 w-4" /> Wooden Pallets
+            <TabsTrigger value="pallets" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+              <Boxes className="h-4 w-4" /> Pallets
             </TabsTrigger>
           </TabsList>
 

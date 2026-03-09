@@ -135,9 +135,9 @@ export default function ScrapManagementTab() {
         </Button>
       </div>
       <Tabs defaultValue="inventory">
-        <TabsList>
-          <TabsTrigger value="inventory">Scrap Inventory</TabsTrigger>
-          <TabsTrigger value="sold">Sold Scrap</TabsTrigger>
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="inventory" className="flex-1 sm:flex-none">Scrap Inventory</TabsTrigger>
+          <TabsTrigger value="sold" className="flex-1 sm:flex-none">Sold Scrap</TabsTrigger>
         </TabsList>
 
         <TabsContent value="inventory" className="mt-4">
