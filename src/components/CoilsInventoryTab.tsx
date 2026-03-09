@@ -593,6 +593,7 @@ export default function CoilsInventoryTab() {
       {/* Coil Sale Dialog */}
       {packCoilBatch && (
         <PackCoilSaleDialog
+          key={`${packCoilBatch.id}-${coilSaleMode}`}
           batch={packCoilBatch}
           allActions={allActions}
           processingRecords={allProcRecords}
