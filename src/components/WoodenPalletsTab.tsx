@@ -48,7 +48,8 @@ export default function WoodenPalletsTab() {
 
   // Dialogs
   const [showAddSKU, setShowAddSKU] = useState(false);
-  const [newSKUSize, setNewSKUSize] = useState('');
+  const [newSKUWidth, setNewSKUWidth] = useState('');
+  const [newSKULength, setNewSKULength] = useState('');
   const [showPurchase, setShowPurchase] = useState<PalletSKU | null>(null);
   const [showConsumption, setShowConsumption] = useState<PalletSKU | null>(null);
   const [purchaseForm, setPurchaseForm] = useState({ date: '', supplier: '', weight: '', pcs: '', rate: '' });
@@ -136,12 +137,20 @@ export default function WoodenPalletsTab() {
   };
 
   const handleAddSKU = async () => {
-    if (!newSKUSize.trim()) { toast.error('Pallet size is required'); return; }
+    const w = Number(newSKUWidth);
+    const l = Number(newSKULength);
+    if (!w || w <= 0 || !l || l <= 0) { toast.error('Enter valid Width and Length'); return; }
+    const palletSize = `${w} x ${l}`;
+    if ((skus || []).some(s => s.pallet_size === palletSize)) {
+      toast.error('This pallet size already exists');
+      return;
+    }
     try {
-      await insertSKU.mutateAsync(newSKUSize.trim());
+      await insertSKU.mutateAsync(palletSize);
       toast.success('SKU added');
       setShowAddSKU(false);
-      setNewSKUSize('');
+      setNewSKUWidth('');
+      setNewSKULength('');
     } catch (e: any) {
       toast.error(e.message?.includes('duplicate') ? 'SKU already exists' : 'Failed to add SKU');
     }
@@ -506,10 +515,19 @@ export default function WoodenPalletsTab() {
             <DialogTitle>Add New Pallet SKU</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Pallet Size *</Label>
-              <Input value={newSKUSize} onChange={e => setNewSKUSize(e.target.value)} placeholder="e.g. 1200 x 800" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Width (mm) *</Label>
+                <Input type="number" value={newSKUWidth} onChange={e => setNewSKUWidth(e.target.value)} placeholder="e.g. 1200" />
+              </div>
+              <div>
+                <Label className="text-xs">Length (mm) *</Label>
+                <Input type="number" value={newSKULength} onChange={e => setNewSKULength(e.target.value)} placeholder="e.g. 800" />
+              </div>
             </div>
+            {newSKUWidth && newSKULength && (
+              <p className="text-xs text-muted-foreground">Pallet Size: <span className="font-semibold">{newSKUWidth} x {newSKULength}</span></p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowAddSKU(false)}>Cancel</Button>
