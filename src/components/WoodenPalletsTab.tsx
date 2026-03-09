@@ -48,7 +48,8 @@ export default function WoodenPalletsTab() {
 
   // Dialogs
   const [showAddSKU, setShowAddSKU] = useState(false);
-  const [newSKUSize, setNewSKUSize] = useState('');
+  const [newSKUWidth, setNewSKUWidth] = useState('');
+  const [newSKULength, setNewSKULength] = useState('');
   const [showPurchase, setShowPurchase] = useState<PalletSKU | null>(null);
   const [showConsumption, setShowConsumption] = useState<PalletSKU | null>(null);
   const [purchaseForm, setPurchaseForm] = useState({ date: '', supplier: '', weight: '', pcs: '', rate: '' });
