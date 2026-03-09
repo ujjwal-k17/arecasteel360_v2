@@ -245,17 +245,23 @@ export default function WoodenPalletsTab() {
     toast.success('Refreshed');
   };
 
+  const filteredSkus = useMemo(() => {
+    if (!skus) return [];
+    if (sizeFilter === 'all') return skus;
+    return skus.filter(s => s.pallet_size === sizeFilter);
+  }, [skus, sizeFilter]);
+
   const grandTotalWeight = useMemo(() => {
     let total = 0;
-    skuSummary.forEach(s => { total += s.balanceWeight; });
+    filteredSkus.forEach(s => { total += skuSummary.get(s.id)?.balanceWeight || 0; });
     return total;
-  }, [skuSummary]);
+  }, [filteredSkus, skuSummary]);
 
   const grandTotalPcs = useMemo(() => {
     let total = 0;
-    skuSummary.forEach(s => { total += s.balancePcs; });
+    filteredSkus.forEach(s => { total += skuSummary.get(s.id)?.balancePcs || 0; });
     return total;
-  }, [skuSummary]);
+  }, [filteredSkus, skuSummary]);
 
   return (
     <div className="space-y-4">
