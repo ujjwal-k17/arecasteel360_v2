@@ -152,7 +152,8 @@ export function usePackCoilSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { batchId: string; usableQty: number; orderId?: string; invoiceNumber?: string; salesDate?: string }) => {
-      const { error: insertError } = await supabase.from('inventory_actions').insert({
+      console.log('Pack Coil Sale params:', JSON.stringify(params));
+      const insertPayload = {
         batch_id: params.batchId,
         action_type: 'pack_coil_sale',
         net_weight: params.usableQty,
@@ -162,9 +163,13 @@ export function usePackCoilSale() {
         invoice_number: params.invoiceNumber || null,
         defect_type: null,
         scrap_type: null,
-      } as any);
+      };
+      console.log('Insert payload:', JSON.stringify(insertPayload));
+      const { error: insertError } = await supabase.from('inventory_actions').insert(insertPayload as any);
+      console.log('Insert result error:', insertError);
       if (insertError) throw insertError;
       const { error: updateError } = await supabase.from('batches').update({ batch_status: 'sold' } as any).eq('id', params.batchId);
+      console.log('Update result error:', updateError);
       if (updateError) throw updateError;
     },
     onSuccess: () => {
