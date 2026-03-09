@@ -318,7 +318,7 @@ export default function CoilsInventoryTab() {
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50">
+            <TableRow className="bg-[hsl(var(--sku-row))]">
               {skuCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
             </TableRow>
           </TableHeader>
