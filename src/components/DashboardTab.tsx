@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAllBatches, useAllActions } from '@/hooks/useBatches';
-import { useWIPItems, useFGItems } from '@/hooks/useProcessing';
+import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes } from 'lucide-react';
