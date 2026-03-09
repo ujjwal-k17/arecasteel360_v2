@@ -31,6 +31,10 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const title = isLoose ? 'Loose Coil Sale' : 'Pack Coil Sale';
 
   const handleSubmit = async () => {
+    if (!orderId.trim()) { toast.error('Order ID is required'); return; }
+    if (!invoiceNumber.trim()) { toast.error('Invoice Number is required'); return; }
+    if (!salesDate) { toast.error('Invoice Date is required'); return; }
+
     if (isLoose) {
       const qty = Number(salesQty) || 0;
       if (qty <= 0) { toast.error('Enter a valid quantity'); return; }
@@ -41,9 +45,9 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
           action_type: 'loose_coil_sale',
           net_weight: qty,
           gross_weight: null,
-          order_id: orderId || null,
-          sales_date: salesDate || null,
-          invoice_number: invoiceNumber || null,
+          order_id: orderId,
+          sales_date: salesDate,
+          invoice_number: invoiceNumber,
           defect_type: null,
           scrap_type: null,
         });
@@ -58,9 +62,9 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
         await packCoilSale.mutateAsync({
           batchId: batch.id,
           usableQty,
-          orderId: orderId || undefined,
-          invoiceNumber: invoiceNumber || undefined,
-          salesDate: salesDate || undefined,
+          orderId,
+          invoiceNumber,
+          salesDate,
         });
         toast.success(`Pack Coil sold for batch ${batch.batch_number} — ${usableQty.toFixed(2)} Kg`);
         onClose();
