@@ -404,7 +404,7 @@ export default function CoilsInventoryTab() {
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="start">
                                             <DropdownMenuItem
-                                              disabled={status === 'loose'}
+                                              disabled={status === 'loose' || batchActions.some(a => a.action_type === 'loose_coil_sale')}
                                               onClick={(e) => { e.stopPropagation(); setCoilSaleMode('pack'); setPackCoilBatch(b); }}
                                             >
                                               Pack Coil Sale
