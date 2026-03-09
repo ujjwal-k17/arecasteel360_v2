@@ -449,28 +449,42 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 <Label className="text-xs"># of Sizes</Label>
                 <Input type="number" value={numSizes} onChange={e => handleNumSizesChange(e.target.value)} className="w-24" />
               </div>
-              {ctlLengths.map((s, i) => (
-                <div key={i} className="grid grid-cols-3 gap-2">
-                  <div>
-                    <Label className="text-xs">CTL Length {i + 1} (mm)</Label>
-                    <Input type="number" value={s.length} onChange={e => {
-                      const arr = [...ctlLengths]; arr[i] = { ...arr[i], length: e.target.value }; setCtlLengths(arr);
-                    }} />
+              {ctlLengths.map((s, i) => {
+                const t = batch.thickness || 0;
+                const w = batch.width || 0;
+                const l = Number(s.length) || 0;
+                const pcs = Number(s.pcs) || 0;
+                const estWt = t * w * l * pcs * 0.00000785;
+                return (
+                  <div key={i} className="space-y-1">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <Label className="text-xs">CTL Length {i + 1} (mm)</Label>
+                        <Input type="number" value={s.length} onChange={e => {
+                          const arr = [...ctlLengths]; arr[i] = { ...arr[i], length: e.target.value }; setCtlLengths(arr);
+                        }} />
+                      </div>
+                      <div>
+                        <Label className="text-xs"># Pcs</Label>
+                        <Input type="number" value={s.pcs} onChange={e => {
+                          const arr = [...ctlLengths]; arr[i] = { ...arr[i], pcs: e.target.value }; setCtlLengths(arr);
+                        }} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Qty (Kg)</Label>
+                        <Input type="number" value={s.qty} onChange={e => {
+                          const arr = [...ctlLengths]; arr[i] = { ...arr[i], qty: e.target.value }; setCtlLengths(arr);
+                        }} />
+                      </div>
+                    </div>
+                    {estWt > 0 && (
+                      <div className="text-xs text-muted-foreground pl-1">
+                        Est. Weight: <span className="font-mono-num font-medium">{estWt.toFixed(2)} Kg</span>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-xs">Qty (Kg)</Label>
-                    <Input type="number" value={s.qty} onChange={e => {
-                      const arr = [...ctlLengths]; arr[i] = { ...arr[i], qty: e.target.value }; setCtlLengths(arr);
-                    }} />
-                  </div>
-                  <div>
-                    <Label className="text-xs"># Pcs</Label>
-                    <Input type="number" value={s.pcs} onChange={e => {
-                      const arr = [...ctlLengths]; arr[i] = { ...arr[i], pcs: e.target.value }; setCtlLengths(arr);
-                    }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
