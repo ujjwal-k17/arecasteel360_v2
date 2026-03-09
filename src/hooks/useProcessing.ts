@@ -109,7 +109,8 @@ export function useInsertProcessing() {
           }
           return base;
         });
-        await supabase.from(targetTable as any).insert(inventoryItems);
+        const { error: invErr } = await supabase.from(targetTable as any).insert(inventoryItems);
+        if (invErr) throw invErr;
       } else {
         const item: any = {
           processing_record_id: (procRec as any).id,
