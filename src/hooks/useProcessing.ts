@@ -236,22 +236,9 @@ export function useWIPProcessing() {
         await supabase.from('fg_items' as any).insert(fgItems);
       }
 
-      // Insert multiple defective entries
-      for (const d of (params.defectives || [])) {
-        if (d.weight > 0) {
-          await supabase.from('inventory_actions').insert({
-            batch_id: params.wipItem.source_batch_id,
-            action_type: 'defective',
-            defect_type: d.type,
-            net_weight: d.weight,
-            gross_weight: null,
-            order_id: null,
-            sales_date: null,
-            invoice_number: null,
-            scrap_type: null,
-          } as any);
-        }
-      }
+      // Defectives from WIP processing are tracked via the WIP item qty reduction
+      // and the processing record's input_qty. No need to insert against original coil batch
+      // as that would cause double counting in balance calculations.
 
       // Calculate remaining qty
       const totalUsed = params.outputItems.reduce((s, i) => s + i.qty_kg, 0) + defectiveTotal;
