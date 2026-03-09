@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAllBatches, useAllActions } from '@/hooks/useBatches';
-import { useWIPItems, useFGItems } from '@/hooks/useProcessing';
+import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes } from 'lucide-react';
+import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, Settings2 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const COLORS = [
@@ -25,6 +25,7 @@ export default function DashboardTab() {
   const { data: wipItems } = useWIPItems();
   const { data: fgItems } = useFGItems();
   const { data: scrapSales } = useScrapSales();
+  const { data: processingRecords } = useAllProcessingRecords();
 
   const { data: palletSkus } = useQuery({
     queryKey: ['pallet_skus'],
@@ -160,6 +161,21 @@ export default function DashboardTab() {
     };
   }, [palletPurchases, palletConsumptions]);
 
+  // Processing this month
+  const processingThisMonth = useMemo(() => {
+    const records = processingRecords || [];
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const monthRecords = records.filter(r => r.created_at >= monthStart);
+    const types = ['Slit', 'CTL', 'GC', 'Profile'];
+    const byType = types.map(t => ({
+      type: t,
+      qty: monthRecords.filter(r => r.process_type === t).reduce((s: number, r: any) => s + (r.input_qty || 0), 0),
+    }));
+    const total = byType.reduce((s, b) => s + b.qty, 0);
+    return { byType, total };
+  }, [processingRecords]);
+
   const totalCoilsQty = coilsByMaterialMake.reduce((s, g) => s + g.totalQty, 0);
   const totalWipQty = wipByMaterialProcess.reduce((s, g) => s + g.totalQty, 0);
   const totalFgQty = fgByMaterialProcess.reduce((s, g) => s + g.totalQty, 0);
@@ -229,7 +245,14 @@ export default function DashboardTab() {
             <Row label="This Month Consumed" value={`${palletStats.monthConsumptionPcs} pcs · ${palletStats.monthConsumptionKg.toFixed(1)} Kg`} />
           </MiniSection>
 
-          {/* Coils */}
+          {/* Processing This Month */}
+          <MiniSection icon={<Settings2 className="h-3.5 w-3.5" />} title="Processing This Month">
+            <Row label="Total" value={`${processingThisMonth.total.toFixed(0)} Kg`} />
+            {processingThisMonth.byType.map(t => (
+              <Row key={t.type} label={t.type} value={`${t.qty.toFixed(0)} Kg`} />
+            ))}
+          </MiniSection>
+
           <MiniSection icon={<Warehouse className="h-3.5 w-3.5" />} title="Coils by Material">
             <MiniTable headers={['Material', 'Make', 'Qty (Kg)']}>
               {coilsByMaterialMake.slice(0, 5).map((g, i) => (
