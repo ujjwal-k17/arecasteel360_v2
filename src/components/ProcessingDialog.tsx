@@ -272,21 +272,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
           </div>
 
-          {/* Loose Coil Sale Section */}
-          <div className="border rounded-md p-3 space-y-2">
-            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Loose Coil Sale</p>
-            <div className="grid grid-cols-2 items-center gap-2">
-              <Label className="text-xs">Sale Qty (Kg)</Label>
-              <Input
-                type="number"
-                className="h-8"
-                value={looseCoilSaleQty}
-                onChange={e => setLooseCoilSaleQty(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          </div>
-
           {/* Inline Scrap Section */}
           <div className="border rounded-md p-3 space-y-2">
             <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Scrap (Kg)</p>
