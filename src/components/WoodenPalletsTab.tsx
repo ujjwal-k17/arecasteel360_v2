@@ -42,6 +42,7 @@ export default function WoodenPalletsTab() {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sizeFilter, setSizeFilter] = useState<string>('all');
 
   // Dialogs
   const [showAddSKU, setShowAddSKU] = useState(false);
@@ -244,17 +245,23 @@ export default function WoodenPalletsTab() {
     toast.success('Refreshed');
   };
 
+  const filteredSkus = useMemo(() => {
+    if (!skus) return [];
+    if (sizeFilter === 'all') return skus;
+    return skus.filter(s => s.pallet_size === sizeFilter);
+  }, [skus, sizeFilter]);
+
   const grandTotalWeight = useMemo(() => {
     let total = 0;
-    skuSummary.forEach(s => { total += s.balanceWeight; });
+    filteredSkus.forEach(s => { total += skuSummary.get(s.id)?.balanceWeight || 0; });
     return total;
-  }, [skuSummary]);
+  }, [filteredSkus, skuSummary]);
 
   const grandTotalPcs = useMemo(() => {
     let total = 0;
-    skuSummary.forEach(s => { total += s.balancePcs; });
+    filteredSkus.forEach(s => { total += skuSummary.get(s.id)?.balancePcs || 0; });
     return total;
-  }, [skuSummary]);
+  }, [filteredSkus, skuSummary]);
 
   return (
     <div className="space-y-4">
@@ -291,7 +298,22 @@ export default function WoodenPalletsTab() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-8" />
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Pallet Size</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">
+                <div className="space-y-1">
+                  <span>Pallet Size</span>
+                  <Select value={sizeFilter} onValueChange={setSizeFilter}>
+                    <SelectTrigger className="h-6 text-[10px] w-full min-w-[100px]">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {(skus || []).map(s => (
+                        <SelectItem key={s.id} value={s.pallet_size}>{s.pallet_size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Balance Weight (Kg)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Balance # of Pcs</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Last Purchase Date</TableHead>
@@ -300,14 +322,14 @@ export default function WoodenPalletsTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(!skus || skus.length === 0) && (
+            {filteredSkus.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  No SKUs found. Add a new SKU or upload inventory.
+                  {(!skus || skus.length === 0) ? 'No SKUs found. Add a new SKU or upload inventory.' : 'No SKUs match the selected filter.'}
                 </TableCell>
               </TableRow>
             )}
-            {(skus || []).map(sku => {
+            {filteredSkus.map(sku => {
               const summary = skuSummary.get(sku.id) || { balanceWeight: 0, balancePcs: 0, lastPurchase: null, lastConsumption: null };
               const isOpen = expanded.has(sku.id);
               const skuPurchases = (purchases || []).filter(p => p.pallet_sku_id === sku.id);
