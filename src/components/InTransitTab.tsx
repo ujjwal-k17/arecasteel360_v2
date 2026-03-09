@@ -359,6 +359,7 @@ export default function InTransitTab() {
                         {b.updated_at ? new Date(b.updated_at).toLocaleDateString('en-IN') : '-'}
                       </TableCell>
                     )}
+                    {!isReceived && (
                       <TableCell>
                         {editingId === b.id ? (
                           <div className="flex gap-1">
