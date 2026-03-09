@@ -223,13 +223,10 @@ export default function DashboardTab() {
 
           {/* Pallets */}
           <MiniSection icon={<Boxes className="h-3.5 w-3.5" />} title="Pallets Stock">
-            {palletStats.bySize.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">No pallet data</p>
-            ) : (
-              palletStats.bySize.map(p => (
-                <Row key={p.size} label={p.size} value={`${p.stockPcs} pcs · ${p.stockKg.toFixed(1)} Kg`} />
-              ))
-            )}
+            <Row label="Stock (Pcs)" value={String(palletStats.totalStockPcs)} />
+            <Row label="Stock (Kg)" value={`${palletStats.totalStockKg.toFixed(1)} Kg`} />
+            <Row label="This Month Purchase" value={`${palletStats.monthPurchasePcs} pcs · ${palletStats.monthPurchaseKg.toFixed(1)} Kg`} />
+            <Row label="This Month Consumed" value={`${palletStats.monthConsumptionPcs} pcs · ${palletStats.monthConsumptionKg.toFixed(1)} Kg`} />
           </MiniSection>
 
           {/* Coils */}
