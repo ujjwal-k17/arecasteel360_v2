@@ -354,7 +354,11 @@ export default function InTransitTab() {
                         {b.status === 'received' ? 'Received' : 'In-Transit'}
                       </Badge>
                     </TableCell>
-                    {!isReceived && (
+                    {isReceived && (
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {b.updated_at ? new Date(b.updated_at).toLocaleDateString('en-IN') : '-'}
+                      </TableCell>
+                    )}
                       <TableCell>
                         {editingId === b.id ? (
                           <div className="flex gap-1">
