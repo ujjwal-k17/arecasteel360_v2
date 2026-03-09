@@ -245,7 +245,14 @@ export default function DashboardTab() {
             <Row label="This Month Consumed" value={`${palletStats.monthConsumptionPcs} pcs · ${palletStats.monthConsumptionKg.toFixed(1)} Kg`} />
           </MiniSection>
 
-          {/* Coils */}
+          {/* Processing This Month */}
+          <MiniSection icon={<Settings2 className="h-3.5 w-3.5" />} title="Processing This Month">
+            <Row label="Total" value={`${processingThisMonth.total.toFixed(0)} Kg`} />
+            {processingThisMonth.byType.map(t => (
+              <Row key={t.type} label={t.type} value={`${t.qty.toFixed(0)} Kg`} />
+            ))}
+          </MiniSection>
+
           <MiniSection icon={<Warehouse className="h-3.5 w-3.5" />} title="Coils by Material">
             <MiniTable headers={['Material', 'Make', 'Qty (Kg)']}>
               {coilsByMaterialMake.slice(0, 5).map((g, i) => (
