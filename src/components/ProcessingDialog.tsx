@@ -177,48 +177,45 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
-      // 3-5. Only run processing if not loose-coil-sale-only
-      if (!isLooseCoilSaleOnly) {
-        let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
+      let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
 
-        if (processType === 'Slit') {
-          if (autoCalcSlitWidths.length === 0 || autoCalcSlitWidths.some(s => !s.width)) {
-            toast.error('Please fill all slit width entries');
-            return;
-          }
-          outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
-        } else if (processType === 'CTL') {
-          if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
-            toast.error('Please fill all CTL length entries');
-            return;
-          }
-          outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
+      if (processType === 'Slit') {
+        if (autoCalcSlitWidths.length === 0 || autoCalcSlitWidths.some(s => !s.width)) {
+          toast.error('Please fill all slit width entries');
+          return;
         }
-
-        await insertProcessing.mutateAsync({
-          batchId: batch.id,
-          processType,
-          outputType: effectiveOutputType,
-          inputQty: processingQty,
-          orderId: '',
-          outputItems,
-          batch,
-        });
-
-        if (processType === 'Slit' && trimQty > 0.01) {
-          const { supabase } = await import('@/integrations/supabase/client');
-          await supabase.from('inventory_actions').insert({
-            batch_id: batch.id,
-            action_type: 'scrap',
-            scrap_type: 'Trimming',
-            net_weight: Math.round(trimQty * 100) / 100,
-            gross_weight: null,
-            order_id: null,
-            sales_date: null,
-            invoice_number: null,
-            defect_type: null,
-          } as any);
+        outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
+      } else if (processType === 'CTL') {
+        if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
+          toast.error('Please fill all CTL length entries');
+          return;
         }
+        outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
+      }
+
+      await insertProcessing.mutateAsync({
+        batchId: batch.id,
+        processType,
+        outputType: effectiveOutputType,
+        inputQty: processingQty,
+        orderId: '',
+        outputItems,
+        batch,
+      });
+
+      if (processType === 'Slit' && trimQty > 0.01) {
+        const { supabase } = await import('@/integrations/supabase/client');
+        await supabase.from('inventory_actions').insert({
+          batch_id: batch.id,
+          action_type: 'scrap',
+          scrap_type: 'Trimming',
+          net_weight: Math.round(trimQty * 100) / 100,
+          gross_weight: null,
+          order_id: null,
+          sales_date: null,
+          invoice_number: null,
+          defect_type: null,
+        } as any);
       }
 
       toast.success(`Processing recorded for batch ${batch.batch_number}`);
