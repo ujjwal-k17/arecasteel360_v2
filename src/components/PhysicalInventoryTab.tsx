@@ -55,6 +55,7 @@ function getMissingFields(b: Batch): string[] {
 export default function PhysicalInventoryTab() {
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
+  const { data: processingRecords } = useAllProcessingRecords();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
