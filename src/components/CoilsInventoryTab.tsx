@@ -590,7 +590,7 @@ export default function CoilsInventoryTab() {
         />
       )}
 
-      {/* Pack Coil Sale Dialog */}
+      {/* Coil Sale Dialog */}
       {packCoilBatch && (
         <PackCoilSaleDialog
           batch={packCoilBatch}
@@ -598,6 +598,7 @@ export default function CoilsInventoryTab() {
           processingRecords={allProcRecords}
           open={!!packCoilBatch}
           onClose={() => setPackCoilBatch(null)}
+          mode={coilSaleMode}
         />
       )}
     </div>
