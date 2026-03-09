@@ -66,6 +66,17 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+
+  /* Hide number input spin buttons globally */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield !important;
+    appearance: textfield !important;
+  }
 }
 
 @layer utilities {
@@ -73,14 +84,4 @@
     font-family: 'IBM Plex Mono', monospace;
     font-variant-numeric: tabular-nums;
   }
-}
-
-/* Hide number input spin buttons */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type="number"] {
-  -moz-appearance: textfield;
 }
