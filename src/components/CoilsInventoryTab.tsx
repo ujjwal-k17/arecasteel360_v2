@@ -391,14 +391,31 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
                                       <div className="flex gap-1">
-                                        <Button
-                                          size="sm" variant="outline" className="text-xs h-7"
-                                          disabled={isSold || status === 'loose'}
-                                          title={isSold ? 'Already sold' : status === 'loose' ? 'Loose coil — not available for pack sale' : ''}
-                                          onClick={(e) => { e.stopPropagation(); setPackCoilBatch(b); }}
-                                        >
-                                          Pack Coil Sale
-                                        </Button>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              size="sm" variant="outline" className="text-xs h-7 gap-1"
+                                              disabled={isSold}
+                                              title={isSold ? 'Already sold' : ''}
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              Coil Sale <ChevronDown className="h-3 w-3" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="start">
+                                            <DropdownMenuItem
+                                              disabled={status === 'loose'}
+                                              onClick={(e) => { e.stopPropagation(); setCoilSaleMode('pack'); setPackCoilBatch(b); }}
+                                            >
+                                              Pack Coil Sale
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onClick={(e) => { e.stopPropagation(); setCoilSaleMode('loose'); setPackCoilBatch(b); }}
+                                            >
+                                              Loose Coil Sale
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                         <Button
                                           size="sm" variant="outline" className="text-xs h-7"
                                           disabled={isSold}
