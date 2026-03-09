@@ -87,6 +87,7 @@ export default function PhysicalInventoryTab() {
   });
 
   const allActions = (actions as InventoryAction[]) || [];
+  const allProcRecords = processingRecords || [];
   const receivedBatches = (batches || []).filter(b => b.status === 'received');
   const inTransitBatches = (batches || []).filter(b => b.status === 'in-transit');
 
