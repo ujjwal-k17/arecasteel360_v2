@@ -312,6 +312,7 @@ export default function InTransitTab() {
                 ))}
                 <TableHead><span className="text-xs font-semibold whitespace-nowrap">Transit Days</span></TableHead>
                 <TableHead><span className="text-xs font-semibold whitespace-nowrap">Status</span></TableHead>
+                {isReceived && <TableHead><span className="text-xs font-semibold whitespace-nowrap">Received Date</span></TableHead>}
                 {!isReceived && <TableHead><span className="text-xs font-semibold whitespace-nowrap">Actions</span></TableHead>}
               </TableRow>
             </TableHeader>
@@ -353,6 +354,11 @@ export default function InTransitTab() {
                         {b.status === 'received' ? 'Received' : 'In-Transit'}
                       </Badge>
                     </TableCell>
+                    {isReceived && (
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {b.updated_at ? new Date(b.updated_at).toLocaleDateString('en-IN') : '-'}
+                      </TableCell>
+                    )}
                     {!isReceived && (
                       <TableCell>
                         {editingId === b.id ? (
