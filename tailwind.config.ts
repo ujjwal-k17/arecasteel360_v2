@@ -59,6 +59,14 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        "sku-row": {
+          DEFAULT: "hsl(var(--sku-row))",
+          foreground: "hsl(var(--sku-row-foreground))",
+        },
+        "batch-row": {
+          DEFAULT: "hsl(var(--batch-row))",
+          foreground: "hsl(var(--batch-row-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
