@@ -43,6 +43,8 @@ export default function WoodenPalletsTab() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sizeFilter, setSizeFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   // Dialogs
   const [showAddSKU, setShowAddSKU] = useState(false);
