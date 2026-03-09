@@ -77,7 +77,8 @@ export function useInsertProcessing() {
           qty_kg: item.qty_kg,
           num_pcs: item.num_pcs ?? null,
         }));
-        await supabase.from('processing_output_items' as any).insert(items);
+        const { error: outErr } = await supabase.from('processing_output_items' as any).insert(items);
+        if (outErr) throw outErr;
       }
 
       const batch = params.batch;
@@ -108,7 +109,8 @@ export function useInsertProcessing() {
           }
           return base;
         });
-        await supabase.from(targetTable as any).insert(inventoryItems);
+        const { error: invErr } = await supabase.from(targetTable as any).insert(inventoryItems);
+        if (invErr) throw invErr;
       } else {
         const item: any = {
           processing_record_id: (procRec as any).id,
@@ -129,7 +131,8 @@ export function useInsertProcessing() {
           item.source_id = params.batchId;
           item.source_type = 'coil';
         }
-        await supabase.from(targetTable as any).insert([item]);
+        const { error: singleErr } = await supabase.from(targetTable as any).insert([item]);
+        if (singleErr) throw singleErr;
       }
 
       await supabase.from('batches').update({ batch_status: 'loose' } as any).eq('id', params.batchId);
