@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAllBatches, useAllActions } from '@/hooks/useBatches';
 import { useWIPItems, useFGItems } from '@/hooks/useProcessing';
 import { useScrapSales } from '@/hooks/useScrapSales';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const COLORS = [
   'hsl(var(--primary))',
@@ -25,13 +26,38 @@ export default function DashboardTab() {
   const { data: fgItems } = useFGItems();
   const { data: scrapSales } = useScrapSales();
 
+  const { data: palletSkus } = useQuery({
+    queryKey: ['pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_skus').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: palletPurchases } = useQuery({
+    queryKey: ['pallet_purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_purchases').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: palletConsumptions } = useQuery({
+    queryKey: ['pallet_consumptions'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_consumptions').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const allBatches = batches || [];
   const allActions = (actions || []) as any[];
   const allWip = wipItems || [];
   const allFg = fgItems || [];
   const allScrap = scrapSales || [];
 
-  // 1. In-Transit
+  // In-Transit
   const inTransitStats = useMemo(() => {
     const transit = allBatches.filter(b => b.status === 'in-transit');
     const totalQty = transit.reduce((s, b) => s + (b.net_weight || 0), 0);
@@ -44,7 +70,7 @@ export default function DashboardTab() {
     return { count: transit.length, totalQty, avgDays };
   }, [allBatches]);
 
-  // 2. Coils by Material & Make
+  // Coils
   const coilsByMaterialMake = useMemo(() => {
     const received = allBatches.filter(b => b.status === 'received');
     const map = new Map<string, { material: string; make: string; count: number; totalQty: number }>();
@@ -58,7 +84,7 @@ export default function DashboardTab() {
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
   }, [allBatches]);
 
-  // 3. WIP by Material & Process
+  // WIP
   const wipByMaterialProcess = useMemo(() => {
     const map = new Map<string, { material: string; process: string; totalQty: number }>();
     for (const item of allWip) {
@@ -69,7 +95,7 @@ export default function DashboardTab() {
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
   }, [allWip]);
 
-  // 4. FG by Material & Process
+  // FG
   const fgByMaterialProcess = useMemo(() => {
     const map = new Map<string, { material: string; process: string; totalQty: number; totalPcs: number }>();
     for (const item of allFg) {
@@ -82,7 +108,7 @@ export default function DashboardTab() {
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
   }, [allFg]);
 
-  // 5. Scrap by Type & Material
+  // Scrap
   const scrapByTypeMaterial = useMemo(() => {
     const scrapActions = allActions.filter((a: any) => a.action_type === 'scrap');
     const map = new Map<string, { scrapType: string; material: string; totalQty: number }>();
@@ -100,7 +126,7 @@ export default function DashboardTab() {
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
   }, [allActions, allScrap]);
 
-  // 6. Defective by Type
+  // Defective
   const defectiveByType = useMemo(() => {
     const defActions = allActions.filter((a: any) => a.action_type === 'defective');
     const map = new Map<string, { defectType: string; totalQty: number }>();
@@ -112,6 +138,29 @@ export default function DashboardTab() {
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
   }, [allActions]);
 
+  // Pallets
+  const palletStats = useMemo(() => {
+    const skus = palletSkus || [];
+    const purchases = palletPurchases || [];
+    const consumptions = palletConsumptions || [];
+    const bySize = skus.map(sku => {
+      const skuPurchases = purchases.filter(p => p.pallet_sku_id === sku.id);
+      const skuConsumptions = consumptions.filter(c => c.pallet_sku_id === sku.id);
+      const totalPurchasedPcs = skuPurchases.reduce((s, p) => s + (p.num_pcs || 0), 0);
+      const totalPurchasedKg = skuPurchases.reduce((s, p) => s + (p.weight_kg || 0), 0);
+      const totalConsumedPcs = skuConsumptions.reduce((s, c) => s + (c.num_pcs || 0), 0);
+      const totalConsumedKg = skuConsumptions.reduce((s, c) => s + (c.weight_kg || 0), 0);
+      return {
+        size: sku.pallet_size,
+        stockPcs: totalPurchasedPcs - totalConsumedPcs,
+        stockKg: totalPurchasedKg - totalConsumedKg,
+      };
+    });
+    const totalStockPcs = bySize.reduce((s, b) => s + b.stockPcs, 0);
+    const totalStockKg = bySize.reduce((s, b) => s + b.stockKg, 0);
+    return { bySize, totalStockPcs, totalStockKg, skuCount: skus.length };
+  }, [palletSkus, palletPurchases, palletConsumptions]);
+
   const totalCoilsQty = coilsByMaterialMake.reduce((s, g) => s + g.totalQty, 0);
   const totalWipQty = wipByMaterialProcess.reduce((s, g) => s + g.totalQty, 0);
   const totalFgQty = fgByMaterialProcess.reduce((s, g) => s + g.totalQty, 0);
@@ -121,7 +170,6 @@ export default function DashboardTab() {
 
   const pct = (v: number) => grandTotal > 0 ? ((v / grandTotal) * 100).toFixed(1) : '0.0';
 
-  // Chart data: inventory distribution
   const inventoryDistribution = useMemo(() => [
     { name: 'In-Transit', value: inTransitStats.totalQty },
     { name: 'Coils', value: totalCoilsQty },
@@ -131,213 +179,152 @@ export default function DashboardTab() {
     { name: 'Defective', value: totalDefectiveQty },
   ].filter(d => d.value > 0), [inTransitStats.totalQty, totalCoilsQty, totalWipQty, totalFgQty, totalScrapQty, totalDefectiveQty]);
 
-  // Coils by material for bar chart
-  const coilsByMaterialChart = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const g of coilsByMaterialMake) {
-      map.set(g.material, (map.get(g.material) || 0) + g.totalQty);
-    }
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value: Math.round(value) }));
-  }, [coilsByMaterialMake]);
-
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <SummaryCard icon={<Package className="h-4 w-4" />} label="In-Transit" value={`${inTransitStats.totalQty.toFixed(0)} Kg`} sub={`${inTransitStats.count} coils · Avg ${inTransitStats.avgDays} days`} pct={`${pct(inTransitStats.totalQty)}%`} />
-        <SummaryCard icon={<Warehouse className="h-4 w-4" />} label="Coils Inventory" value={`${totalCoilsQty.toFixed(0)} Kg`} sub={`${coilsByMaterialMake.reduce((s, g) => s + g.count, 0)} coils`} pct={`${pct(totalCoilsQty)}%`} />
-        <SummaryCard icon={<Layers className="h-4 w-4" />} label="WIP Inventory" value={`${totalWipQty.toFixed(0)} Kg`} sub={`${allWip.length} items`} pct={`${pct(totalWipQty)}%`} />
-        <SummaryCard icon={<CheckCircle className="h-4 w-4" />} label="FG Inventory" value={`${totalFgQty.toFixed(0)} Kg`} sub={`${allFg.length} items`} pct={`${pct(totalFgQty)}%`} />
-        <SummaryCard icon={<Trash2 className="h-4 w-4" />} label="Total Scrap" value={`${totalScrapQty.toFixed(0)} Kg`} sub={`${scrapByTypeMaterial.length} types`} pct={`${pct(totalScrapQty)}%`} />
-        <SummaryCard icon={<AlertTriangle className="h-4 w-4" />} label="Total Defective" value={`${totalDefectiveQty.toFixed(0)} Kg`} sub={`${defectiveByType.length} types`} pct={`${pct(totalDefectiveQty)}%`} />
+    <div className="space-y-5">
+      {/* Summary Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+        <StatChip icon={<Package className="h-3.5 w-3.5" />} label="In-Transit" value={`${inTransitStats.totalQty.toFixed(0)} Kg`} detail={`${inTransitStats.count} coils`} />
+        <StatChip icon={<Warehouse className="h-3.5 w-3.5" />} label="Coils" value={`${totalCoilsQty.toFixed(0)} Kg`} detail={`${coilsByMaterialMake.reduce((s, g) => s + g.count, 0)} coils`} />
+        <StatChip icon={<Layers className="h-3.5 w-3.5" />} label="WIP" value={`${totalWipQty.toFixed(0)} Kg`} detail={`${allWip.length} items`} />
+        <StatChip icon={<CheckCircle className="h-3.5 w-3.5" />} label="FG" value={`${totalFgQty.toFixed(0)} Kg`} detail={`${allFg.length} items`} />
+        <StatChip icon={<Trash2 className="h-3.5 w-3.5" />} label="Scrap" value={`${totalScrapQty.toFixed(0)} Kg`} detail={`${scrapByTypeMaterial.length} types`} />
+        <StatChip icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Defective" value={`${totalDefectiveQty.toFixed(0)} Kg`} detail={`${defectiveByType.length} types`} />
+        <StatChip icon={<Boxes className="h-3.5 w-3.5" />} label="Pallets" value={`${palletStats.totalStockPcs} Pcs`} detail={`${palletStats.totalStockKg.toFixed(1)} Kg`} />
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Inventory Distribution</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie data={inventoryDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`} labelLine={false}>
-                  {inventoryDistribution.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(v: number) => `${v.toFixed(2)} Kg`} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* Chart + In-Transit side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-1 rounded-lg border bg-card p-4">
+          <p className="text-xs font-semibold text-muted-foreground mb-2">Distribution</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={inventoryDistribution} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2} dataKey="value" strokeWidth={0}>
+                {inventoryDistribution.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <Tooltip formatter={(v: number) => `${v.toFixed(0)} Kg`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
+            {inventoryDistribution.map((d, i) => (
+              <span key={d.name} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                {d.name} ({pct(d.value)}%)
+              </span>
+            ))}
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Coils Inventory by Material</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={coilsByMaterialChart} layout="vertical" margin={{ left: 10, right: 20 }}>
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip formatter={(v: number) => `${v} Kg`} />
-                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* In-Transit */}
+          <MiniSection icon={<Package className="h-3.5 w-3.5" />} title="In-Transit">
+            <Row label="Total Coils" value={String(inTransitStats.count)} />
+            <Row label="Total Qty" value={`${inTransitStats.totalQty.toFixed(2)} Kg`} />
+            <Row label="Avg Transit" value={`${inTransitStats.avgDays} days`} />
+          </MiniSection>
 
-      {/* Detail Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* In-Transit */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" /> In-Transit Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-sm space-y-1">
-              <div className="flex justify-between"><span className="text-muted-foreground">Total Coils</span><span className="font-mono-num font-semibold">{inTransitStats.count}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Total Qty</span><span className="font-mono-num font-semibold">{inTransitStats.totalQty.toFixed(2)} Kg</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Avg Transit Days</span><span className="font-mono-num font-semibold">{inTransitStats.avgDays} days</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">% of Total Inventory</span><span className="font-mono-num font-semibold text-primary">{pct(inTransitStats.totalQty)}%</span></div>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Pallets */}
+          <MiniSection icon={<Boxes className="h-3.5 w-3.5" />} title="Pallets Stock">
+            {palletStats.bySize.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">No pallet data</p>
+            ) : (
+              palletStats.bySize.map(p => (
+                <Row key={p.size} label={p.size} value={`${p.stockPcs} pcs · ${p.stockKg.toFixed(1)} Kg`} />
+              ))
+            )}
+          </MiniSection>
 
-        {/* Coils by Material & Make */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Warehouse className="h-4 w-4 text-primary" /> Coils Inventory by Material & Make
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <MiniTable headers={['Material', 'Make', 'Coils', 'Qty (Kg)', '%']}>
-              {coilsByMaterialMake.map((g, i) => (
+          {/* Coils */}
+          <MiniSection icon={<Warehouse className="h-3.5 w-3.5" />} title="Coils by Material">
+            <MiniTable headers={['Material', 'Make', 'Qty (Kg)']}>
+              {coilsByMaterialMake.slice(0, 5).map((g, i) => (
                 <TableRow key={i}>
-                  <TableCell className="text-xs">{g.material}</TableCell>
-                  <TableCell className="text-xs">{g.make}</TableCell>
-                  <TableCell className="text-xs font-mono-num">{g.count}</TableCell>
-                  <TableCell className="text-xs font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-xs font-mono-num text-primary">{totalCoilsQty > 0 ? ((g.totalQty / totalCoilsQty) * 100).toFixed(1) : '0.0'}%</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.material}</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.make}</TableCell>
+                  <TableCell className="text-[11px] py-1 font-mono-num font-semibold">{g.totalQty.toFixed(0)}</TableCell>
                 </TableRow>
               ))}
             </MiniTable>
-          </CardContent>
-        </Card>
+          </MiniSection>
 
-        {/* WIP by Material & Process */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Layers className="h-4 w-4 text-primary" /> WIP Inventory by Material & Process
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <MiniTable headers={['Material', 'Process', 'Qty (Kg)', '%']}>
-              {wipByMaterialProcess.map((g, i) => (
+          {/* WIP */}
+          <MiniSection icon={<Layers className="h-3.5 w-3.5" />} title="WIP by Process">
+            <MiniTable headers={['Material', 'Process', 'Qty (Kg)']}>
+              {wipByMaterialProcess.slice(0, 5).map((g, i) => (
                 <TableRow key={i}>
-                  <TableCell className="text-xs">{g.material}</TableCell>
-                  <TableCell className="text-xs">{g.process}</TableCell>
-                  <TableCell className="text-xs font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-xs font-mono-num text-primary">{totalWipQty > 0 ? ((g.totalQty / totalWipQty) * 100).toFixed(1) : '0.0'}%</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.material}</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.process}</TableCell>
+                  <TableCell className="text-[11px] py-1 font-mono-num font-semibold">{g.totalQty.toFixed(0)}</TableCell>
                 </TableRow>
               ))}
             </MiniTable>
-          </CardContent>
-        </Card>
+          </MiniSection>
 
-        {/* FG by Material & Process */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-primary" /> FG Inventory by Material & Process
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <MiniTable headers={['Material', 'Process', 'Qty (Kg)', '# Pcs', '%']}>
-              {fgByMaterialProcess.map((g, i) => (
+          {/* FG */}
+          <MiniSection icon={<CheckCircle className="h-3.5 w-3.5" />} title="FG by Process">
+            <MiniTable headers={['Material', 'Process', 'Qty (Kg)']}>
+              {fgByMaterialProcess.slice(0, 5).map((g, i) => (
                 <TableRow key={i}>
-                  <TableCell className="text-xs">{g.material}</TableCell>
-                  <TableCell className="text-xs">{g.process}</TableCell>
-                  <TableCell className="text-xs font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-xs font-mono-num">{g.totalPcs}</TableCell>
-                  <TableCell className="text-xs font-mono-num text-primary">{totalFgQty > 0 ? ((g.totalQty / totalFgQty) * 100).toFixed(1) : '0.0'}%</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.material}</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.process}</TableCell>
+                  <TableCell className="text-[11px] py-1 font-mono-num font-semibold">{g.totalQty.toFixed(0)}</TableCell>
                 </TableRow>
               ))}
             </MiniTable>
-          </CardContent>
-        </Card>
+          </MiniSection>
 
-        {/* Scrap by Type & Material */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Trash2 className="h-4 w-4 text-primary" /> Scrap by Type & Material
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <MiniTable headers={['Scrap Type', 'Material', 'Qty (Kg)', '%']}>
-              {scrapByTypeMaterial.map((g, i) => (
+          {/* Scrap */}
+          <MiniSection icon={<Trash2 className="h-3.5 w-3.5" />} title="Scrap Summary">
+            <MiniTable headers={['Type', 'Material', 'Qty (Kg)']}>
+              {scrapByTypeMaterial.slice(0, 5).map((g, i) => (
                 <TableRow key={i}>
-                  <TableCell className="text-xs">{g.scrapType}</TableCell>
-                  <TableCell className="text-xs">{g.material}</TableCell>
-                  <TableCell className="text-xs font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-xs font-mono-num text-primary">{totalScrapQty > 0 ? ((g.totalQty / totalScrapQty) * 100).toFixed(1) : '0.0'}%</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.scrapType}</TableCell>
+                  <TableCell className="text-[11px] py-1">{g.material}</TableCell>
+                  <TableCell className="text-[11px] py-1 font-mono-num font-semibold">{g.totalQty.toFixed(0)}</TableCell>
                 </TableRow>
               ))}
             </MiniTable>
-          </CardContent>
-        </Card>
-
-        {/* Defective by Type */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-primary" /> Defective Material by Type
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <MiniTable headers={['Defect Type', 'Qty (Kg)', '%']}>
-              {defectiveByType.map((g, i) => (
-                <TableRow key={i}>
-                  <TableCell className="text-xs">{g.defectType}</TableCell>
-                  <TableCell className="text-xs font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-xs font-mono-num text-primary">{totalDefectiveQty > 0 ? ((g.totalQty / totalDefectiveQty) * 100).toFixed(1) : '0.0'}%</TableCell>
-                </TableRow>
-              ))}
-            </MiniTable>
-          </CardContent>
-        </Card>
+          </MiniSection>
+        </div>
       </div>
     </div>
   );
 }
 
-function SummaryCard({ icon, label, value, sub, pct }: { icon: React.ReactNode; label: string; value: string; sub: string; pct: string }) {
+function StatChip({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail: string }) {
   return (
-    <Card>
-      <CardContent className="p-3">
-        <div className="flex items-center gap-2 text-muted-foreground mb-1">{icon}<span className="text-xs font-medium">{label}</span></div>
-        <div className="text-lg font-bold font-mono-num">{value}</div>
-        <div className="flex items-center justify-between mt-0.5">
-          <span className="text-xs text-muted-foreground">{sub}</span>
-          <span className="text-xs font-semibold text-primary">{pct}</span>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="rounded-lg border bg-card px-3 py-2">
+      <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">{icon}<span className="text-[10px] font-medium uppercase tracking-wide">{label}</span></div>
+      <p className="text-sm font-bold font-mono-num leading-tight">{value}</p>
+      <p className="text-[10px] text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function MiniSection({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="flex items-center gap-1.5 text-muted-foreground mb-2">{icon}<span className="text-xs font-semibold">{title}</span></div>
+      {children}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between text-xs py-0.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono-num font-semibold">{value}</span>
+    </div>
   );
 }
 
 function MiniTable({ headers, children }: { headers: string[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded border">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50">
-            {headers.map(h => <TableHead key={h} className="text-xs font-semibold whitespace-nowrap py-2">{h}</TableHead>)}
+          <TableRow className="bg-muted/30">
+            {headers.map(h => <TableHead key={h} className="text-[10px] font-semibold whitespace-nowrap py-1 px-2">{h}</TableHead>)}
           </TableRow>
         </TableHeader>
         <TableBody>{children}</TableBody>
