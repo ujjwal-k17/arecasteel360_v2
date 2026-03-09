@@ -369,8 +369,8 @@ export default function PhysicalInventoryTab() {
                                     <TableCell className="text-sm">{b.coil_number || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
-                                    <TableCell className="text-sm font-mono-num font-semibold">{calcBalanceQty(b, allActions).toFixed(2)}</TableCell>
-                                    <TableCell className="text-sm font-mono-num font-semibold">{calcUsableBalanceQty(b, allActions).toFixed(2)}</TableCell>
+                                    <TableCell className="text-sm font-mono-num font-semibold">{calcBalanceQty(b, allActions, allProcRecords).toFixed(2)}</TableCell>
+                                    <TableCell className="text-sm font-mono-num font-semibold">{calcUsableBalanceQty(b, allActions, allProcRecords).toFixed(2)}</TableCell>
                                     <TableCell>
                                       <div className="flex gap-1">
                                         {(() => { const isPackCoil = (b as any).form === 'Pack coil'; return (<>

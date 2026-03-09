@@ -111,7 +111,7 @@ export default function DashboardTab() {
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
   }, [allFg]);
 
-  // Scrap
+  // Scrap — only count unsold scrap (scrap actions minus scrap sales)
   const scrapByTypeMaterial = useMemo(() => {
     const scrapActions = allActions.filter((a: any) => a.action_type === 'scrap');
     const map = new Map<string, { scrapType: string; material: string; totalQty: number }>();
@@ -121,12 +121,14 @@ export default function DashboardTab() {
       if (!map.has(key)) map.set(key, { scrapType: a.scrap_type || '-', material: batchMaterial, totalQty: 0 });
       map.get(key)!.totalQty += a.net_weight || 0;
     }
+    // Subtract sold scrap
     for (const s of allScrap) {
       const key = `${s.scrap_type || '-'}|${s.material || '-'}`;
-      if (!map.has(key)) map.set(key, { scrapType: s.scrap_type || '-', material: s.material || '-', totalQty: 0 });
-      map.get(key)!.totalQty += s.qty_sold || 0;
+      if (map.has(key)) {
+        map.get(key)!.totalQty -= s.qty_sold || 0;
+      }
     }
-    return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
+    return Array.from(map.values()).filter(r => r.totalQty > 0).sort((a, b) => b.totalQty - a.totalQty);
   }, [allActions, allScrap]);
 
   // Defective
