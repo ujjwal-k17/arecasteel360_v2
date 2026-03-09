@@ -310,7 +310,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
             {inlineDeductions > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
-                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective){coilMode === 'partial' && partialQty ? ` → capped at ${partialQty}` : ''}
+                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective)
               </div>
             )}
           </div>
