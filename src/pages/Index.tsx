@@ -1,5 +1,5 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle, LayoutDashboard } from 'lucide-react';
+import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle, LayoutDashboard, BarChart3, Boxes } from 'lucide-react';
 import DashboardTab from '@/components/DashboardTab';
 import InTransitTab from '@/components/InTransitTab';
 import CoilsInventoryTab from '@/components/CoilsInventoryTab';
@@ -7,6 +7,8 @@ import ScrapManagementTab from '@/components/ScrapManagementTab';
 import DefectiveManagementTab from '@/components/DefectiveManagementTab';
 import WIPInventoryTab from '@/components/WIPInventoryTab';
 import FGInventoryTab from '@/components/FGInventoryTab';
+import SalesDataTab from '@/components/SalesDataTab';
+import WoodenPalletsTab from '@/components/WoodenPalletsTab';
 import arecaLogo from '@/assets/areca-steel-logo.png';
 
 const Index = () => {
@@ -43,6 +45,12 @@ const Index = () => {
             <TabsTrigger value="defective" className="gap-2 text-sm">
               <AlertTriangle className="h-4 w-4" /> Defective Material
             </TabsTrigger>
+            <TabsTrigger value="sales-data" className="gap-2 text-sm">
+              <BarChart3 className="h-4 w-4" /> Sales Data
+            </TabsTrigger>
+            <TabsTrigger value="pallets" className="gap-2 text-sm">
+              <Boxes className="h-4 w-4" /> Wooden Pallets
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
@@ -65,6 +73,12 @@ const Index = () => {
           </TabsContent>
           <TabsContent value="defective">
             <DefectiveManagementTab />
+          </TabsContent>
+          <TabsContent value="sales-data">
+            <SalesDataTab />
+          </TabsContent>
+          <TabsContent value="pallets">
+            <WoodenPalletsTab />
           </TabsContent>
         </Tabs>
       </main>
