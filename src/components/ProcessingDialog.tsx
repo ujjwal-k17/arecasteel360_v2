@@ -129,10 +129,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
       return;
     }
-    if (!coilMode) {
-      toast.error('Please select Full Coil or Partial Coil');
-      return;
-    }
     if (processingQty <= 0) {
       toast.error('Processing quantity must be greater than 0');
       return;
