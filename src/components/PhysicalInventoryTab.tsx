@@ -121,8 +121,8 @@ export default function PhysicalInventoryTab() {
     skuMap.forEach((batchList, key) => {
       const first = batchList[0];
       const totalNetWeight = batchList.reduce((s, b) => s + (b.net_weight || 0), 0);
-      const totalBalanceQty = batchList.reduce((s, b) => s + calcBalanceQty(b, allActions), 0);
-      const totalUsableQty = batchList.reduce((s, b) => s + calcUsableBalanceQty(b, allActions), 0);
+      const totalBalanceQty = batchList.reduce((s, b) => s + calcBalanceQty(b, allActions, allProcRecords), 0);
+      const totalUsableQty = batchList.reduce((s, b) => s + calcUsableBalanceQty(b, allActions, allProcRecords), 0);
       groups.push({
         key, batches: batchList, material: first.material, make: first.make,
         thickness: first.thickness, width: first.width, length: first.length,
@@ -131,7 +131,7 @@ export default function PhysicalInventoryTab() {
       });
     });
     return groups;
-  }, [filteredBatches, allActions]);
+  }, [filteredBatches, allActions, allProcRecords]);
 
   const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
   const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
