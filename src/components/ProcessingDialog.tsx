@@ -62,11 +62,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
 
   const inlineDeductions = inlineScrapTotal + inlineDefectiveTotal;
 
-  // Processing qty depends on Full/Partial selection
-  const baseProcessingQty = Math.max(0, usableQty - inlineDeductions);
-  const processingQty = coilMode === 'partial' && partialQty
-    ? Math.min(Number(partialQty) || 0, baseProcessingQty)
-    : baseProcessingQty;
+  // Processing qty: always full coil minus deductions
+  const processingQty = Math.max(0, usableQty - inlineDeductions);
 
   // Defect entry helpers
   const addDefectEntry = () => setDefectEntries(prev => [...prev, { type: '', weight: '' }]);
