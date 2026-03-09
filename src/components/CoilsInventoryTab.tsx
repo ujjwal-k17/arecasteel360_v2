@@ -343,7 +343,7 @@ export default function CoilsInventoryTab() {
                 {expandedSKU === g.key && (
                   <TableRow key={`${g.key}-detail`}>
                     <TableCell colSpan={skuCols.length} className="p-0">
-                      <div className="bg-muted/20 p-3">
+                      <div className="bg-[hsl(var(--batch-row))] p-3">
                         <Table>
                           <TableHeader>
                             <TableRow>
