@@ -7,6 +7,7 @@ import ScrapManagementTab from '@/components/ScrapManagementTab';
 import DefectiveManagementTab from '@/components/DefectiveManagementTab';
 import WIPInventoryTab from '@/components/WIPInventoryTab';
 import FGInventoryTab from '@/components/FGInventoryTab';
+import arecaLogo from '@/assets/areca-steel-logo.png';
 
 const Index = () => {
   return (
