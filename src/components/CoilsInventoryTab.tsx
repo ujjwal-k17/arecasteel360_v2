@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Undo2, Download } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 import ProcessingDialog from './ProcessingDialog';
@@ -71,7 +72,7 @@ export default function CoilsInventoryTab() {
   // Action dialogs
   const [processingBatch, setProcessingBatch] = useState<Batch | null>(null);
   const [packCoilBatch, setPackCoilBatch] = useState<Batch | null>(null);
-
+  const [coilSaleMode, setCoilSaleMode] = useState<'pack' | 'loose'>('pack');
   const [filters, setFilters] = useState<Record<string, string>>({});
 
   const setFilter = (field: string, value: string) => {
@@ -390,14 +391,31 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
                                       <div className="flex gap-1">
-                                        <Button
-                                          size="sm" variant="outline" className="text-xs h-7"
-                                          disabled={isSold || status === 'loose'}
-                                          title={isSold ? 'Already sold' : status === 'loose' ? 'Loose coil — not available for pack sale' : ''}
-                                          onClick={(e) => { e.stopPropagation(); setPackCoilBatch(b); }}
-                                        >
-                                          Pack Coil Sale
-                                        </Button>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              size="sm" variant="outline" className="text-xs h-7 gap-1"
+                                              disabled={isSold}
+                                              title={isSold ? 'Already sold' : ''}
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              Coil Sale <ChevronDown className="h-3 w-3" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="start">
+                                            <DropdownMenuItem
+                                              disabled={status === 'loose'}
+                                              onClick={(e) => { e.stopPropagation(); setCoilSaleMode('pack'); setPackCoilBatch(b); }}
+                                            >
+                                              Pack Coil Sale
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onClick={(e) => { e.stopPropagation(); setCoilSaleMode('loose'); setPackCoilBatch(b); }}
+                                            >
+                                              Loose Coil Sale
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                         <Button
                                           size="sm" variant="outline" className="text-xs h-7"
                                           disabled={isSold}
@@ -572,7 +590,7 @@ export default function CoilsInventoryTab() {
         />
       )}
 
-      {/* Pack Coil Sale Dialog */}
+      {/* Coil Sale Dialog */}
       {packCoilBatch && (
         <PackCoilSaleDialog
           batch={packCoilBatch}
@@ -580,6 +598,7 @@ export default function CoilsInventoryTab() {
           processingRecords={allProcRecords}
           open={!!packCoilBatch}
           onClose={() => setPackCoilBatch(null)}
+          mode={coilSaleMode}
         />
       )}
     </div>
