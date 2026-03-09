@@ -312,6 +312,7 @@ export default function InTransitTab() {
                 ))}
                 <TableHead><span className="text-xs font-semibold whitespace-nowrap">Transit Days</span></TableHead>
                 <TableHead><span className="text-xs font-semibold whitespace-nowrap">Status</span></TableHead>
+                {isReceived && <TableHead><span className="text-xs font-semibold whitespace-nowrap">Received Date</span></TableHead>}
                 {!isReceived && <TableHead><span className="text-xs font-semibold whitespace-nowrap">Actions</span></TableHead>}
               </TableRow>
             </TableHeader>
