@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useAllBatches, useAllActions, useUpdateBatch, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,7 @@ function getMissingFields(b: Batch): string[] {
 export default function PhysicalInventoryTab() {
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
+  const { data: processingRecords } = useAllProcessingRecords();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
@@ -85,6 +87,7 @@ export default function PhysicalInventoryTab() {
   });
 
   const allActions = (actions as InventoryAction[]) || [];
+  const allProcRecords = processingRecords || [];
   const receivedBatches = (batches || []).filter(b => b.status === 'received');
   const inTransitBatches = (batches || []).filter(b => b.status === 'in-transit');
 
@@ -118,8 +121,8 @@ export default function PhysicalInventoryTab() {
     skuMap.forEach((batchList, key) => {
       const first = batchList[0];
       const totalNetWeight = batchList.reduce((s, b) => s + (b.net_weight || 0), 0);
-      const totalBalanceQty = batchList.reduce((s, b) => s + calcBalanceQty(b, allActions), 0);
-      const totalUsableQty = batchList.reduce((s, b) => s + calcUsableBalanceQty(b, allActions), 0);
+      const totalBalanceQty = batchList.reduce((s, b) => s + calcBalanceQty(b, allActions, allProcRecords), 0);
+      const totalUsableQty = batchList.reduce((s, b) => s + calcUsableBalanceQty(b, allActions, allProcRecords), 0);
       groups.push({
         key, batches: batchList, material: first.material, make: first.make,
         thickness: first.thickness, width: first.width, length: first.length,
@@ -128,10 +131,10 @@ export default function PhysicalInventoryTab() {
       });
     });
     return groups;
-  }, [filteredBatches, allActions]);
+  }, [filteredBatches, allActions, allProcRecords]);
 
-  const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
-  const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
+  const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
+  const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
 
   const toggleBatchSelect = (id: string) => {
     setSelectedBatchIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -240,8 +243,8 @@ export default function PhysicalInventoryTab() {
         'Gross Wt (Kg)': b.gross_weight ?? '', 'Net Wt (Kg)': b.net_weight ?? '',
         'Coil No': b.coil_number || '', 'Purchase Date': b.purchase_date || '', 'Purchase From': b.purchase_from || '',
         'Sales (Kg)': salesWt || '', 'Defective (Kg)': defectiveWt || '', 'Scrap (Kg)': scrapWt || '',
-        'Balance Qty': calcBalanceQty(b, allActions).toFixed(2),
-        'Usable Qty': calcUsableBalanceQty(b, allActions).toFixed(2),
+        'Balance Qty': calcBalanceQty(b, allActions, allProcRecords).toFixed(2),
+        'Usable Qty': calcUsableBalanceQty(b, allActions, allProcRecords).toFixed(2),
       };
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -366,8 +369,8 @@ export default function PhysicalInventoryTab() {
                                     <TableCell className="text-sm">{b.coil_number || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
-                                    <TableCell className="text-sm font-mono-num font-semibold">{calcBalanceQty(b, allActions).toFixed(2)}</TableCell>
-                                    <TableCell className="text-sm font-mono-num font-semibold">{calcUsableBalanceQty(b, allActions).toFixed(2)}</TableCell>
+                                    <TableCell className="text-sm font-mono-num font-semibold">{calcBalanceQty(b, allActions, allProcRecords).toFixed(2)}</TableCell>
+                                    <TableCell className="text-sm font-mono-num font-semibold">{calcUsableBalanceQty(b, allActions, allProcRecords).toFixed(2)}</TableCell>
                                     <TableCell>
                                       <div className="flex gap-1">
                                         {(() => { const isPackCoil = (b as any).form === 'Pack coil'; return (<>

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAllBatches, useAllActions } from '@/hooks/useBatches';
+import { useAllBatches, useAllActions, calcUsableBalanceQty, type InventoryAction } from '@/hooks/useBatches';
 import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -71,7 +71,9 @@ export default function DashboardTab() {
     return { count: transit.length, totalQty, avgDays };
   }, [allBatches]);
 
-  // Coils
+  // Coils — use usable balance qty (accounts for processing, sales, scrap, defective)
+  const allActionsTyped = allActions as InventoryAction[];
+  const allProcRecords = processingRecords || [];
   const coilsByMaterialMake = useMemo(() => {
     const received = allBatches.filter(b => b.status === 'received');
     const map = new Map<string, { material: string; make: string; count: number; totalQty: number }>();
@@ -80,10 +82,10 @@ export default function DashboardTab() {
       if (!map.has(key)) map.set(key, { material: b.material || '-', make: b.make || '-', count: 0, totalQty: 0 });
       const g = map.get(key)!;
       g.count++;
-      g.totalQty += b.net_weight || 0;
+      g.totalQty += calcUsableBalanceQty(b, allActionsTyped, allProcRecords);
     }
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
-  }, [allBatches]);
+  }, [allBatches, allActionsTyped, allProcRecords]);
 
   // WIP
   const wipByMaterialProcess = useMemo(() => {
@@ -109,7 +111,7 @@ export default function DashboardTab() {
     return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
   }, [allFg]);
 
-  // Scrap
+  // Scrap — only count unsold scrap (scrap actions minus scrap sales)
   const scrapByTypeMaterial = useMemo(() => {
     const scrapActions = allActions.filter((a: any) => a.action_type === 'scrap');
     const map = new Map<string, { scrapType: string; material: string; totalQty: number }>();
@@ -119,12 +121,14 @@ export default function DashboardTab() {
       if (!map.has(key)) map.set(key, { scrapType: a.scrap_type || '-', material: batchMaterial, totalQty: 0 });
       map.get(key)!.totalQty += a.net_weight || 0;
     }
+    // Subtract sold scrap
     for (const s of allScrap) {
       const key = `${s.scrap_type || '-'}|${s.material || '-'}`;
-      if (!map.has(key)) map.set(key, { scrapType: s.scrap_type || '-', material: s.material || '-', totalQty: 0 });
-      map.get(key)!.totalQty += s.qty_sold || 0;
+      if (map.has(key)) {
+        map.get(key)!.totalQty -= s.qty_sold || 0;
+      }
     }
-    return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
+    return Array.from(map.values()).filter(r => r.totalQty > 0).sort((a, b) => b.totalQty - a.totalQty);
   }, [allActions, allScrap]);
 
   // Defective
