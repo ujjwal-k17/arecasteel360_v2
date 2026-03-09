@@ -161,6 +161,21 @@ export default function DashboardTab() {
     };
   }, [palletPurchases, palletConsumptions]);
 
+  // Processing this month
+  const processingThisMonth = useMemo(() => {
+    const records = processingRecords || [];
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const monthRecords = records.filter(r => r.created_at >= monthStart);
+    const types = ['Slit', 'CTL', 'GC', 'Profile'];
+    const byType = types.map(t => ({
+      type: t,
+      qty: monthRecords.filter(r => r.process_type === t).reduce((s: number, r: any) => s + (r.input_qty || 0), 0),
+    }));
+    const total = byType.reduce((s, b) => s + b.qty, 0);
+    return { byType, total };
+  }, [processingRecords]);
+
   const totalCoilsQty = coilsByMaterialMake.reduce((s, g) => s + g.totalQty, 0);
   const totalWipQty = wipByMaterialProcess.reduce((s, g) => s + g.totalQty, 0);
   const totalFgQty = fgByMaterialProcess.reduce((s, g) => s + g.totalQty, 0);
