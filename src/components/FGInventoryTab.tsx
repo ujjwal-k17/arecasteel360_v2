@@ -1,12 +1,17 @@
 import { useState, useMemo } from 'react';
 import { useFGItems } from '@/hooks/useProcessing';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+
+const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
 interface SKUGroup {
   key: string;
@@ -34,6 +39,74 @@ export default function FGInventoryTab() {
   const [filterProcess, setFilterProcess] = useState('all');
   const [filterCoating, setFilterCoating] = useState('all');
   const [filterGrade, setFilterGrade] = useState('all');
+
+  // Dialogs
+  const [saleDialog, setSaleDialog] = useState<any | null>(null);
+  const [defectDialog, setDefectDialog] = useState<any | null>(null);
+  const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
+  const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '' });
+
+  // Fetch FG sales & defectives
+  const { data: fgSales } = useQuery({
+    queryKey: ['fg_sales'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fg_sales' as any).select('*');
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const { data: fgDefectives } = useQuery({
+    queryKey: ['fg_defectives'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fg_defectives' as any).select('*');
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const insertFGSale = useMutation({
+    mutationFn: async (sale: any) => {
+      const { error } = await supabase.from('fg_sales' as any).insert(sale);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fg_sales'] }),
+  });
+
+  const insertFGDefective = useMutation({
+    mutationFn: async (defective: any) => {
+      const { error } = await supabase.from('fg_defectives' as any).insert(defective);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fg_defectives'] });
+      queryClient.invalidateQueries({ queryKey: ['fg_sales'] });
+    },
+  });
+
+  // Compute sold & defective qty per fg_item
+  const soldByItem = useMemo(() => {
+    const map = new Map<string, number>();
+    (fgSales || []).forEach((s: any) => {
+      map.set(s.fg_item_id, (map.get(s.fg_item_id) || 0) + (s.quantity || 0));
+    });
+    return map;
+  }, [fgSales]);
+
+  const defectiveByItem = useMemo(() => {
+    const map = new Map<string, number>();
+    (fgDefectives || []).forEach((d: any) => {
+      map.set(d.fg_item_id, (map.get(d.fg_item_id) || 0) + (d.quantity || 0));
+    });
+    return map;
+  }, [fgDefectives]);
+
+  const getAvailableQty = (item: any) => {
+    const original = item.qty || 0;
+    const sold = soldByItem.get(item.id) || 0;
+    const defective = defectiveByItem.get(item.id) || 0;
+    return original - sold - defective;
+  };
 
   const { data: batches } = useQuery({
     queryKey: ['batches_lookup'],
@@ -88,7 +161,7 @@ export default function FGInventoryTab() {
     );
   }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade]);
 
-  const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + (i.qty || 0), 0), [filteredItems]);
+  const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
 
   const skuGroups = useMemo(() => {
@@ -99,12 +172,12 @@ export default function FGInventoryTab() {
         map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, items: [] });
       }
       const g = map.get(key)!;
-      g.totalQty += item.qty || 0;
+      g.totalQty += getAvailableQty(item);
       g.totalPcs += item.num_pcs || 0;
       g.items.push(item);
     }
     return Array.from(map.values());
-  }, [filteredItems]);
+  }, [filteredItems, soldByItem, defectiveByItem]);
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
@@ -120,6 +193,45 @@ export default function FGInventoryTab() {
     return batchMap.get(item.source_id) || '-';
   };
 
+  const handleSaleSubmit = async () => {
+    if (!saleDialog) return;
+    const qty = Number(saleForm.quantity) || 0;
+    const available = getAvailableQty(saleDialog);
+    if (qty <= 0) { toast.error('Enter a valid quantity'); return; }
+    if (qty > available + 0.01) { toast.error(`Quantity exceeds available (${available.toFixed(2)} Kg)`); return; }
+    try {
+      await insertFGSale.mutateAsync({
+        fg_item_id: saleDialog.id,
+        invoice_number: saleForm.invoice_number || null,
+        order_id: saleForm.order_id || null,
+        quantity: qty,
+        sales_date: saleForm.sales_date || null,
+      });
+      toast.success('Sale recorded');
+      setSaleDialog(null);
+      setSaleForm({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
+    } catch { toast.error('Failed to record sale'); }
+  };
+
+  const handleDefectSubmit = async () => {
+    if (!defectDialog) return;
+    const qty = Number(defectForm.quantity) || 0;
+    const available = getAvailableQty(defectDialog);
+    if (!defectForm.defect_type) { toast.error('Select a defect type'); return; }
+    if (qty <= 0) { toast.error('Enter a valid quantity'); return; }
+    if (qty > available + 0.01) { toast.error(`Quantity exceeds available (${available.toFixed(2)} Kg)`); return; }
+    try {
+      await insertFGDefective.mutateAsync({
+        fg_item_id: defectDialog.id,
+        defect_type: defectForm.defect_type,
+        quantity: qty,
+      });
+      toast.success('Defective recorded');
+      setDefectDialog(null);
+      setDefectForm({ defect_type: '', quantity: '' });
+    } catch { toast.error('Failed to record defective'); }
+  };
+
   const FilterSelect = ({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder: string }) => (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder={placeholder} /></SelectTrigger>
@@ -130,10 +242,19 @@ export default function FGInventoryTab() {
     </Select>
   );
 
+  const refreshAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['fg_items'] });
+    queryClient.invalidateQueries({ queryKey: ['fg_sales'] });
+    queryClient.invalidateQueries({ queryKey: ['fg_defectives'] });
+    queryClient.invalidateQueries({ queryKey: ['batches_lookup'] });
+    queryClient.invalidateQueries({ queryKey: ['wip_items_lookup'] });
+    toast.success('Refreshed');
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['fg_items'] }); queryClient.invalidateQueries({ queryKey: ['batches_lookup'] }); queryClient.invalidateQueries({ queryKey: ['wip_items_lookup'] }); toast.success('Refreshed'); }} className="gap-2">
+        <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
         <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
@@ -154,6 +275,7 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap"># Pcs</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
             </TableRow>
             <TableRow className="bg-muted/20">
               <TableHead />
@@ -165,11 +287,12 @@ export default function FGInventoryTab() {
               <TableHead><FilterSelect value={filterGrade} onChange={setFilterGrade} options={uniqueVals.grade} placeholder="Grade" /></TableHead>
               <TableHead />
               <TableHead />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {skuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {skuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -185,25 +308,97 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{g.totalPcs}</TableCell>
+                    <TableCell />
                   </TableRow>
-                  {isOpen && g.items.map((item: any) => (
-                    <TableRow key={item.id} className="bg-background">
-                      <TableCell />
-                      <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
-                      <TableCell className="text-xs font-mono-num">{item.qty ?? '-'}</TableCell>
-                      <TableCell className="text-xs font-mono-num">{item.num_pcs ?? '-'}</TableCell>
-                    </TableRow>
-                  ))}
+                  {isOpen && g.items.map((item: any) => {
+                    const availQty = getAvailableQty(item);
+                    return (
+                      <TableRow key={item.id} className="bg-background">
+                        <TableCell />
+                        <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{item.num_pcs ?? '-'}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }}>
+                              <ShoppingCart className="h-3 w-3" /> Sale
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }}>
+                              <AlertTriangle className="h-3 w-3" /> Defective
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </>
               );
             })}
           </TableBody>
         </Table>
       </div>
+
+      {/* Sale Dialog */}
+      <Dialog open={!!saleDialog} onOpenChange={() => setSaleDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record FG Sale</DialogTitle>
+          </DialogHeader>
+          {saleDialog && (
+            <div className="space-y-1 text-xs text-muted-foreground bg-muted/50 rounded p-2 mb-2">
+              <p>Available Qty: <span className="font-semibold font-mono-num">{getAvailableQty(saleDialog).toFixed(2)} Kg</span></p>
+            </div>
+          )}
+          <div className="space-y-3">
+            <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
+            <div><Label className="text-xs">Order Number</Label><Input value={saleForm.order_id} onChange={e => setSaleForm(v => ({ ...v, order_id: e.target.value }))} /></div>
+            <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={saleForm.quantity} onChange={e => setSaleForm(v => ({ ...v, quantity: e.target.value }))} /></div>
+            <div><Label className="text-xs">Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSaleDialog(null)}>Cancel</Button>
+            <Button onClick={handleSaleSubmit} disabled={insertFGSale.isPending}>
+              {insertFGSale.isPending ? 'Saving...' : 'Record Sale'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Defective Dialog */}
+      <Dialog open={!!defectDialog} onOpenChange={() => setDefectDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record FG Defective</DialogTitle>
+          </DialogHeader>
+          {defectDialog && (
+            <div className="space-y-1 text-xs text-muted-foreground bg-muted/50 rounded p-2 mb-2">
+              <p>Available Qty: <span className="font-semibold font-mono-num">{getAvailableQty(defectDialog).toFixed(2)} Kg</span></p>
+            </div>
+          )}
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Defect Type</Label>
+              <Select value={defectForm.defect_type} onValueChange={v => setDefectForm(f => ({ ...f, defect_type: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select defect type" /></SelectTrigger>
+                <SelectContent>
+                  {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={defectForm.quantity} onChange={e => setDefectForm(v => ({ ...v, quantity: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDefectDialog(null)}>Cancel</Button>
+            <Button onClick={handleDefectSubmit} disabled={insertFGDefective.isPending} variant="destructive">
+              {insertFGDefective.isPending ? 'Saving...' : 'Record Defective'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
