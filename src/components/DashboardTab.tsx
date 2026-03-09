@@ -5,7 +5,7 @@ import { useAllBatches, useAllActions } from '@/hooks/useBatches';
 import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes } from 'lucide-react';
+import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, Settings2 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const COLORS = [
