@@ -301,30 +301,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             )}
           </div>
 
-          {/* Full Coil / Partial Coil */}
-          <div>
-            <Label className="text-xs">Coil Processing Mode</Label>
-            <Select value={coilMode} onValueChange={(v: 'full' | 'partial') => { setCoilMode(v); if (v === 'full') setPartialQty(''); }}>
-              <SelectTrigger><SelectValue placeholder="Select Full or Partial Coil" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full">Full Coil</SelectItem>
-                <SelectItem value="partial">Partial Coil</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {coilMode === 'partial' && (
-            <div>
-              <Label className="text-xs">Processing Qty (Kg)</Label>
-              <Input
-                type="number"
-                value={partialQty}
-                onChange={e => setPartialQty(e.target.value)}
-                placeholder={`Max ${baseProcessingQty.toFixed(2)}`}
-                max={baseProcessingQty}
-              />
-            </div>
-          )}
 
           {/* Processing Quantity (auto-calculated) */}
           <div className="bg-muted/30 rounded-md p-3 text-sm">
