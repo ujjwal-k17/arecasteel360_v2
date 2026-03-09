@@ -133,8 +133,8 @@ export default function PhysicalInventoryTab() {
     return groups;
   }, [filteredBatches, allActions, allProcRecords]);
 
-  const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
-  const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions), 0), [filteredBatches, allActions]);
+  const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
+  const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
 
   const toggleBatchSelect = (id: string) => {
     setSelectedBatchIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
