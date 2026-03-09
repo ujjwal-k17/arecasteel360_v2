@@ -40,8 +40,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [numSizes, setNumSizes] = useState('');
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
-  const [coilMode] = useState<'full'>('full');
-  const [partialQty] = useState('');
   const [trimOption, setTrimOption] = useState<'yes' | 'no' | ''>('');
 
   // Inline scrap & defective state
