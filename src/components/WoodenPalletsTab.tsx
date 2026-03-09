@@ -515,10 +515,19 @@ export default function WoodenPalletsTab() {
             <DialogTitle>Add New Pallet SKU</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Pallet Size *</Label>
-              <Input value={newSKUSize} onChange={e => setNewSKUSize(e.target.value)} placeholder="e.g. 1200 x 800" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Width (mm) *</Label>
+                <Input type="number" value={newSKUWidth} onChange={e => setNewSKUWidth(e.target.value)} placeholder="e.g. 1200" />
+              </div>
+              <div>
+                <Label className="text-xs">Length (mm) *</Label>
+                <Input type="number" value={newSKULength} onChange={e => setNewSKULength(e.target.value)} placeholder="e.g. 800" />
+              </div>
             </div>
+            {newSKUWidth && newSKULength && (
+              <p className="text-xs text-muted-foreground">Pallet Size: <span className="font-semibold">{newSKUWidth} x {newSKULength}</span></p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowAddSKU(false)}>Cancel</Button>
