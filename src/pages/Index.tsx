@@ -14,13 +14,8 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">AS</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground tracking-tight">Areca Steel</h1>
-            <p className="text-xs text-muted-foreground">Inventory Management System</p>
-          </div>
+          <img src={arecaLogo} alt="Areca Steel" className="h-10" />
+          <p className="text-xs text-muted-foreground">Inventory Management System</p>
         </div>
       </header>
 
