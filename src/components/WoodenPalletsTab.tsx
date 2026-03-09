@@ -43,6 +43,8 @@ export default function WoodenPalletsTab() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sizeFilter, setSizeFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   // Dialogs
   const [showAddSKU, setShowAddSKU] = useState(false);
@@ -263,6 +265,62 @@ export default function WoodenPalletsTab() {
     return total;
   }, [filteredSkus, skuSummary]);
 
+  const handleDownloadExcel = () => {
+    const skusToExport = filteredSkus;
+    if (skusToExport.length === 0) { toast.info('No data to download'); return; }
+
+    const filterPurchase = (p: PalletPurchase) => {
+      if (dateFrom && p.purchase_date < dateFrom) return false;
+      if (dateTo && p.purchase_date > dateTo) return false;
+      return true;
+    };
+    const filterConsumption = (c: PalletConsumption) => {
+      if (dateFrom && c.consumption_date < dateFrom) return false;
+      if (dateTo && c.consumption_date > dateTo) return false;
+      return true;
+    };
+
+    const purchaseRows = (purchases || [])
+      .filter(p => skusToExport.some(s => s.id === p.pallet_sku_id) && filterPurchase(p))
+      .map(p => {
+        const sku = skusToExport.find(s => s.id === p.pallet_sku_id);
+        return {
+          'Type': 'Purchase',
+          'Pallet Size': sku?.pallet_size || '',
+          'Date': p.purchase_date,
+          'Supplier / Order ID': p.supplier || '',
+          'Weight (Kg)': p.weight_kg,
+          '# Pcs': p.num_pcs,
+          'Rate per Kg': p.rate_per_kg ?? '',
+        };
+      });
+
+    const consumptionRows = (consumptions || [])
+      .filter(c => skusToExport.some(s => s.id === c.pallet_sku_id) && filterConsumption(c))
+      .map(c => {
+        const sku = skusToExport.find(s => s.id === c.pallet_sku_id);
+        return {
+          'Type': 'Consumption',
+          'Pallet Size': sku?.pallet_size || '',
+          'Date': c.consumption_date,
+          'Supplier / Order ID': c.order_id || '',
+          'Weight (Kg)': c.weight_kg,
+          '# Pcs': c.num_pcs,
+          'Rate per Kg': '',
+        };
+      });
+
+    const allRows = [...purchaseRows, ...consumptionRows].sort((a, b) => a['Date'].localeCompare(b['Date']));
+
+    if (allRows.length === 0) { toast.info('No transactions in selected date range'); return; }
+
+    const ws = XLSX.utils.json_to_sheet(allRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Pallet Transactions');
+    XLSX.writeFile(wb, `wooden_pallets_${dateFrom || 'all'}_to_${dateTo || 'all'}.xlsx`);
+    toast.success('Downloaded');
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
@@ -279,6 +337,17 @@ export default function WoodenPalletsTab() {
         <Button variant="outline" onClick={handleDownloadTemplate} className="gap-2">
           <Download className="h-4 w-4" /> Download Template
         </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Input type="date" className="h-8 w-36 text-xs" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input type="date" className="h-8 w-36 text-xs" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2 h-8">
+            <Download className="h-3.5 w-3.5" /> Download Excel
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 text-sm">
