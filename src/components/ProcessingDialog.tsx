@@ -123,22 +123,19 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   };
 
   const handleSubmit = async () => {
-    const isLooseCoilSaleOnly = looseCoilSaleTotal > 0 && !processType && !coilMode;
     const effectiveOutputType = processType === 'Slit' ? outputType : 'FG';
 
-    if (!isLooseCoilSaleOnly) {
-      if (!processType || !effectiveOutputType) {
-        toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
-        return;
-      }
-      if (!coilMode) {
-        toast.error('Please select Full Coil or Partial Coil');
-        return;
-      }
-      if (processingQty <= 0) {
-        toast.error('Processing quantity must be greater than 0');
-        return;
-      }
+    if (!processType || !effectiveOutputType) {
+      toast.error('Please select Process' + (processType === 'Slit' ? ' and Output Type' : ''));
+      return;
+    }
+    if (!coilMode) {
+      toast.error('Please select Full Coil or Partial Coil');
+      return;
+    }
+    if (processingQty <= 0) {
+      toast.error('Processing quantity must be greater than 0');
+      return;
     }
     if (exceedsUsable) {
       toast.error(`Total (${totalCommitted.toFixed(2)} Kg) exceeds usable qty (${usableQty.toFixed(2)} Kg)`);
@@ -178,21 +175,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             scrap_type: null,
           });
         }
-      }
-
-      // 2b. Save loose coil sale
-      if (looseCoilSaleTotal > 0) {
-        await insertAction.mutateAsync({
-          batch_id: batch.id,
-          action_type: 'loose_coil_sale',
-          net_weight: looseCoilSaleTotal,
-          gross_weight: null,
-          order_id: null,
-          sales_date: new Date().toISOString().slice(0, 10),
-          invoice_number: null,
-          defect_type: null,
-          scrap_type: null,
-        });
       }
 
       // 3-5. Only run processing if not loose-coil-sale-only
