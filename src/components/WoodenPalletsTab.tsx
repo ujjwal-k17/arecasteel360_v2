@@ -137,12 +137,20 @@ export default function WoodenPalletsTab() {
   };
 
   const handleAddSKU = async () => {
-    if (!newSKUSize.trim()) { toast.error('Pallet size is required'); return; }
+    const w = Number(newSKUWidth);
+    const l = Number(newSKULength);
+    if (!w || w <= 0 || !l || l <= 0) { toast.error('Enter valid Width and Length'); return; }
+    const palletSize = `${w} x ${l}`;
+    if ((skus || []).some(s => s.pallet_size === palletSize)) {
+      toast.error('This pallet size already exists');
+      return;
+    }
     try {
-      await insertSKU.mutateAsync(newSKUSize.trim());
+      await insertSKU.mutateAsync(palletSize);
       toast.success('SKU added');
       setShowAddSKU(false);
-      setNewSKUSize('');
+      setNewSKUWidth('');
+      setNewSKULength('');
     } catch (e: any) {
       toast.error(e.message?.includes('duplicate') ? 'SKU already exists' : 'Failed to add SKU');
     }
