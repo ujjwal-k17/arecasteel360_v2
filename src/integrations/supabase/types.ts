@@ -93,6 +93,7 @@ export type Database = {
           customer_address: string | null
           customer_name: string
           customer_type: string
+          gst_number: string | null
           id: string
           reference: string | null
         }
@@ -102,6 +103,7 @@ export type Database = {
           customer_address?: string | null
           customer_name: string
           customer_type?: string
+          gst_number?: string | null
           id?: string
           reference?: string | null
         }
@@ -111,6 +113,7 @@ export type Database = {
           customer_address?: string | null
           customer_name?: string
           customer_type?: string
+          gst_number?: string | null
           id?: string
           reference?: string | null
         }
