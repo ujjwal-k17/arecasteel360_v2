@@ -562,7 +562,7 @@ export default function CoilsInventoryTab() {
                                                     <div className="flex flex-wrap gap-2">
                                                       {scrapActions.map(a => (
                                                         <div key={a.id} className="border rounded-md px-3 py-1.5 bg-background text-xs flex flex-col items-center min-w-[80px]">
-                                                          <span className="text-muted-foreground">{a.scrap_type || '-'}</span>
+                                                          <span className="text-muted-foreground">{a.scrap_type === 'Trimming' ? 'Trim' : (a.scrap_type || '-')}</span>
                                                           <span className="font-semibold font-mono-num">{a.net_weight != null ? Number(a.net_weight).toFixed(2) : '-'} Kg</span>
                                                         </div>
                                                       ))}
