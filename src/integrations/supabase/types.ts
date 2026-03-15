@@ -200,6 +200,7 @@ export type Database = {
           process: string | null
           processing_record_id: string | null
           qty: number | null
+          sku_id: string | null
           source_id: string | null
           source_type: string | null
           thickness: number | null
@@ -218,6 +219,7 @@ export type Database = {
           process?: string | null
           processing_record_id?: string | null
           qty?: number | null
+          sku_id?: string | null
           source_id?: string | null
           source_type?: string | null
           thickness?: number | null
@@ -236,6 +238,7 @@ export type Database = {
           process?: string | null
           processing_record_id?: string | null
           qty?: number | null
+          sku_id?: string | null
           source_id?: string | null
           source_type?: string | null
           thickness?: number | null
@@ -247,6 +250,13 @@ export type Database = {
             columns: ["processing_record_id"]
             isOneToOne: false
             referencedRelation: "processing_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fg_items_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "skus"
             referencedColumns: ["id"]
           },
         ]
@@ -386,6 +396,7 @@ export type Database = {
           material: string | null
           net_weight: number | null
           order_id: string
+          sku_id: string | null
           thickness: number | null
           width: number | null
         }
@@ -400,6 +411,7 @@ export type Database = {
           material?: string | null
           net_weight?: number | null
           order_id: string
+          sku_id?: string | null
           thickness?: number | null
           width?: number | null
         }
@@ -414,6 +426,7 @@ export type Database = {
           material?: string | null
           net_weight?: number | null
           order_id?: string
+          sku_id?: string | null
           thickness?: number | null
           width?: number | null
         }
@@ -423,6 +436,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "skus"
             referencedColumns: ["id"]
           },
         ]
@@ -677,6 +697,39 @@ export type Database = {
         }
         Relationships: []
       }
+      skus: {
+        Row: {
+          coating: string | null
+          created_at: string
+          grade: string | null
+          id: string
+          length: number | null
+          material: string | null
+          thickness: number | null
+          width: number | null
+        }
+        Insert: {
+          coating?: string | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          length?: number | null
+          material?: string | null
+          thickness?: number | null
+          width?: number | null
+        }
+        Update: {
+          coating?: string | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          length?: number | null
+          material?: string | null
+          thickness?: number | null
+          width?: number | null
+        }
+        Relationships: []
+      }
       wip_items: {
         Row: {
           coating: string | null
@@ -754,7 +807,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      upsert_sku: {
+        Args: {
+          p_coating: string
+          p_grade: string
+          p_length: number
+          p_material: string
+          p_thickness: number
+          p_width: number
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
