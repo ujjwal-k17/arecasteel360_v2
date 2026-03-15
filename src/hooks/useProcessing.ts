@@ -7,7 +7,7 @@ export function useAllProcessingRecords() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('processing_records' as any)
-        .select('*')
+        .select('*, processing_output_items(*)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as any[];

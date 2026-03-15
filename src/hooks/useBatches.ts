@@ -143,7 +143,10 @@ export function calcProcessedQty(batch: Batch, actions: InventoryAction[], proce
     .reduce((sum, a) => sum + (a.net_weight || 0), 0);
   const processingInput = (processingRecords || [])
     .filter((p: any) => p.batch_id === batch.id && (p.source_type || 'coil') === 'coil')
-    .reduce((sum: number, p: any) => sum + (p.input_qty || 0), 0);
+    .reduce((sum: number, p: any) => {
+      const outputItems = p.processing_output_items || [];
+      return sum + outputItems.reduce((s: number, item: any) => s + (item.qty_kg || 0), 0);
+    }, 0);
   return actionDeductions + processingInput;
 }
 
