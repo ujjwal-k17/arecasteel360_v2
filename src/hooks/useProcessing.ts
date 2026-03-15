@@ -86,7 +86,7 @@ export function useInsertProcessing() {
       const targetTable = params.outputType === 'WIP' ? 'wip_items' : 'fg_items';
 
       if (params.outputItems.length > 0) {
-        const inventoryItems = params.outputItems.map(item => {
+        const inventoryItems = await Promise.all(params.outputItems.map(async (item) => {
           const base: any = {
             processing_record_id: (procRec as any).id,
             material: batch.material,
@@ -107,9 +107,10 @@ export function useInsertProcessing() {
           } else {
             base.source_id = params.batchId;
             base.source_type = 'coil';
+            base.sku_id = await upsertSku({ material: batch.material, thickness: batch.thickness, width: item.width ?? batch.width, length: item.length ?? null, coating: batch.coating, grade: batch.grade });
           }
           return base;
-        });
+        }));
         const { error: invErr } = await supabase.from(targetTable as any).insert(inventoryItems);
         if (invErr) throw invErr;
       } else {
