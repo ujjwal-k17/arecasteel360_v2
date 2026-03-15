@@ -45,6 +45,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
   const insertOrder = useInsertOrder();
   const updateOrder = useUpdateOrder();
   const [orderNumber, setOrderNumber] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
