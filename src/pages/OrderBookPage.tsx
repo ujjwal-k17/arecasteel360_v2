@@ -163,6 +163,7 @@ export default function OrderBookPage() {
                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{o.order_number}</TableCell>
+                    <TableCell className="text-xs">{o.po_number || '-'}</TableCell>
                     <TableCell>{(o.customers as any)?.customer_name || '-'}</TableCell>
                     <TableCell className="text-xs">{o.order_date || '-'}</TableCell>
                     <TableCell className="text-right font-mono">{totals.total.toFixed(2)}</TableCell>
