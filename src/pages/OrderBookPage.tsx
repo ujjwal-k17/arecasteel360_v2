@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import NewOrderDialog from '@/components/NewOrderDialog';
-import OrderSalesDialog from '@/components/OrderSalesDialog';
+
 import { parseOrderExcel, downloadOrdersExcel, generateOrderTemplate } from '@/lib/order-excel-utils';
 import { toast } from 'sonner';
 import { getSkuLabel } from '@/lib/sku-utils';
