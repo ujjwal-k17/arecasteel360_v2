@@ -139,6 +139,7 @@ export default function OrderBookPage() {
             <TableRow>
               <TableHead className="w-8"></TableHead>
               <TableHead>Order ID</TableHead>
+              <TableHead>PO Number</TableHead>
               <TableHead>Customer Name</TableHead>
               <TableHead>Order Date</TableHead>
               <TableHead className="text-right">Total Order Qty (Kg)</TableHead>
@@ -149,9 +150,9 @@ export default function OrderBookPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
             ) : !orders || orders.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No orders yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No orders yet</TableCell></TableRow>
             ) : orders.map((o: any) => {
               const totals = getOrderTotals(o.order_items);
               const isExpanded = expanded.has(o.id);
@@ -162,6 +163,7 @@ export default function OrderBookPage() {
                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{o.order_number}</TableCell>
+                    <TableCell className="text-xs">{o.po_number || '-'}</TableCell>
                     <TableCell>{(o.customers as any)?.customer_name || '-'}</TableCell>
                     <TableCell className="text-xs">{o.order_date || '-'}</TableCell>
                     <TableCell className="text-right font-mono">{totals.total.toFixed(2)}</TableCell>
@@ -183,7 +185,7 @@ export default function OrderBookPage() {
                   </TableRow>
                   {isExpanded && o.order_items?.length > 0 && (
                     <TableRow key={`${o.id}-sub`}>
-                      <TableCell colSpan={8} className="p-0 bg-muted/20">
+                      <TableCell colSpan={9} className="p-0 bg-muted/20">
                         <div className="px-8 py-2">
                           <Table>
                             <TableHeader>

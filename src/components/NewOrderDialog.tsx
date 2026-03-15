@@ -45,6 +45,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
   const insertOrder = useInsertOrder();
   const updateOrder = useUpdateOrder();
   const [orderNumber, setOrderNumber] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -60,6 +61,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
   useEffect(() => {
     if (editOrder && open) {
       setOrderNumber(editOrder.order_number || '');
+      setPoNumber(editOrder.po_number || '');
       setCustomerId(editOrder.customer_id || '');
       setCustomerSearch((editOrder.customers as any)?.customer_name || '');
       setOrderComments(editOrder.comments || '');
@@ -114,6 +116,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
 
   const resetForm = () => {
     setOrderNumber('');
+    setPoNumber('');
     setCustomerId('');
     setCustomerSearch('');
     setOrderComments('');
@@ -162,6 +165,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
         customer_id: customerId,
         comments: orderComments || undefined,
         order_date: orderDate ? format(orderDate, 'yyyy-MM-dd') : undefined,
+        po_number: poNumber.trim() || undefined,
       };
 
       if (isEditMode) {
@@ -199,10 +203,14 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
             <DialogTitle>{isEditMode ? 'Edit Order' : 'New Order'}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div className="space-y-1">
               <Label>Order ID *</Label>
               <Input value={orderNumber} onChange={e => setOrderNumber(e.target.value)} placeholder="e.g. ORD-001" disabled={isEditMode} />
+            </div>
+            <div className="space-y-1">
+              <Label>PO Number</Label>
+              <Input value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="PO Number" />
             </div>
             <div className="space-y-1 relative" ref={dropdownRef}>
               <Label>Customer *</Label>
