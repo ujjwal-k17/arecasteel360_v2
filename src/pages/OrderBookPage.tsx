@@ -358,9 +358,6 @@ export default function OrderBookPage() {
       </div>
 
       <NewOrderDialog open={showNew} onOpenChange={setShowNew} editOrder={editOrder} />
-      {salesOrder && (
-        <OrderSalesDialog open={!!salesOrder} onOpenChange={() => setSalesOrder(null)} order={salesOrder} />
-      )}
 
       <AlertDialog open={!!deleteOrder} onOpenChange={(open) => { if (!open) setDeleteOrder(null); }}>
         <AlertDialogContent>
