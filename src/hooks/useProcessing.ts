@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { upsertSku } from '@/lib/sku-utils';
 
 export function useAllProcessingRecords() {
   return useQuery({
