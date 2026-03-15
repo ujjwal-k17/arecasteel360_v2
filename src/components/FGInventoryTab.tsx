@@ -219,6 +219,7 @@ export default function FGInventoryTab() {
       });
       toast.success('Sale recorded');
       setSaleDialog(null);
+      setSaleCustomerId('');
       setSaleForm({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
     } catch { toast.error('Failed to record sale'); }
   };
