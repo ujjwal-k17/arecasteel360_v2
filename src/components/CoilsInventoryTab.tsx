@@ -442,9 +442,11 @@ export default function CoilsInventoryTab() {
                                           {(() => {
                                             const scrapActions = batchActions.filter(a => a.action_type === 'scrap');
                                             const defectiveActions = batchActions.filter(a => a.action_type === 'defective');
-                                            const salesActions = batchActions.filter(a => ['pack_coil_sale', 'loose_coil_sale', 'sales'].includes(a.action_type));
+                                            const packCoilSales = batchActions.filter(a => a.action_type === 'pack_coil_sale');
+                                            const looseCoilSales = batchActions.filter(a => a.action_type === 'loose_coil_sale');
                                             const batchProcRecords = allProcRecords.filter((p: any) => p.batch_id === b.id);
-                                            const hasNothing = scrapActions.length === 0 && defectiveActions.length === 0 && salesActions.length === 0 && batchProcRecords.length === 0;
+                                            const hasCoilSales = packCoilSales.length > 0 || looseCoilSales.length > 0;
+                                            const hasNothing = scrapActions.length === 0 && defectiveActions.length === 0 && !hasCoilSales && batchProcRecords.length === 0;
 
                                             if (hasNothing) {
                                               return <p className="text-xs text-muted-foreground text-center py-1">No actions or processing recorded for this batch.</p>;
@@ -452,120 +454,159 @@ export default function CoilsInventoryTab() {
 
                                             return (
                                               <>
+                                                {/* Coil Sales Section */}
+                                                {hasCoilSales && (
+                                                  <div>
+                                                    <p className="text-xs font-semibold text-muted-foreground mb-1">Coil Sales</p>
+                                                    {packCoilSales.length > 0 && (
+                                                      <div className="mb-2">
+                                                        <p className="text-[11px] font-medium text-muted-foreground ml-2 mb-0.5">Pack Coil Sale</p>
+                                                        <Table>
+                                                          <TableHeader>
+                                                            <TableRow>
+                                                              <TableHead className="text-xs">Weight (Kg)</TableHead>
+                                                              <TableHead className="text-xs">Invoice</TableHead>
+                                                              <TableHead className="text-xs">Order ID</TableHead>
+                                                              <TableHead className="text-xs">Date</TableHead>
+                                                            </TableRow>
+                                                          </TableHeader>
+                                                          <TableBody>
+                                                            {packCoilSales.map(a => (
+                                                              <TableRow key={a.id}>
+                                                                <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
+                                                                <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
+                                                                <TableCell className="text-xs">{a.order_id || '-'}</TableCell>
+                                                                <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
+                                                              </TableRow>
+                                                            ))}
+                                                          </TableBody>
+                                                        </Table>
+                                                      </div>
+                                                    )}
+                                                    {looseCoilSales.length > 0 && (
+                                                      <div className="mb-2">
+                                                        <p className="text-[11px] font-medium text-muted-foreground ml-2 mb-0.5">Loose Coil Sale</p>
+                                                        <Table>
+                                                          <TableHeader>
+                                                            <TableRow>
+                                                              <TableHead className="text-xs">Weight (Kg)</TableHead>
+                                                              <TableHead className="text-xs">Invoice</TableHead>
+                                                              <TableHead className="text-xs">Order ID</TableHead>
+                                                              <TableHead className="text-xs">Date</TableHead>
+                                                            </TableRow>
+                                                          </TableHeader>
+                                                          <TableBody>
+                                                            {looseCoilSales.map(a => (
+                                                              <TableRow key={a.id}>
+                                                                <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
+                                                                <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
+                                                                <TableCell className="text-xs">{a.order_id || '-'}</TableCell>
+                                                                <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
+                                                              </TableRow>
+                                                            ))}
+                                                          </TableBody>
+                                                        </Table>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+
+                                                {/* Processing Section */}
+                                                {batchProcRecords.length > 0 && (
+                                                  <div>
+                                                    <p className="text-xs font-semibold text-muted-foreground mb-1">Processing</p>
+                                                    {batchProcRecords.map((pr: any) => {
+                                                      const outputItems = pr.processing_output_items || [];
+                                                      const totalProcessedQty = outputItems.reduce((s: number, item: any) => s + (item.qty_kg || 0), 0);
+                                                      return (
+                                                        <div key={pr.id} className="mb-2 border rounded p-2 bg-background">
+                                                          <div className="flex gap-4 text-xs text-muted-foreground mb-1">
+                                                            <span><strong>Process:</strong> {pr.process_type}</span>
+                                                            <span><strong>Output:</strong> {pr.output_type}</span>
+                                                            <span><strong>Order:</strong> {pr.order_id || '-'}</span>
+                                                            <span><strong>Date:</strong> {pr.created_at ? new Date(pr.created_at).toLocaleDateString() : '-'}</span>
+                                                            <span className="font-semibold"><strong>Total Processed Qty:</strong> <span className="font-mono-num">{totalProcessedQty.toFixed(2)} Kg</span></span>
+                                                          </div>
+                                                          {outputItems.length > 0 && (
+                                                            <Table>
+                                                              <TableHeader>
+                                                                <TableRow>
+                                                                  <TableHead className="text-xs">Width (mm)</TableHead>
+                                                                  <TableHead className="text-xs">Length (mm)</TableHead>
+                                                                  <TableHead className="text-xs">Pcs</TableHead>
+                                                                  <TableHead className="text-xs">Processed Qty (Kg)</TableHead>
+                                                                </TableRow>
+                                                              </TableHeader>
+                                                              <TableBody>
+                                                                {outputItems.map((item: any) => (
+                                                                  <TableRow key={item.id}>
+                                                                    <TableCell className="text-xs font-mono-num">{item.width ?? '-'}</TableCell>
+                                                                    <TableCell className="text-xs font-mono-num">{item.length ?? '-'}</TableCell>
+                                                                    <TableCell className="text-xs font-mono-num">{item.num_pcs ?? '-'}</TableCell>
+                                                                    <TableCell className="text-xs font-mono-num">{item.qty_kg != null ? Number(item.qty_kg).toFixed(2) : '-'}</TableCell>
+                                                                  </TableRow>
+                                                                ))}
+                                                              </TableBody>
+                                                            </Table>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                )}
+
                                                 {/* Scrap Section */}
                                                 {scrapActions.length > 0 && (
-                                                  <>
-                                                    <p className="text-xs font-semibold text-muted-foreground">Scrap</p>
+                                                  <div>
+                                                    <p className="text-xs font-semibold text-muted-foreground mb-1">Scrap</p>
                                                     <Table>
                                                       <TableHeader>
                                                         <TableRow>
-                                                          <TableHead className="text-xs">Type</TableHead>
-                                                          <TableHead className="text-xs">Detail</TableHead>
+                                                          <TableHead className="text-xs">Scrap Type</TableHead>
                                                           <TableHead className="text-xs">Weight (Kg)</TableHead>
                                                         </TableRow>
                                                       </TableHeader>
                                                       <TableBody>
                                                         {scrapActions.map(a => (
                                                           <TableRow key={a.id}>
-                                                            <TableCell className="text-xs">Scrap</TableCell>
                                                             <TableCell className="text-xs">{a.scrap_type || '-'}</TableCell>
                                                             <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
                                                           </TableRow>
                                                         ))}
                                                         <TableRow className="bg-muted/30 font-semibold">
-                                                          <TableCell className="text-xs" colSpan={2}>Total Scrap</TableCell>
+                                                          <TableCell className="text-xs">Total Scrap</TableCell>
                                                           <TableCell className="text-xs font-mono-num">{scrapActions.reduce((s, a) => s + (a.net_weight || 0), 0).toFixed(2)}</TableCell>
                                                         </TableRow>
                                                       </TableBody>
                                                     </Table>
-                                                  </>
+                                                  </div>
                                                 )}
 
                                                 {/* Defective Section */}
                                                 {defectiveActions.length > 0 && (
-                                                  <>
-                                                    <p className="text-xs font-semibold text-muted-foreground">Defective</p>
+                                                  <div>
+                                                    <p className="text-xs font-semibold text-muted-foreground mb-1">Defective</p>
                                                     <Table>
                                                       <TableHeader>
                                                         <TableRow>
-                                                          <TableHead className="text-xs">Type</TableHead>
-                                                          <TableHead className="text-xs">Detail</TableHead>
+                                                          <TableHead className="text-xs">Defect Type</TableHead>
                                                           <TableHead className="text-xs">Weight (Kg)</TableHead>
                                                         </TableRow>
                                                       </TableHeader>
                                                       <TableBody>
                                                         {defectiveActions.map(a => (
                                                           <TableRow key={a.id}>
-                                                            <TableCell className="text-xs">Defective</TableCell>
                                                             <TableCell className="text-xs">{a.defect_type || '-'}</TableCell>
                                                             <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
                                                           </TableRow>
                                                         ))}
                                                         <TableRow className="bg-muted/30 font-semibold">
-                                                          <TableCell className="text-xs" colSpan={2}>Total Defective</TableCell>
+                                                          <TableCell className="text-xs">Total Defective</TableCell>
                                                           <TableCell className="text-xs font-mono-num">{defectiveActions.reduce((s, a) => s + (a.net_weight || 0), 0).toFixed(2)}</TableCell>
                                                         </TableRow>
                                                       </TableBody>
                                                     </Table>
-                                                  </>
-                                                )}
-
-                                                {/* Processing Section */}
-                                                {batchProcRecords.length > 0 && (
-                                                  <>
-                                                    <p className="text-xs font-semibold text-muted-foreground">Processing</p>
-                                                    <Table>
-                                                      <TableHeader>
-                                                        <TableRow>
-                                                          <TableHead className="text-xs">Process</TableHead>
-                                                          <TableHead className="text-xs">Output Type</TableHead>
-                                                          <TableHead className="text-xs">Input Qty (Kg)</TableHead>
-                                                          <TableHead className="text-xs">Order ID</TableHead>
-                                                          <TableHead className="text-xs">Date</TableHead>
-                                                        </TableRow>
-                                                      </TableHeader>
-                                                      <TableBody>
-                                                        {batchProcRecords.map((pr: any) => (
-                                                          <TableRow key={pr.id}>
-                                                            <TableCell className="text-xs">{pr.process_type}</TableCell>
-                                                            <TableCell className="text-xs">{pr.output_type}</TableCell>
-                                                            <TableCell className="text-xs font-mono-num">{pr.input_qty ?? '-'}</TableCell>
-                                                            <TableCell className="text-xs">{pr.order_id || '-'}</TableCell>
-                                                            <TableCell className="text-xs">{pr.created_at ? new Date(pr.created_at).toLocaleDateString() : '-'}</TableCell>
-                                                          </TableRow>
-                                                        ))}
-                                                      </TableBody>
-                                                    </Table>
-                                                  </>
-                                                )}
-
-                                                {/* Sales Section */}
-                                                {salesActions.length > 0 && (
-                                                  <>
-                                                    <p className="text-xs font-semibold text-muted-foreground">Sales</p>
-                                                    <Table>
-                                                      <TableHeader>
-                                                        <TableRow>
-                                                          <TableHead className="text-xs">Type</TableHead>
-                                                          <TableHead className="text-xs">Weight (Kg)</TableHead>
-                                                          <TableHead className="text-xs">Invoice</TableHead>
-                                                          <TableHead className="text-xs">Order ID</TableHead>
-                                                          <TableHead className="text-xs">Date</TableHead>
-                                                        </TableRow>
-                                                      </TableHeader>
-                                                      <TableBody>
-                                                        {salesActions.map(a => (
-                                                          <TableRow key={a.id}>
-                                                            <TableCell className="text-xs capitalize">{a.action_type.replace(/_/g, ' ')}</TableCell>
-                                                            <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
-                                                            <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
-                                                            <TableCell className="text-xs">{a.order_id || '-'}</TableCell>
-                                                            <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
-                                                          </TableRow>
-                                                        ))}
-                                                      </TableBody>
-                                                    </Table>
-                                                  </>
+                                                  </div>
                                                 )}
                                               </>
                                             );
