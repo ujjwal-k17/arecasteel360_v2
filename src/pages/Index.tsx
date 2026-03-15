@@ -1,6 +1,5 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle, LayoutDashboard, BarChart3 } from 'lucide-react';
-import DashboardTab from '@/components/DashboardTab';
+import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle, BarChart3 } from 'lucide-react';
 import InTransitTab from '@/components/InTransitTab';
 import CoilsInventoryTab from '@/components/CoilsInventoryTab';
 import ScrapManagementTab from '@/components/ScrapManagementTab';
@@ -12,11 +11,8 @@ import SalesDataTab from '@/components/SalesDataTab';
 const Index = () => {
   return (
     <div className="container py-6">
-      <Tabs defaultValue="dashboard">
+      <Tabs defaultValue="in-transit">
         <TabsList className="mb-6 h-auto gap-1 bg-transparent p-0 flex flex-wrap">
-          <TabsTrigger value="dashboard" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
-            <LayoutDashboard className="h-4 w-4" /> Dashboard
-          </TabsTrigger>
           <TabsTrigger value="in-transit" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
             <Package className="h-4 w-4" /> In-Transit
           </TabsTrigger>
@@ -40,9 +36,6 @@ const Index = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard">
-          <DashboardTab />
-        </TabsContent>
         <TabsContent value="in-transit">
           <InTransitTab />
         </TabsContent>
