@@ -185,7 +185,7 @@ export default function OrderBookPage() {
                   </TableRow>
                   {isExpanded && o.order_items?.length > 0 && (
                     <TableRow key={`${o.id}-sub`}>
-                      <TableCell colSpan={8} className="p-0 bg-muted/20">
+                      <TableCell colSpan={9} className="p-0 bg-muted/20">
                         <div className="px-8 py-2">
                           <Table>
                             <TableHeader>
