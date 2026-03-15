@@ -131,6 +131,25 @@ export function useUpdateOrder() {
   });
 }
 
+export function useDeleteOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderId: string) => {
+      // order_items cascade-deleted via FK, but dispatches reference order_items so delete those first
+      const { data: items } = await supabase.from('order_items').select('id').eq('order_id', orderId);
+      if (items && items.length > 0) {
+        const ids = items.map(i => i.id);
+        await supabase.from('order_dispatches' as any).delete().in('order_item_id', ids);
+      }
+      const { error: iErr } = await supabase.from('order_items').delete().eq('order_id', orderId);
+      if (iErr) throw iErr;
+      const { error } = await supabase.from('orders').delete().eq('id', orderId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['orders'] }),
+  });
+}
+
 // ---------- Dispatches ----------
 interface DispatchRow {
   id: string;
