@@ -119,10 +119,12 @@ export function useUpdateOrder() {
       if (dErr) throw dErr;
 
       if (payload.items.length > 0) {
-        const items = payload.items.map(i => {
-          const { id: _id, ...rest } = i;
-          return { ...rest, order_id: payload.orderId };
-        });
+        const items = payload.items.map(({ id: _id, ...rest }) => ({
+          ...rest,
+          order_id: payload.orderId,
+        }));
+        // Remove any undefined 'id' keys to let DB generate them
+        items.forEach(i => { delete (i as any).id; });
         const { error: iErr } = await supabase.from('order_items').insert(items);
         if (iErr) throw iErr;
       }
