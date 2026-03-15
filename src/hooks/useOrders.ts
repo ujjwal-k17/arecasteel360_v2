@@ -120,7 +120,7 @@ export function useUpdateOrder() {
 
       if (payload.items.length > 0) {
         const items = payload.items.map(i => {
-          const { id, ...rest } = i;
+          const { id: _id, ...rest } = i;
           return { ...rest, order_id: payload.orderId };
         });
         const { error: iErr } = await supabase.from('order_items').insert(items);
