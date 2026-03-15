@@ -11,17 +11,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getSkuLabel } from '@/lib/sku-utils';
 
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   order: any;
 }
-
-const getSKULabel = (item: any) => {
-  const parts = [item.material, item.form, item.thickness ? `${item.thickness}mm` : null, item.width ? `${item.width}W` : null, item.length ? `${item.length}L` : null, item.coating, item.grade].filter(Boolean);
-  return parts.join(' | ') || '-';
-};
 
 export default function OrderSalesDialog({ open, onOpenChange, order }: Props) {
   const items = order?.order_items || [];
