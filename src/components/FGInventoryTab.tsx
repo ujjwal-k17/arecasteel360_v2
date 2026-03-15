@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCustomers, useOrders } from '@/hooks/useOrders';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
@@ -43,8 +44,17 @@ export default function FGInventoryTab() {
   // Dialogs
   const [saleDialog, setSaleDialog] = useState<any | null>(null);
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
+  const [saleCustomerId, setSaleCustomerId] = useState('');
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '' });
+
+  const { data: customers } = useCustomers();
+  const { data: allOrders } = useOrders();
+
+  const filteredSaleOrders = useMemo(() => {
+    if (!allOrders || !saleCustomerId) return [];
+    return allOrders.filter((o: any) => o.customer_id === saleCustomerId && o.status === 'open');
+  }, [allOrders, saleCustomerId]);
 
   // Fetch FG sales & defectives
   const { data: fgSales } = useQuery({
@@ -209,6 +219,7 @@ export default function FGInventoryTab() {
       });
       toast.success('Sale recorded');
       setSaleDialog(null);
+      setSaleCustomerId('');
       setSaleForm({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
     } catch { toast.error('Failed to record sale'); }
   };
@@ -354,9 +365,33 @@ export default function FGInventoryTab() {
             </div>
           )}
           <div className="space-y-3">
-            <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
-            <div><Label className="text-xs">Order Number</Label><Input value={saleForm.order_id} onChange={e => setSaleForm(v => ({ ...v, order_id: e.target.value }))} /></div>
             <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={saleForm.quantity} onChange={e => setSaleForm(v => ({ ...v, quantity: e.target.value }))} /></div>
+            <div>
+              <Label className="text-xs">Customer Name</Label>
+              <Select value={saleCustomerId} onValueChange={(v) => { setSaleCustomerId(v); setSaleForm(f => ({ ...f, order_id: '' })); }}>
+                <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+                <SelectContent>
+                  {(customers || []).map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Order Number</Label>
+              <Select value={saleForm.order_id} onValueChange={v => setSaleForm(f => ({ ...f, order_id: v }))} disabled={!saleCustomerId}>
+                <SelectTrigger><SelectValue placeholder={saleCustomerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
+                <SelectContent>
+                  {filteredSaleOrders.map((o: any) => (
+                    <SelectItem key={o.id} value={o.order_number}>{o.order_number}{o.po_number ? ` (PO: ${o.po_number})` : ''}</SelectItem>
+                  ))}
+                  {filteredSaleOrders.length === 0 && saleCustomerId && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">No open orders</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
             <div><Label className="text-xs">Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
           </div>
           <DialogFooter>
