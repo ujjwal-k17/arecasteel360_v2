@@ -118,7 +118,7 @@ export default function OrderSalesDialog({ open, onOpenChange, order }: Props) {
               const balance = orderQty - dispatched;
               return (
                 <TableRow key={item.id}>
-                  <TableCell className="text-xs">{getSKULabel(item)}</TableCell>
+                  <TableCell className="text-xs">{getSkuLabel(item)}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{orderQty.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{dispatched.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{balance.toFixed(2)}</TableCell>
