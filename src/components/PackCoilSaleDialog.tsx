@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { usePackCoilSale } from '@/hooks/useProcessing';
 import { useInsertAction } from '@/hooks/useBatches';
 import type { Batch, InventoryAction } from '@/hooks/useBatches';
 import { calcUsableBalanceQty } from '@/hooks/useBatches';
+import { useCustomers, useOrders } from '@/hooks/useOrders';
 
 interface Props {
   batch: Batch;
@@ -22,6 +24,10 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const packCoilSale = usePackCoilSale();
   const insertAction = useInsertAction();
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
+  const { data: customers } = useCustomers();
+  const { data: orders } = useOrders();
+
+  const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [salesDate, setSalesDate] = useState('');
@@ -29,6 +35,17 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
 
   const isLoose = mode === 'loose';
   const title = isLoose ? 'Loose Coil Sale' : 'Pack Coil Sale';
+
+  // Filter open orders for the selected customer
+  const filteredOrders = useMemo(() => {
+    if (!orders || !customerId) return [];
+    return orders.filter((o: any) => o.customer_id === customerId && o.status === 'open');
+  }, [orders, customerId]);
+
+  const handleCustomerChange = (val: string) => {
+    setCustomerId(val);
+    setOrderId(''); // reset order when customer changes
+  };
 
   const handleSubmit = async () => {
     if (!orderId.trim()) { toast.error('Order ID is required'); return; }
@@ -100,8 +117,29 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
             </div>
           )}
           <div>
+            <Label className="text-xs">Customer Name</Label>
+            <Select value={customerId} onValueChange={handleCustomerChange}>
+              <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+              <SelectContent>
+                {(customers || []).map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label className="text-xs">Order ID</Label>
-            <Input value={orderId} onChange={e => setOrderId(e.target.value)} />
+            <Select value={orderId} onValueChange={setOrderId} disabled={!customerId}>
+              <SelectTrigger><SelectValue placeholder={customerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
+              <SelectContent>
+                {filteredOrders.map((o: any) => (
+                  <SelectItem key={o.id} value={o.order_number}>{o.order_number}{o.po_number ? ` (PO: ${o.po_number})` : ''}</SelectItem>
+                ))}
+                {filteredOrders.length === 0 && customerId && (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">No open orders</div>
+                )}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label className="text-xs">Invoice Number</Label>
