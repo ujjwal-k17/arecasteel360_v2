@@ -165,6 +165,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
         customer_id: customerId,
         comments: orderComments || undefined,
         order_date: orderDate ? format(orderDate, 'yyyy-MM-dd') : undefined,
+        po_number: poNumber.trim() || undefined,
       };
 
       if (isEditMode) {
