@@ -57,7 +57,7 @@ export default function OrderSalesDialog({ open, onOpenChange, order }: Props) {
       const already = getDispatchedQty(d.order_item_id);
       const balance = (Number(item?.net_weight) || 0) - already;
       if (d.dispatch_qty > balance) {
-        toast.error(`Dispatch qty exceeds balance for ${getSKULabel(item)}`);
+        toast.error(`Dispatch qty exceeds balance for ${getSkuLabel(item)}`);
         return;
       }
     }
