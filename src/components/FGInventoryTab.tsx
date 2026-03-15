@@ -44,8 +44,17 @@ export default function FGInventoryTab() {
   // Dialogs
   const [saleDialog, setSaleDialog] = useState<any | null>(null);
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
+  const [saleCustomerId, setSaleCustomerId] = useState('');
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '' });
+
+  const { data: customers } = useCustomers();
+  const { data: allOrders } = useOrders();
+
+  const filteredSaleOrders = useMemo(() => {
+    if (!allOrders || !saleCustomerId) return [];
+    return allOrders.filter((o: any) => o.customer_id === saleCustomerId && o.status === 'open');
+  }, [allOrders, saleCustomerId]);
 
   // Fetch FG sales & defectives
   const { data: fgSales } = useQuery({
