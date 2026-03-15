@@ -165,7 +165,7 @@ export function useAllDispatches() {
         .from('order_dispatches' as any)
         .select('*');
       if (error) throw error;
-      return (data || []) as DispatchRow[];
+      return (data || []) as unknown as DispatchRow[];
     },
   });
 }
