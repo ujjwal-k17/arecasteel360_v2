@@ -61,6 +61,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
   useEffect(() => {
     if (editOrder && open) {
       setOrderNumber(editOrder.order_number || '');
+      setPoNumber(editOrder.po_number || '');
       setCustomerId(editOrder.customer_id || '');
       setCustomerSearch((editOrder.customers as any)?.customer_name || '');
       setOrderComments(editOrder.comments || '');
