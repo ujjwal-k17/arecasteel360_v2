@@ -54,7 +54,7 @@ export function useInsertOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: {
-      order: { order_number: string; customer_id: string; comments?: string; order_date?: string };
+      order: { order_number: string; customer_id: string; comments?: string; order_date?: string; po_number?: string };
       items: Array<{
         material?: string;
         form?: string;
