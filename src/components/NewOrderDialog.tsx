@@ -135,8 +135,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
   };
 
   const buildItemsPayload = () => {
-    return items.filter(i => i.material || i.net_weight).map(i => ({
-      id: i.id,
+    return items.filter(i => i.material || i.net_weight).map(({ id, ...i }) => ({
       material: i.material || undefined,
       form: i.form || undefined,
       thickness: i.thickness ? Number(i.thickness) : undefined,
