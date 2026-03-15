@@ -198,7 +198,7 @@ export default function OrderBookPage() {
                                 const dq = getItemDispatched(item.id);
                                 return (
                                   <TableRow key={item.id}>
-                                    <TableCell className="text-xs">{getSKULabel(item)}</TableCell>
+                                    <TableCell className="text-xs">{getSkuLabel(item)}</TableCell>
                                     <TableCell className="text-xs text-right font-mono">{oq.toFixed(2)}</TableCell>
                                     <TableCell className="text-xs text-right font-mono">{dq.toFixed(2)}</TableCell>
                                     <TableCell className="text-xs text-right font-mono">{(oq - dq).toFixed(2)}</TableCell>
