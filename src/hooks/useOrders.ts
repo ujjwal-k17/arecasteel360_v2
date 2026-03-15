@@ -132,17 +132,26 @@ export function useUpdateOrder() {
 }
 
 // ---------- Dispatches ----------
+interface DispatchRow {
+  id: string;
+  order_item_id: string;
+  dispatch_qty: number;
+  dispatch_date: string | null;
+  invoice_number: string | null;
+  created_at: string;
+}
+
 export function useOrderDispatches(orderItemIds: string[]) {
   return useQuery({
     queryKey: ['order_dispatches', orderItemIds],
     queryFn: async () => {
-      if (orderItemIds.length === 0) return [];
+      if (orderItemIds.length === 0) return [] as DispatchRow[];
       const { data, error } = await supabase
-        .from('order_dispatches')
+        .from('order_dispatches' as any)
         .select('*')
         .in('order_item_id', orderItemIds);
       if (error) throw error;
-      return data;
+      return (data || []) as DispatchRow[];
     },
     enabled: orderItemIds.length > 0,
   });
@@ -153,10 +162,10 @@ export function useAllDispatches() {
     queryKey: ['all_order_dispatches'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('order_dispatches')
+        .from('order_dispatches' as any)
         .select('*');
       if (error) throw error;
-      return data;
+      return (data || []) as DispatchRow[];
     },
   });
 }
@@ -170,7 +179,7 @@ export function useInsertDispatches() {
       dispatch_date?: string;
       invoice_number?: string;
     }>) => {
-      const { error } = await supabase.from('order_dispatches').insert(dispatches);
+      const { error } = await supabase.from('order_dispatches' as any).insert(dispatches as any);
       if (error) throw error;
     },
     onSuccess: () => {
