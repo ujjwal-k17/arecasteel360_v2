@@ -9,11 +9,7 @@ import NewOrderDialog from '@/components/NewOrderDialog';
 import OrderSalesDialog from '@/components/OrderSalesDialog';
 import { parseOrderExcel, downloadOrdersExcel, generateOrderTemplate } from '@/lib/order-excel-utils';
 import { toast } from 'sonner';
-
-const getSKULabel = (item: any) => {
-  const parts = [item.material, item.form, item.thickness ? `${item.thickness}mm` : null, item.width ? `${item.width}W` : null, item.length ? `${item.length}L` : null, item.coating, item.grade].filter(Boolean);
-  return parts.join(' | ') || '-';
-};
+import { getSkuLabel } from '@/lib/sku-utils';
 
 export default function OrderBookPage() {
   const { data: orders, isLoading } = useOrders();
