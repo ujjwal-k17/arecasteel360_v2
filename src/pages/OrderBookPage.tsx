@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { useOrders, useCustomers, useInsertOrder, useAllDispatches } from '@/hooks/useOrders';
+import { useOrders, useCustomers, useInsertOrder, useAllDispatches, useDeleteOrder } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, ShoppingCart, Download, Upload } from 'lucide-react';
