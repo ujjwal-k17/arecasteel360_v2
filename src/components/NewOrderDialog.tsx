@@ -116,6 +116,7 @@ export default function NewOrderDialog({ open, onOpenChange, editOrder }: Props)
 
   const resetForm = () => {
     setOrderNumber('');
+    setPoNumber('');
     setCustomerId('');
     setCustomerSearch('');
     setOrderComments('');
