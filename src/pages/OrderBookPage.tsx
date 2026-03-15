@@ -150,9 +150,9 @@ export default function OrderBookPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
             ) : !orders || orders.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No orders yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No orders yet</TableCell></TableRow>
             ) : orders.map((o: any) => {
               const totals = getOrderTotals(o.order_items);
               const isExpanded = expanded.has(o.id);
