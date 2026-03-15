@@ -123,12 +123,12 @@ export function useUpdateOrder() {
       if (dErr) throw dErr;
 
       if (payload.items.length > 0) {
-        const items = payload.items.map(({ id: _id, ...rest }) => ({
-          ...rest,
-          order_id: payload.orderId,
+        const items = await Promise.all(payload.items.map(async ({ id: _id, ...rest }) => {
+          const sku_id = await upsertSku({ material: rest.material, thickness: rest.thickness, width: rest.width, length: rest.length, coating: rest.coating, grade: rest.grade });
+          const item = { ...rest, order_id: payload.orderId, sku_id };
+          delete (item as any).id;
+          return item;
         }));
-        // Remove any undefined 'id' keys to let DB generate them
-        items.forEach(i => { delete (i as any).id; });
         const { error: iErr } = await supabase.from('order_items').insert(items);
         if (iErr) throw iErr;
       }
