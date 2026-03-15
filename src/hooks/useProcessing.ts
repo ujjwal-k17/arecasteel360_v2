@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { upsertSku } from '@/lib/sku-utils';
 
 export function useAllProcessingRecords() {
   return useQuery({
@@ -85,7 +86,7 @@ export function useInsertProcessing() {
       const targetTable = params.outputType === 'WIP' ? 'wip_items' : 'fg_items';
 
       if (params.outputItems.length > 0) {
-        const inventoryItems = params.outputItems.map(item => {
+        const inventoryItems = await Promise.all(params.outputItems.map(async (item) => {
           const base: any = {
             processing_record_id: (procRec as any).id,
             material: batch.material,
@@ -106,9 +107,10 @@ export function useInsertProcessing() {
           } else {
             base.source_id = params.batchId;
             base.source_type = 'coil';
+            base.sku_id = await upsertSku({ material: batch.material, thickness: batch.thickness, width: item.width ?? batch.width, length: item.length ?? null, coating: batch.coating, grade: batch.grade });
           }
           return base;
-        });
+        }));
         const { error: invErr } = await supabase.from(targetTable as any).insert(inventoryItems);
         if (invErr) throw invErr;
       } else {
@@ -216,21 +218,25 @@ export function useWIPProcessing() {
         await supabase.from('processing_output_items' as any).insert(items);
       }
 
-      const fgItems = params.outputItems.map(item => ({
-        source_id: params.wipItemId,
-        source_type: 'wip',
-        processing_record_id: (procRec as any).id,
-        material: params.wipItem.material,
-        make: params.wipItem.make,
-        process: 'CTL',
-        width: params.wipItem.width,
-        thickness: params.wipItem.thickness ?? null,
-        length: item.length,
-        coating: params.wipItem.coating,
-        grade: params.wipItem.grade,
-        qty: item.qty_kg,
-        num_pcs: item.num_pcs,
-        order_id: params.orderId || null,
+      const fgItems = await Promise.all(params.outputItems.map(async (item) => {
+        const sku_id = await upsertSku({ material: params.wipItem.material, thickness: params.wipItem.thickness, width: params.wipItem.width, length: item.length, coating: params.wipItem.coating, grade: params.wipItem.grade });
+        return {
+          source_id: params.wipItemId,
+          source_type: 'wip',
+          processing_record_id: (procRec as any).id,
+          material: params.wipItem.material,
+          make: params.wipItem.make,
+          process: 'CTL',
+          width: params.wipItem.width,
+          thickness: params.wipItem.thickness ?? null,
+          length: item.length,
+          coating: params.wipItem.coating,
+          grade: params.wipItem.grade,
+          qty: item.qty_kg,
+          num_pcs: item.num_pcs,
+          order_id: params.orderId || null,
+          sku_id,
+        };
       }));
       if (fgItems.length > 0) {
         await supabase.from('fg_items' as any).insert(fgItems);

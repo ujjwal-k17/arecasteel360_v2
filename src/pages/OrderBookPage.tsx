@@ -9,11 +9,7 @@ import NewOrderDialog from '@/components/NewOrderDialog';
 import OrderSalesDialog from '@/components/OrderSalesDialog';
 import { parseOrderExcel, downloadOrdersExcel, generateOrderTemplate } from '@/lib/order-excel-utils';
 import { toast } from 'sonner';
-
-const getSKULabel = (item: any) => {
-  const parts = [item.material, item.form, item.thickness ? `${item.thickness}mm` : null, item.width ? `${item.width}W` : null, item.length ? `${item.length}L` : null, item.coating, item.grade].filter(Boolean);
-  return parts.join(' | ') || '-';
-};
+import { getSkuLabel } from '@/lib/sku-utils';
 
 export default function OrderBookPage() {
   const { data: orders, isLoading } = useOrders();
@@ -202,7 +198,7 @@ export default function OrderBookPage() {
                                 const dq = getItemDispatched(item.id);
                                 return (
                                   <TableRow key={item.id}>
-                                    <TableCell className="text-xs">{getSKULabel(item)}</TableCell>
+                                    <TableCell className="text-xs">{getSkuLabel(item)}</TableCell>
                                     <TableCell className="text-xs text-right font-mono">{oq.toFixed(2)}</TableCell>
                                     <TableCell className="text-xs text-right font-mono">{dq.toFixed(2)}</TableCell>
                                     <TableCell className="text-xs text-right font-mono">{(oq - dq).toFixed(2)}</TableCell>
