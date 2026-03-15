@@ -76,8 +76,11 @@ export function useInsertOrder() {
       if (oErr) throw oErr;
 
       if (payload.items.length > 0) {
-        const items = payload.items.map(i => ({ ...i, order_id: order.id }));
-        const { error: iErr } = await supabase.from('order_items').insert(items);
+        const itemsWithSku = await Promise.all(payload.items.map(async (i) => {
+          const sku_id = await upsertSku({ material: i.material, thickness: i.thickness, width: i.width, length: i.length, coating: i.coating, grade: i.grade });
+          return { ...i, order_id: order.id, sku_id };
+        }));
+        const { error: iErr } = await supabase.from('order_items').insert(itemsWithSku);
         if (iErr) throw iErr;
       }
       return order;
