@@ -138,9 +138,13 @@ export function isPackCoilSold(batch: Batch, actions: InventoryAction[]): boolea
 
 export function calcProcessedQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
   const batchActions = actions.filter(a => a.batch_id === batch.id);
-  return batchActions
+  const actionDeductions = batchActions
     .filter(a => ['sales', 'scrap', 'defective', 'pack_coil_sale', 'loose_coil_sale'].includes(a.action_type))
     .reduce((sum, a) => sum + (a.net_weight || 0), 0);
+  const processingInput = (processingRecords || [])
+    .filter((p: any) => p.batch_id === batch.id && (p.source_type || 'coil') === 'coil')
+    .reduce((sum: number, p: any) => sum + (p.input_qty || 0), 0);
+  return actionDeductions + processingInput;
 }
 
 export function calcUsableBalanceQty(batch: Batch, actions: InventoryAction[], processingRecords?: any[]): number {
