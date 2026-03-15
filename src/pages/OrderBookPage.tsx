@@ -2,12 +2,12 @@ import { useState, useMemo, useRef } from 'react';
 import { useOrders, useCustomers, useInsertOrder, useAllDispatches, useDeleteOrder } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, ShoppingCart, Download, Upload, Trash2 } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import NewOrderDialog from '@/components/NewOrderDialog';
-import OrderSalesDialog from '@/components/OrderSalesDialog';
+
 import { parseOrderExcel, downloadOrdersExcel, generateOrderTemplate } from '@/lib/order-excel-utils';
 import { toast } from 'sonner';
 import { getSkuLabel } from '@/lib/sku-utils';
@@ -23,7 +23,7 @@ export default function OrderBookPage() {
   const { data: allDispatches } = useAllDispatches();
   const [showNew, setShowNew] = useState(false);
   const [editOrder, setEditOrder] = useState<any>(null);
-  const [salesOrder, setSalesOrder] = useState<any>(null);
+  
   const [deleteOrder, setDeleteOrder] = useState<any>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const qc = useQueryClient();
@@ -296,9 +296,6 @@ export default function OrderBookPage() {
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditOrder(o); setShowNew(true); }} title="Edit">
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSalesOrder(o)} title="Sales">
-                          <ShoppingCart className="h-3.5 w-3.5" />
-                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteOrder(o)} title="Delete">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -361,9 +358,6 @@ export default function OrderBookPage() {
       </div>
 
       <NewOrderDialog open={showNew} onOpenChange={setShowNew} editOrder={editOrder} />
-      {salesOrder && (
-        <OrderSalesDialog open={!!salesOrder} onOpenChange={() => setSalesOrder(null)} order={salesOrder} />
-      )}
 
       <AlertDialog open={!!deleteOrder} onOpenChange={(open) => { if (!open) setDeleteOrder(null); }}>
         <AlertDialogContent>
