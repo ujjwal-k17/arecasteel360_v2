@@ -224,6 +224,34 @@ export default function OrderBookPage() {
       {salesOrder && (
         <OrderSalesDialog open={!!salesOrder} onOpenChange={() => setSalesOrder(null)} order={salesOrder} />
       )}
+
+      <AlertDialog open={!!deleteOrder} onOpenChange={(open) => { if (!open) setDeleteOrder(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete order <strong>{deleteOrder?.order_number}</strong>? This will also remove all items and dispatch records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                try {
+                  await deleteOrderMutation.mutateAsync(deleteOrder.id);
+                  toast.success('Order deleted');
+                  setDeleteOrder(null);
+                } catch (e: any) {
+                  toast.error(e.message || 'Failed to delete order');
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
