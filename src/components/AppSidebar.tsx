@@ -1,4 +1,4 @@
-import { Package, Wrench, ClipboardList, Wallet, Truck } from 'lucide-react';
+import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import arecaLogo from '@/assets/areca-steel-logo.png';
@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/sidebar';
 
 const modules = [
-  { title: 'Inventory', url: '/', icon: Package },
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard },
+  { title: 'Inventory', url: '/inventory', icon: Package },
   { title: 'Consumables', url: '/consumables', icon: Wrench },
   { title: 'Order Book', url: '/order-book', icon: ClipboardList },
   { title: 'Working Capital', url: '/working-capital', icon: Wallet },
