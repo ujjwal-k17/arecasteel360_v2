@@ -352,6 +352,65 @@ export type Database = {
           },
         ]
       }
+      invoice_details: {
+        Row: {
+          created_at: string
+          credit_period: number | null
+          id: string
+          invoice_amount: number | null
+          invoice_number: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_period?: number | null
+          id?: string
+          invoice_amount?: number | null
+          invoice_number: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_period?: number | null
+          id?: string
+          invoice_amount?: number | null
+          invoice_number?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inward_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          customer_id: string
+          id: string
+          payment_date: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          customer_id: string
+          id?: string
+          payment_date: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          customer_id?: string
+          id?: string
+          payment_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inward_payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_dispatches: {
         Row: {
           created_at: string
