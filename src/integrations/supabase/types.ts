@@ -339,6 +339,41 @@ export type Database = {
           },
         ]
       }
+      order_dispatches: {
+        Row: {
+          created_at: string
+          dispatch_date: string | null
+          dispatch_qty: number | null
+          id: string
+          invoice_number: string | null
+          order_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          dispatch_date?: string | null
+          dispatch_qty?: number | null
+          id?: string
+          invoice_number?: string | null
+          order_item_id: string
+        }
+        Update: {
+          created_at?: string
+          dispatch_date?: string | null
+          dispatch_qty?: number | null
+          id?: string
+          invoice_number?: string | null
+          order_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_dispatches_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           coating: string | null
@@ -398,6 +433,7 @@ export type Database = {
           created_at: string
           customer_id: string
           id: string
+          order_date: string | null
           order_number: string
           status: string
         }
@@ -406,6 +442,7 @@ export type Database = {
           created_at?: string
           customer_id: string
           id?: string
+          order_date?: string | null
           order_number: string
           status?: string
         }
@@ -414,6 +451,7 @@ export type Database = {
           created_at?: string
           customer_id?: string
           id?: string
+          order_date?: string | null
           order_number?: string
           status?: string
         }
