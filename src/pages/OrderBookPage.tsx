@@ -1,8 +1,9 @@
 import { useState, useMemo, useRef } from 'react';
-import { useOrders, useCustomers, useInsertOrder, useAllDispatches } from '@/hooks/useOrders';
+import { useOrders, useCustomers, useInsertOrder, useAllDispatches, useDeleteOrder } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, ShoppingCart, Download, Upload } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, ShoppingCart, Download, Upload, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import NewOrderDialog from '@/components/NewOrderDialog';
 import OrderSalesDialog from '@/components/OrderSalesDialog';
@@ -21,9 +22,11 @@ export default function OrderBookPage() {
   const [showNew, setShowNew] = useState(false);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [salesOrder, setSalesOrder] = useState<any>(null);
+  const [deleteOrder, setDeleteOrder] = useState<any>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const qc = useQueryClient();
   const insertOrder = useInsertOrder();
+  const deleteOrderMutation = useDeleteOrder();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const dispatchMap = useMemo(() => {
@@ -172,6 +175,9 @@ export default function OrderBookPage() {
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSalesOrder(o)} title="Sales">
                           <ShoppingCart className="h-3.5 w-3.5" />
                         </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteOrder(o)} title="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -218,6 +224,34 @@ export default function OrderBookPage() {
       {salesOrder && (
         <OrderSalesDialog open={!!salesOrder} onOpenChange={() => setSalesOrder(null)} order={salesOrder} />
       )}
+
+      <AlertDialog open={!!deleteOrder} onOpenChange={(open) => { if (!open) setDeleteOrder(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete order <strong>{deleteOrder?.order_number}</strong>? This will also remove all items and dispatch records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                try {
+                  await deleteOrderMutation.mutateAsync(deleteOrder.id);
+                  toast.success('Order deleted');
+                  setDeleteOrder(null);
+                } catch (e: any) {
+                  toast.error(e.message || 'Failed to delete order');
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
