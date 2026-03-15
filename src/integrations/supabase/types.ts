@@ -86,6 +86,36 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          created_at: string
+          credit_terms: string | null
+          customer_address: string | null
+          customer_name: string
+          customer_type: string
+          id: string
+          reference: string | null
+        }
+        Insert: {
+          created_at?: string
+          credit_terms?: string | null
+          customer_address?: string | null
+          customer_name: string
+          customer_type?: string
+          id?: string
+          reference?: string | null
+        }
+        Update: {
+          created_at?: string
+          credit_terms?: string | null
+          customer_address?: string | null
+          customer_name?: string
+          customer_type?: string
+          id?: string
+          reference?: string | null
+        }
+        Relationships: []
+      }
       defective_sales: {
         Row: {
           batch_id: string | null
@@ -305,6 +335,94 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          coating: string | null
+          comments: string | null
+          created_at: string
+          form: string | null
+          grade: string | null
+          id: string
+          length: number | null
+          material: string | null
+          net_weight: number | null
+          order_id: string
+          thickness: number | null
+          width: number | null
+        }
+        Insert: {
+          coating?: string | null
+          comments?: string | null
+          created_at?: string
+          form?: string | null
+          grade?: string | null
+          id?: string
+          length?: number | null
+          material?: string | null
+          net_weight?: number | null
+          order_id: string
+          thickness?: number | null
+          width?: number | null
+        }
+        Update: {
+          coating?: string | null
+          comments?: string | null
+          created_at?: string
+          form?: string | null
+          grade?: string | null
+          id?: string
+          length?: number | null
+          material?: string | null
+          net_weight?: number | null
+          order_id?: string
+          thickness?: number | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          comments: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          order_number: string
+          status: string
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          order_number: string
+          status?: string
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          order_number?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
