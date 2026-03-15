@@ -151,7 +151,7 @@ export function useOrderDispatches(orderItemIds: string[]) {
         .select('*')
         .in('order_item_id', orderItemIds);
       if (error) throw error;
-      return (data || []) as DispatchRow[];
+      return (data || []) as unknown as DispatchRow[];
     },
     enabled: orderItemIds.length > 0,
   });
