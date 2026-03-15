@@ -2,20 +2,26 @@ import { useState, useMemo, useRef } from 'react';
 import { useOrders, useCustomers, useInsertOrder, useAllDispatches, useDeleteOrder } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2 } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2, Filter, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import NewOrderDialog from '@/components/NewOrderDialog';
-
 import { parseOrderExcel, downloadOrdersExcel, generateOrderTemplate } from '@/lib/order-excel-utils';
 import { toast } from 'sonner';
 import { getSkuLabel } from '@/lib/sku-utils';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
 
-/** Build a SKU key from dimension fields for matching */
 const skuKey = (item: { material?: string | null; thickness?: number | null; width?: number | null; length?: number | null; coating?: string | null; grade?: string | null }) =>
   [item.material || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].join('|');
+
+type DatePreset = 'all' | 'current_month' | 'today' | 'custom';
 
 export default function OrderBookPage() {
   const { data: orders, isLoading } = useOrders();
@@ -23,7 +29,6 @@ export default function OrderBookPage() {
   const { data: allDispatches } = useAllDispatches();
   const [showNew, setShowNew] = useState(false);
   const [editOrder, setEditOrder] = useState<any>(null);
-  
   const [deleteOrder, setDeleteOrder] = useState<any>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const qc = useQueryClient();
@@ -31,7 +36,32 @@ export default function OrderBookPage() {
   const deleteOrderMutation = useDeleteOrder();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Fetch coil sales (pack_coil_sale & loose_coil_sale) with batch info
+  // Filters
+  const [filterOrderId, setFilterOrderId] = useState('');
+  const [filterPoNumber, setFilterPoNumber] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterOrderDate, setFilterOrderDate] = useState('');
+
+  // Date range
+  const [datePreset, setDatePreset] = useState<DatePreset>('all');
+  const [customFrom, setCustomFrom] = useState<Date | undefined>();
+  const [customTo, setCustomTo] = useState<Date | undefined>();
+
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    switch (datePreset) {
+      case 'current_month':
+        return { from: startOfMonth(now), to: endOfMonth(now) };
+      case 'today':
+        return { from: startOfDay(now), to: endOfDay(now) };
+      case 'custom':
+        return { from: customFrom, to: customTo };
+      default:
+        return { from: undefined, to: undefined };
+    }
+  }, [datePreset, customFrom, customTo]);
+
+  // Fetch coil sales
   const { data: coilSales } = useQuery({
     queryKey: ['coil_sales_for_orders'],
     queryFn: async () => {
@@ -45,7 +75,7 @@ export default function OrderBookPage() {
     },
   });
 
-  // Fetch FG sales with fg_item info
+  // Fetch FG sales
   const { data: fgSales } = useQuery({
     queryKey: ['fg_sales_for_orders'],
     queryFn: async () => {
@@ -58,49 +88,28 @@ export default function OrderBookPage() {
     },
   });
 
-  // Build a map: order_number -> { skuKey -> { label, qty, source } }
   const salesByOrder = useMemo(() => {
-    const map: Record<string, Record<string, { label: string; qty: number; material?: string; thickness?: number; width?: number; length?: number; coating?: string; grade?: string }>> = {};
-
+    const map: Record<string, Record<string, { label: string; qty: number }>> = {};
     const addSale = (orderNumber: string, item: any, qty: number) => {
       if (!orderNumber || !item) return;
       const key = skuKey(item);
       if (!map[orderNumber]) map[orderNumber] = {};
       if (!map[orderNumber][key]) {
-        map[orderNumber][key] = {
-          label: getSkuLabel(item),
-          qty: 0,
-          material: item.material,
-          thickness: item.thickness,
-          width: item.width,
-          length: item.length,
-          coating: item.coating,
-          grade: item.grade,
-        };
+        map[orderNumber][key] = { label: getSkuLabel(item), qty: 0 };
       }
       map[orderNumber][key].qty += qty;
     };
-
-    // Coil sales
     for (const s of coilSales || []) {
       const batch = (s as any).batches;
-      if (batch && s.order_id) {
-        addSale(s.order_id, batch, s.net_weight || 0);
-      }
+      if (batch && s.order_id) addSale(s.order_id, batch, s.net_weight || 0);
     }
-
-    // FG sales
     for (const s of fgSales || []) {
       const fgItem = (s as any).fg_items;
-      if (fgItem && s.order_id) {
-        addSale(s.order_id, fgItem, s.quantity || 0);
-      }
+      if (fgItem && s.order_id) addSale(s.order_id, fgItem, s.quantity || 0);
     }
-
     return map;
   }, [coilSales, fgSales]);
 
-  // Keep legacy dispatch map for order_dispatches
   const dispatchMap = useMemo(() => {
     const map: Record<string, number> = {};
     if (allDispatches) {
@@ -111,16 +120,11 @@ export default function OrderBookPage() {
     return map;
   }, [allDispatches]);
 
-  const getItemDispatched = (itemId: string) => dispatchMap[itemId] || 0;
-
-  // Compute order totals using sales-based dispatch
   const getOrderTotals = (order: any) => {
     const items = order.order_items || [];
     const total = items.reduce((s: number, i: any) => s + (Number(i.net_weight) || 0), 0);
-
     const orderSales = salesByOrder[order.order_number] || {};
     const totalDispatched = Object.values(orderSales).reduce((s, v) => s + v.qty, 0);
-
     return { total, dispatched: totalDispatched, balance: total - totalDispatched };
   };
 
@@ -132,46 +136,62 @@ export default function OrderBookPage() {
     });
   };
 
-  // Build sub-table rows: order items + extra sold SKUs
   const getSubRows = (order: any) => {
     const orderItems = order.order_items || [];
     const orderSales = salesByOrder[order.order_number] || {};
-
-    // Track which sales SKU keys are matched to order items
     const matchedKeys = new Set<string>();
-
     const rows: { key: string; label: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
-
-    // Order items with their matched dispatch qty
     for (const item of orderItems) {
       const key = skuKey(item);
       const salesEntry = orderSales[key];
       const dq = salesEntry ? salesEntry.qty : 0;
       if (salesEntry) matchedKeys.add(key);
-
-      rows.push({
-        key: item.id,
-        label: getSkuLabel(item),
-        orderQty: Number(item.net_weight) || 0,
-        dispatchQty: dq,
-        isExtra: false,
-      });
+      rows.push({ key: item.id, label: getSkuLabel(item), orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
     }
-
-    // Extra SKUs sold but not in order items
     for (const [key, entry] of Object.entries(orderSales)) {
       if (!matchedKeys.has(key)) {
-        rows.push({
-          key: `extra-${key}`,
-          label: entry.label,
-          orderQty: 0,
-          dispatchQty: entry.qty,
-          isExtra: true,
-        });
+        rows.push({ key: `extra-${key}`, label: entry.label, orderQty: 0, dispatchQty: entry.qty, isExtra: true });
       }
     }
-
     return rows;
+  };
+
+  // Filtered orders
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    return orders.filter((o: any) => {
+      if (filterOrderId && !o.order_number?.toLowerCase().includes(filterOrderId.toLowerCase())) return false;
+      if (filterPoNumber && !(o.po_number || '').toLowerCase().includes(filterPoNumber.toLowerCase())) return false;
+      if (filterCustomer && !(o.customers as any)?.customer_name?.toLowerCase().includes(filterCustomer.toLowerCase())) return false;
+      if (filterOrderDate && !(o.order_date || '').includes(filterOrderDate)) return false;
+      // Date range filter
+      if (dateRange.from || dateRange.to) {
+        const od = o.order_date ? new Date(o.order_date) : null;
+        if (!od) return false;
+        if (dateRange.from && od < dateRange.from) return false;
+        if (dateRange.to && od > dateRange.to) return false;
+      }
+      return true;
+    });
+  }, [orders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
+
+  // Summary totals
+  const summaryTotals = useMemo(() => {
+    let totalOrder = 0, totalDispatch = 0;
+    for (const o of filteredOrders) {
+      const t = getOrderTotals(o);
+      totalOrder += t.total;
+      totalDispatch += t.dispatched;
+    }
+    return { totalOrder, totalDispatch, totalBalance: totalOrder - totalDispatch };
+  }, [filteredOrders, salesByOrder]);
+
+  const hasFilters = filterOrderId || filterPoNumber || filterCustomer || filterOrderDate;
+  const clearFilters = () => {
+    setFilterOrderId('');
+    setFilterPoNumber('');
+    setFilterCustomer('');
+    setFilterOrderDate('');
   };
 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,44 +200,23 @@ export default function OrderBookPage() {
     try {
       const rows = await parseOrderExcel(file);
       if (rows.length === 0) { toast.error('No valid rows found'); return; }
-
       const grouped: Record<string, typeof rows> = {};
       rows.forEach(r => {
         if (!grouped[r.order_number]) grouped[r.order_number] = [];
         grouped[r.order_number].push(r);
       });
-
-      let created = 0;
-      let skipped = 0;
+      let created = 0, skipped = 0;
       for (const [orderNum, items] of Object.entries(grouped)) {
         const custName = items[0].customer_name;
         const cust = customers?.find(c => c.customer_name.toLowerCase() === custName?.toLowerCase());
         if (!cust) { skipped++; continue; }
-
         try {
           await insertOrder.mutateAsync({
-            order: {
-              order_number: orderNum,
-              customer_id: cust.id,
-              comments: items[0].comments || undefined,
-              order_date: items[0].order_date || undefined,
-            },
-            items: items.filter(i => i.material || i.net_weight).map(i => ({
-              material: i.material,
-              form: i.form,
-              thickness: i.thickness,
-              width: i.width,
-              length: i.length,
-              coating: i.coating,
-              grade: i.grade,
-              net_weight: i.net_weight,
-              comments: i.item_comments,
-            })),
+            order: { order_number: orderNum, customer_id: cust.id, comments: items[0].comments || undefined, order_date: items[0].order_date || undefined },
+            items: items.filter(i => i.material || i.net_weight).map(i => ({ material: i.material, form: i.form, thickness: i.thickness, width: i.width, length: i.length, coating: i.coating, grade: i.grade, net_weight: i.net_weight, comments: i.item_comments })),
           });
           created++;
-        } catch {
-          skipped++;
-        }
+        } catch { skipped++; }
       }
       toast.success(`Imported ${created} orders${skipped > 0 ? `, ${skipped} skipped` : ''}`);
     } catch (err: any) {
@@ -228,6 +227,7 @@ export default function OrderBookPage() {
 
   return (
     <div className="container py-6 space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Order Book</h1>
         <div className="flex gap-2">
@@ -254,32 +254,122 @@ export default function OrderBookPage() {
         </div>
       </div>
 
+      {/* Date range tabs */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium text-muted-foreground">Period:</span>
+        {(['all', 'current_month', 'today', 'custom'] as DatePreset[]).map(preset => (
+          <Button
+            key={preset}
+            variant={datePreset === preset ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setDatePreset(preset)}
+          >
+            {preset === 'all' ? 'All' : preset === 'current_month' ? 'Current Month' : preset === 'today' ? 'Today' : 'Custom'}
+          </Button>
+        ))}
+        {datePreset === 'custom' && (
+          <div className="flex items-center gap-2 ml-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left font-normal', !customFrom && 'text-muted-foreground')}>
+                  {customFrom ? format(customFrom, 'dd/MM/yyyy') : 'From'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customFrom} onSelect={setCustomFrom} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <span className="text-muted-foreground">–</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left font-normal', !customTo && 'text-muted-foreground')}>
+                  {customTo ? format(customTo, 'dd/MM/yyyy') : 'To'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customTo} onSelect={setCustomTo} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Total Order Qty</p>
+            <p className="text-xl font-bold font-mono">{summaryTotals.totalOrder.toFixed(2)} <span className="text-xs font-normal text-muted-foreground">Kg</span></p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Total Dispatch Qty</p>
+            <p className="text-xl font-bold font-mono">{summaryTotals.totalDispatch.toFixed(2)} <span className="text-xs font-normal text-muted-foreground">Kg</span></p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Total Balance Qty</p>
+            <p className="text-xl font-bold font-mono">{summaryTotals.totalBalance.toFixed(2)} <span className="text-xs font-normal text-muted-foreground">Kg</span></p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table */}
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-8"></TableHead>
-              <TableHead>Order ID</TableHead>
-              <TableHead>PO Number</TableHead>
-              <TableHead>Customer Name</TableHead>
-              <TableHead>Order Date</TableHead>
+              <TableHead>
+                <div className="space-y-1">
+                  <span>Order ID</span>
+                  <Input placeholder="Filter..." value={filterOrderId} onChange={e => setFilterOrderId(e.target.value)} className="h-7 text-xs" />
+                </div>
+              </TableHead>
+              <TableHead>
+                <div className="space-y-1">
+                  <span>PO Number</span>
+                  <Input placeholder="Filter..." value={filterPoNumber} onChange={e => setFilterPoNumber(e.target.value)} className="h-7 text-xs" />
+                </div>
+              </TableHead>
+              <TableHead>
+                <div className="space-y-1">
+                  <span>Customer Name</span>
+                  <Input placeholder="Filter..." value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} className="h-7 text-xs" />
+                </div>
+              </TableHead>
+              <TableHead>
+                <div className="space-y-1">
+                  <span>Order Date</span>
+                  <Input placeholder="YYYY-MM-DD" value={filterOrderDate} onChange={e => setFilterOrderDate(e.target.value)} className="h-7 text-xs" />
+                </div>
+              </TableHead>
               <TableHead className="text-right">Total Order Qty (Kg)</TableHead>
               <TableHead className="text-right">Dispatch Qty (Kg)</TableHead>
               <TableHead className="text-right">Balance Qty (Kg)</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-right">
+                Actions
+                {hasFilters && (
+                  <Button variant="ghost" size="sm" className="ml-1 h-6 px-1 text-xs" onClick={clearFilters}>
+                    <X className="h-3 w-3 mr-0.5" /> Clear
+                  </Button>
+                )}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
-            ) : !orders || orders.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No orders yet</TableCell></TableRow>
-            ) : orders.map((o: any) => {
+            ) : filteredOrders.length === 0 ? (
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No orders found</TableCell></TableRow>
+            ) : filteredOrders.map((o: any) => {
               const totals = getOrderTotals(o);
               const isExpanded = expanded.has(o.id);
               const subRows = isExpanded ? getSubRows(o) : [];
               return (
-                <>
+                <> 
                   <TableRow key={o.id} className="cursor-pointer" onClick={() => toggleExpand(o.id)}>
                     <TableCell className="w-8 px-2">
                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
