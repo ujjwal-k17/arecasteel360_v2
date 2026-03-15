@@ -139,6 +139,7 @@ export default function OrderBookPage() {
             <TableRow>
               <TableHead className="w-8"></TableHead>
               <TableHead>Order ID</TableHead>
+              <TableHead>PO Number</TableHead>
               <TableHead>Customer Name</TableHead>
               <TableHead>Order Date</TableHead>
               <TableHead className="text-right">Total Order Qty (Kg)</TableHead>
