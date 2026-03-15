@@ -23,7 +23,7 @@ export default function OrderBookPage() {
   const { data: allDispatches } = useAllDispatches();
   const [showNew, setShowNew] = useState(false);
   const [editOrder, setEditOrder] = useState<any>(null);
-  const [salesOrder, setSalesOrder] = useState<any>(null);
+  
   const [deleteOrder, setDeleteOrder] = useState<any>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const qc = useQueryClient();
