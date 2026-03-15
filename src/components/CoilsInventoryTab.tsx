@@ -559,26 +559,18 @@ export default function CoilsInventoryTab() {
                                                 {scrapActions.length > 0 && (
                                                   <div>
                                                     <p className="text-xs font-semibold text-muted-foreground mb-1">Scrap</p>
-                                                    <Table>
-                                                      <TableHeader>
-                                                        <TableRow>
-                                                          <TableHead className="text-xs">Scrap Type</TableHead>
-                                                          <TableHead className="text-xs">Weight (Kg)</TableHead>
-                                                        </TableRow>
-                                                      </TableHeader>
-                                                      <TableBody>
-                                                        {scrapActions.map(a => (
-                                                          <TableRow key={a.id}>
-                                                            <TableCell className="text-xs">{a.scrap_type || '-'}</TableCell>
-                                                            <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
-                                                          </TableRow>
-                                                        ))}
-                                                        <TableRow className="bg-muted/30 font-semibold">
-                                                          <TableCell className="text-xs">Total Scrap</TableCell>
-                                                          <TableCell className="text-xs font-mono-num">{scrapActions.reduce((s, a) => s + (a.net_weight || 0), 0).toFixed(2)}</TableCell>
-                                                        </TableRow>
-                                                      </TableBody>
-                                                    </Table>
+                                                    <div className="flex flex-wrap gap-2">
+                                                      {scrapActions.map(a => (
+                                                        <div key={a.id} className="border rounded-md px-3 py-1.5 bg-background text-xs flex flex-col items-center min-w-[80px]">
+                                                          <span className="text-muted-foreground">{a.scrap_type || '-'}</span>
+                                                          <span className="font-semibold font-mono-num">{a.net_weight != null ? Number(a.net_weight).toFixed(2) : '-'} Kg</span>
+                                                        </div>
+                                                      ))}
+                                                      <div className="border rounded-md px-3 py-1.5 bg-muted/40 text-xs flex flex-col items-center min-w-[80px] font-semibold">
+                                                        <span className="text-muted-foreground">Total</span>
+                                                        <span className="font-mono-num">{scrapActions.reduce((s, a) => s + (a.net_weight || 0), 0).toFixed(2)} Kg</span>
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                 )}
 
@@ -586,26 +578,18 @@ export default function CoilsInventoryTab() {
                                                 {defectiveActions.length > 0 && (
                                                   <div>
                                                     <p className="text-xs font-semibold text-muted-foreground mb-1">Defective</p>
-                                                    <Table>
-                                                      <TableHeader>
-                                                        <TableRow>
-                                                          <TableHead className="text-xs">Defect Type</TableHead>
-                                                          <TableHead className="text-xs">Weight (Kg)</TableHead>
-                                                        </TableRow>
-                                                      </TableHeader>
-                                                      <TableBody>
-                                                        {defectiveActions.map(a => (
-                                                          <TableRow key={a.id}>
-                                                            <TableCell className="text-xs">{a.defect_type || '-'}</TableCell>
-                                                            <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
-                                                          </TableRow>
-                                                        ))}
-                                                        <TableRow className="bg-muted/30 font-semibold">
-                                                          <TableCell className="text-xs">Total Defective</TableCell>
-                                                          <TableCell className="text-xs font-mono-num">{defectiveActions.reduce((s, a) => s + (a.net_weight || 0), 0).toFixed(2)}</TableCell>
-                                                        </TableRow>
-                                                      </TableBody>
-                                                    </Table>
+                                                    <div className="flex flex-wrap gap-2">
+                                                      {defectiveActions.map(a => (
+                                                        <div key={a.id} className="border rounded-md px-3 py-1.5 bg-background text-xs flex flex-col items-center min-w-[80px]">
+                                                          <span className="text-muted-foreground">{a.defect_type || '-'}</span>
+                                                          <span className="font-semibold font-mono-num">{a.net_weight != null ? Number(a.net_weight).toFixed(2) : '-'} Kg</span>
+                                                        </div>
+                                                      ))}
+                                                      <div className="border rounded-md px-3 py-1.5 bg-muted/40 text-xs flex flex-col items-center min-w-[80px] font-semibold">
+                                                        <span className="text-muted-foreground">Total</span>
+                                                        <span className="font-mono-num">{defectiveActions.reduce((s, a) => s + (a.net_weight || 0), 0).toFixed(2)} Kg</span>
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                 )}
                                               </>
