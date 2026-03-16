@@ -50,6 +50,7 @@ export default function FGInventoryTab() {
 
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
+  const { data: allDispatches } = useAllDispatches();
 
   const filteredSaleOrders = useMemo(() => {
     if (!allOrders || !saleCustomerId) return [];
