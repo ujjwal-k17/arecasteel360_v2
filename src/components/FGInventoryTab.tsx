@@ -57,6 +57,21 @@ export default function FGInventoryTab() {
     return allOrders.filter((o: any) => o.customer_id === saleCustomerId && o.status === 'open');
   }, [allOrders, saleCustomerId]);
 
+  // Compute order balance qty for selected order in sale dialog
+  const saleOrderBalanceQty = useMemo(() => {
+    if (!saleForm.order_id || !allOrders) return null;
+    const order = allOrders.find((o: any) => o.order_number === saleForm.order_id);
+    if (!order) return null;
+    const orderItems = order.order_items || [];
+    const totalOrderQty = orderItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
+    const dispatchMap = new Map<string, number>();
+    (allDispatches || []).forEach((d: any) => {
+      dispatchMap.set(d.order_item_id, (dispatchMap.get(d.order_item_id) || 0) + (d.dispatch_qty || 0));
+    });
+    const totalDispatched = orderItems.reduce((s: number, i: any) => s + (dispatchMap.get(i.id) || 0), 0);
+    return totalOrderQty - totalDispatched;
+  }, [saleForm.order_id, allOrders, allDispatches]);
+
   // Fetch FG sales & defectives
   const { data: fgSales } = useQuery({
     queryKey: ['fg_sales'],
