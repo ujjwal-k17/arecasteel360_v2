@@ -388,7 +388,6 @@ export default function FGInventoryTab() {
             </div>
           )}
           <div className="space-y-3">
-            <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={saleForm.quantity} onChange={e => setSaleForm(v => ({ ...v, quantity: e.target.value }))} /></div>
             <div>
               <Label className="text-xs">Customer Name</Label>
               <Select value={saleCustomerId} onValueChange={(v) => { setSaleCustomerId(v); setSaleForm(f => ({ ...f, order_id: '' })); }}>
@@ -421,7 +420,8 @@ export default function FGInventoryTab() {
               </div>
             )}
             <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
-            <div><Label className="text-xs">Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
+            <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={saleForm.quantity} onChange={e => setSaleForm(v => ({ ...v, quantity: e.target.value }))} /></div>
+            <div><Label className="text-xs">Invoice Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSaleDialog(null)}>Cancel</Button>
