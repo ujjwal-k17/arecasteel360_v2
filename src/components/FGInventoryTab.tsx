@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCustomers, useOrders } from '@/hooks/useOrders';
+import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
@@ -50,11 +50,27 @@ export default function FGInventoryTab() {
 
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
+  const { data: allDispatches } = useAllDispatches();
 
   const filteredSaleOrders = useMemo(() => {
     if (!allOrders || !saleCustomerId) return [];
     return allOrders.filter((o: any) => o.customer_id === saleCustomerId && o.status === 'open');
   }, [allOrders, saleCustomerId]);
+
+  // Compute order balance qty for selected order in sale dialog
+  const saleOrderBalanceQty = useMemo(() => {
+    if (!saleForm.order_id || !allOrders) return null;
+    const order = allOrders.find((o: any) => o.order_number === saleForm.order_id);
+    if (!order) return null;
+    const orderItems = order.order_items || [];
+    const totalOrderQty = orderItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
+    const dispatchMap = new Map<string, number>();
+    (allDispatches || []).forEach((d: any) => {
+      dispatchMap.set(d.order_item_id, (dispatchMap.get(d.order_item_id) || 0) + (d.dispatch_qty || 0));
+    });
+    const totalDispatched = orderItems.reduce((s: number, i: any) => s + (dispatchMap.get(i.id) || 0), 0);
+    return totalOrderQty - totalDispatched;
+  }, [saleForm.order_id, allOrders, allDispatches]);
 
   // Fetch FG sales & defectives
   const { data: fgSales } = useQuery({
@@ -360,8 +376,15 @@ export default function FGInventoryTab() {
             <DialogTitle>Record FG Sale</DialogTitle>
           </DialogHeader>
           {saleDialog && (
-            <div className="space-y-1 text-xs text-muted-foreground bg-muted/50 rounded p-2 mb-2">
-              <p>Available Qty: <span className="font-semibold font-mono-num">{getAvailableQty(saleDialog).toFixed(2)} Kg</span></p>
+            <div className="space-y-1.5 text-sm">
+              <div className="bg-accent/30 rounded-md p-2 border border-accent">
+                <span className="text-muted-foreground text-xs">SKU:</span>{' '}
+                <span className="font-semibold">{[saleDialog.material, saleDialog.thickness ? `${saleDialog.thickness}mm` : null, saleDialog.width ? `${saleDialog.width}W` : null, saleDialog.length ? `${saleDialog.length}L` : null, saleDialog.coating, saleDialog.grade].filter(Boolean).join(' | ') || '-'}</span>
+              </div>
+              <div className="bg-muted/50 rounded-md p-2">
+                <span className="text-muted-foreground text-xs">Available Qty:</span>{' '}
+                <span className="font-semibold font-mono-num">{getAvailableQty(saleDialog).toFixed(2)} Kg</span>
+              </div>
             </div>
           )}
           <div className="space-y-3">
@@ -391,6 +414,12 @@ export default function FGInventoryTab() {
                 </SelectContent>
               </Select>
             </div>
+            {saleOrderBalanceQty !== null && (
+              <div className="bg-primary/10 rounded-md p-2 text-sm border border-primary/20">
+                <span className="text-muted-foreground text-xs">Order Balance Qty:</span>{' '}
+                <span className="font-semibold font-mono-num text-primary">{saleOrderBalanceQty.toFixed(2)} Kg</span>
+              </div>
+            )}
             <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
             <div><Label className="text-xs">Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
           </div>

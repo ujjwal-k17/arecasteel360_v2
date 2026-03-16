@@ -9,7 +9,7 @@ import { usePackCoilSale } from '@/hooks/useProcessing';
 import { useInsertAction } from '@/hooks/useBatches';
 import type { Batch, InventoryAction } from '@/hooks/useBatches';
 import { calcUsableBalanceQty } from '@/hooks/useBatches';
-import { useCustomers, useOrders } from '@/hooks/useOrders';
+import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
 
 interface Props {
   batch: Batch;
@@ -26,6 +26,7 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
   const { data: customers } = useCustomers();
   const { data: orders } = useOrders();
+  const { data: allDispatches } = useAllDispatches();
 
   const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
@@ -36,11 +37,38 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const isLoose = mode === 'loose';
   const title = isLoose ? 'Loose Coil Sale' : 'Pack Coil Sale';
 
+  // SKU label from batch
+  const skuLabel = useMemo(() => {
+    const parts = [
+      batch.material,
+      batch.thickness ? `${batch.thickness}mm` : null,
+      batch.width ? `${batch.width}W` : null,
+      batch.coating,
+      batch.grade,
+    ].filter(Boolean);
+    return parts.join(' | ') || '-';
+  }, [batch]);
+
   // Filter open orders for the selected customer
   const filteredOrders = useMemo(() => {
     if (!orders || !customerId) return [];
     return orders.filter((o: any) => o.customer_id === customerId && o.status === 'open');
   }, [orders, customerId]);
+
+  // Compute order balance qty for selected order
+  const orderBalanceQty = useMemo(() => {
+    if (!orderId || !orders) return null;
+    const order = orders.find((o: any) => o.order_number === orderId);
+    if (!order) return null;
+    const orderItems = order.order_items || [];
+    const totalOrderQty = orderItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
+    const dispatchMap = new Map<string, number>();
+    (allDispatches || []).forEach((d: any) => {
+      dispatchMap.set(d.order_item_id, (dispatchMap.get(d.order_item_id) || 0) + (d.dispatch_qty || 0));
+    });
+    const totalDispatched = orderItems.reduce((s: number, i: any) => s + (dispatchMap.get(i.id) || 0), 0);
+    return totalOrderQty - totalDispatched;
+  }, [orderId, orders, allDispatches]);
 
   const handleCustomerChange = (val: string) => {
     setCustomerId(val);
@@ -99,6 +127,12 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
           <DialogTitle>{title} — Batch {batch.batch_number}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {/* SKU Info */}
+          <div className="bg-accent/30 rounded-md p-3 text-sm border border-accent">
+            <span className="text-muted-foreground">SKU:</span>{' '}
+            <span className="font-semibold">{skuLabel}</span>
+          </div>
+
           {isLoose ? (
             <div className="bg-muted/50 rounded-md p-3 text-sm">
               <span className="text-muted-foreground">Max Sales Qty (Usable):</span>{' '}
@@ -141,6 +175,13 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
               </SelectContent>
             </Select>
           </div>
+          {/* Order Balance Qty */}
+          {orderBalanceQty !== null && (
+            <div className="bg-primary/10 rounded-md p-3 text-sm border border-primary/20">
+              <span className="text-muted-foreground">Order Balance Qty:</span>{' '}
+              <span className="font-semibold font-mono-num text-primary">{orderBalanceQty.toFixed(2)} Kg</span>
+            </div>
+          )}
           <div>
             <Label className="text-xs">Invoice Number</Label>
             <Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} />
