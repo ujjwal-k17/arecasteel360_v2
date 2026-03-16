@@ -40,6 +40,7 @@ export default function FGInventoryTab() {
   const [filterProcess, setFilterProcess] = useState('all');
   const [filterCoating, setFilterCoating] = useState('all');
   const [filterGrade, setFilterGrade] = useState('all');
+  const [filterDimension, setFilterDimension] = useState('all');
 
   // Dialogs
   const [saleDialog, setSaleDialog] = useState<any | null>(null);
@@ -169,12 +170,18 @@ export default function FGInventoryTab() {
 
   const items = fgItems || [];
 
+  const getDimLabel = (i: any) => {
+    const isSlit = (i.process || '').toLowerCase().includes('slit');
+    return `${i.thickness ?? '-'} x ${i.width ?? '-'} x ${isSlit ? 'Coil' : (i.length ?? '-')}`;
+  };
+
   const uniqueVals = useMemo(() => ({
     material: [...new Set(items.map(i => i.material || '-'))].sort(),
     make: [...new Set(items.map(i => i.make || '-'))].sort(),
     process: [...new Set(items.map(i => i.process || '-'))].sort(),
     coating: [...new Set(items.map(i => i.coating || '-'))].sort(),
     grade: [...new Set(items.map(i => i.grade || '-'))].sort(),
+    dimension: [...new Set(items.map(i => getDimLabel(i)))].sort(),
   }), [items]);
 
   const filteredItems = useMemo(() => {
@@ -183,9 +190,10 @@ export default function FGInventoryTab() {
       (filterMake === 'all' || (i.make || '-') === filterMake) &&
       (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
       (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
-      (filterGrade === 'all' || (i.grade || '-') === filterGrade)
+      (filterGrade === 'all' || (i.grade || '-') === filterGrade) &&
+      (filterDimension === 'all' || getDimLabel(i) === filterDimension)
     );
-  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade]);
+  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension]);
 
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
@@ -309,7 +317,7 @@ export default function FGInventoryTab() {
               <TableHead><FilterSelect value={filterMaterial} onChange={setFilterMaterial} options={uniqueVals.material} placeholder="Material" /></TableHead>
               <TableHead><FilterSelect value={filterMake} onChange={setFilterMake} options={uniqueVals.make} placeholder="Make" /></TableHead>
               <TableHead><FilterSelect value={filterProcess} onChange={setFilterProcess} options={uniqueVals.process} placeholder="Process" /></TableHead>
-              <TableHead />
+              <TableHead><FilterSelect value={filterDimension} onChange={setFilterDimension} options={uniqueVals.dimension} placeholder="Dimensions" /></TableHead>
               <TableHead><FilterSelect value={filterCoating} onChange={setFilterCoating} options={uniqueVals.coating} placeholder="Coating" /></TableHead>
               <TableHead><FilterSelect value={filterGrade} onChange={setFilterGrade} options={uniqueVals.grade} placeholder="Grade" /></TableHead>
               <TableHead />
