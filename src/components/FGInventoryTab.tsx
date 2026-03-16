@@ -40,6 +40,7 @@ export default function FGInventoryTab() {
   const [filterProcess, setFilterProcess] = useState('all');
   const [filterCoating, setFilterCoating] = useState('all');
   const [filterGrade, setFilterGrade] = useState('all');
+  const [filterDimension, setFilterDimension] = useState('all');
 
   // Dialogs
   const [saleDialog, setSaleDialog] = useState<any | null>(null);
