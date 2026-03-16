@@ -190,9 +190,10 @@ export default function FGInventoryTab() {
       (filterMake === 'all' || (i.make || '-') === filterMake) &&
       (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
       (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
-      (filterGrade === 'all' || (i.grade || '-') === filterGrade)
+      (filterGrade === 'all' || (i.grade || '-') === filterGrade) &&
+      (filterDimension === 'all' || getDimLabel(i) === filterDimension)
     );
-  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade]);
+  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension]);
 
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
