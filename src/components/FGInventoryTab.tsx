@@ -170,12 +170,18 @@ export default function FGInventoryTab() {
 
   const items = fgItems || [];
 
+  const getDimLabel = (i: any) => {
+    const isSlit = (i.process || '').toLowerCase().includes('slit');
+    return `${i.thickness ?? '-'} x ${i.width ?? '-'} x ${isSlit ? 'Coil' : (i.length ?? '-')}`;
+  };
+
   const uniqueVals = useMemo(() => ({
     material: [...new Set(items.map(i => i.material || '-'))].sort(),
     make: [...new Set(items.map(i => i.make || '-'))].sort(),
     process: [...new Set(items.map(i => i.process || '-'))].sort(),
     coating: [...new Set(items.map(i => i.coating || '-'))].sort(),
     grade: [...new Set(items.map(i => i.grade || '-'))].sort(),
+    dimension: [...new Set(items.map(i => getDimLabel(i)))].sort(),
   }), [items]);
 
   const filteredItems = useMemo(() => {
