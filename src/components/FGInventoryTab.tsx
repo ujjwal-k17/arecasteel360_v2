@@ -376,8 +376,15 @@ export default function FGInventoryTab() {
             <DialogTitle>Record FG Sale</DialogTitle>
           </DialogHeader>
           {saleDialog && (
-            <div className="space-y-1 text-xs text-muted-foreground bg-muted/50 rounded p-2 mb-2">
-              <p>Available Qty: <span className="font-semibold font-mono-num">{getAvailableQty(saleDialog).toFixed(2)} Kg</span></p>
+            <div className="space-y-1.5 text-sm">
+              <div className="bg-accent/30 rounded-md p-2 border border-accent">
+                <span className="text-muted-foreground text-xs">SKU:</span>{' '}
+                <span className="font-semibold">{[saleDialog.material, saleDialog.thickness ? `${saleDialog.thickness}mm` : null, saleDialog.width ? `${saleDialog.width}W` : null, saleDialog.length ? `${saleDialog.length}L` : null, saleDialog.coating, saleDialog.grade].filter(Boolean).join(' | ') || '-'}</span>
+              </div>
+              <div className="bg-muted/50 rounded-md p-2">
+                <span className="text-muted-foreground text-xs">Available Qty:</span>{' '}
+                <span className="font-semibold font-mono-num">{getAvailableQty(saleDialog).toFixed(2)} Kg</span>
+              </div>
             </div>
           )}
           <div className="space-y-3">
@@ -407,6 +414,12 @@ export default function FGInventoryTab() {
                 </SelectContent>
               </Select>
             </div>
+            {saleOrderBalanceQty !== null && (
+              <div className="bg-primary/10 rounded-md p-2 text-sm border border-primary/20">
+                <span className="text-muted-foreground text-xs">Order Balance Qty:</span>{' '}
+                <span className="font-semibold font-mono-num text-primary">{saleOrderBalanceQty.toFixed(2)} Kg</span>
+              </div>
+            )}
             <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
             <div><Label className="text-xs">Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
           </div>
