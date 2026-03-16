@@ -144,12 +144,6 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
               <span className="font-semibold font-mono-num">{usableQty.toFixed(2)} Kg</span>
             </div>
           )}
-          {isLoose && (
-            <div>
-              <Label className="text-xs">Sales Quantity (Kg)</Label>
-              <Input type="number" value={salesQty} onChange={e => setSalesQty(e.target.value)} placeholder={`Max ${usableQty.toFixed(2)}`} max={usableQty} />
-            </div>
-          )}
           <div>
             <Label className="text-xs">Customer Name</Label>
             <Select value={customerId} onValueChange={handleCustomerChange}>
@@ -186,6 +180,12 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
             <Label className="text-xs">Invoice Number</Label>
             <Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} />
           </div>
+          {isLoose && (
+            <div>
+              <Label className="text-xs">Sales Quantity (Kg)</Label>
+              <Input type="number" value={salesQty} onChange={e => setSalesQty(e.target.value)} placeholder={`Max ${usableQty.toFixed(2)}`} max={usableQty} />
+            </div>
+          )}
           <div>
             <Label className="text-xs">Invoice Date</Label>
             <Input type="date" value={salesDate} onChange={e => setSalesDate(e.target.value)} />
