@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCustomers, useOrders } from '@/hooks/useOrders';
+import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
