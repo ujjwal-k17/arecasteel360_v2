@@ -457,7 +457,16 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
           )}
 
-          {/* Validation warning */}
+          {/* Profile / GC — simple Process Qty input */}
+          {(processType === 'Profile' || processType === 'GC') && (
+            <div className="space-y-3 border rounded-md p-3">
+              <div>
+                <Label className="text-xs">Process Qty (Kg)</Label>
+                <Input type="number" value={profileGcQty} onChange={e => setProfileGcQty(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+          )}
+
           {exceedsUsable && (
             <div className="bg-destructive/10 text-destructive text-xs rounded-md p-2 font-medium">
               ⚠ Total committed ({totalCommitted.toFixed(2)} Kg) exceeds usable qty ({usableQty.toFixed(2)} Kg)
