@@ -145,6 +145,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           toast.error('Please fill all CTL entries (length, qty & pcs are required)');
           return;
         }
+      } else if (processType === 'Profile' || processType === 'GC') {
+        if (!profileGcQty || Number(profileGcQty) <= 0) {
+          toast.error('Please enter Process Qty');
+          return;
+        }
       }
     }
 
