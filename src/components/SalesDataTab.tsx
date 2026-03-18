@@ -36,6 +36,10 @@ export default function SalesDataTab() {
   const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [filterInvoice, setFilterInvoice] = useState('');
+  const [filterOrderId, setFilterOrderId] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterProcess, setFilterProcess] = useState('');
 
   // Fetch orders with customers for mapping order_id → customer_name
   const { data: orders } = useQuery({
