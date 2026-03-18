@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrders } from '@/hooks/useOrders';
+import OrderIdCombobox from '@/components/OrderIdCombobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -590,18 +591,11 @@ export default function WoodenPalletsTab() {
             </div>
             <div>
               <Label className="text-xs">Order ID</Label>
-              <Select value={consumptionForm.orderId} onValueChange={v => setConsumptionForm(f => ({ ...f, orderId: v }))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select order..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(orders || []).map((o: any) => (
-                    <SelectItem key={o.id} value={o.order_number}>
-                      {o.order_number} — {o.customers?.customer_name || ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <OrderIdCombobox
+                value={consumptionForm.orderId}
+                onChange={v => setConsumptionForm(f => ({ ...f, orderId: v }))}
+                orders={(orders || []) as any[]}
+              />
             </div>
             <div>
               <Label className="text-xs">Weight (Kg) *</Label>

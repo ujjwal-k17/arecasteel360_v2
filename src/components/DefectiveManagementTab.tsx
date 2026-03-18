@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import OrderIdCombobox from '@/components/OrderIdCombobox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChevronDown, ChevronRight, RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
@@ -260,18 +261,11 @@ export default function DefectiveManagementTab() {
           <div className="space-y-3">
             <div>
               <Label className="text-xs">Order ID</Label>
-              <Select value={saleForm.order_id} onValueChange={v => setSaleForm(f => ({ ...f, order_id: v }))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select order..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(orders || []).map((o: any) => (
-                    <SelectItem key={o.id} value={o.order_number}>
-                      {o.order_number} — {o.customers?.customer_name || ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <OrderIdCombobox
+                value={saleForm.order_id}
+                onChange={v => setSaleForm(f => ({ ...f, order_id: v }))}
+                orders={(orders || []) as any[]}
+              />
             </div>
             <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
             <div><Label className="text-xs">Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
