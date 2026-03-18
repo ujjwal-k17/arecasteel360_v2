@@ -278,75 +278,6 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
           </div>
 
-          {/* Inline Scrap Section */}
-          <div className="border rounded-md p-3 space-y-2">
-            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Scrap (Kg)</p>
-            {SCRAP_TYPES_NO_TRIM.map(type => (
-              <div key={type} className="grid grid-cols-2 items-center gap-2">
-                <Label className="text-xs">{type}</Label>
-                <Input
-                  type="number"
-                  className="h-8"
-                  value={scrapEntries[type]}
-                  onChange={e => setScrapEntries(v => ({ ...v, [type]: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-            ))}
-            {inlineScrapTotal > 0 && (
-              <div className="text-xs text-muted-foreground text-right">Total Scrap: {inlineScrapTotal.toFixed(2)} Kg</div>
-            )}
-          </div>
-
-          {/* Inline Defective Section — Multiple entries */}
-          <div className="border rounded-md p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Defective</p>
-              <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={addDefectEntry}>
-                <Plus className="h-3 w-3" /> Add
-              </Button>
-            </div>
-            {defectEntries.map((d, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                <div>
-                  <Label className="text-xs">Defect Type</Label>
-                  <Select value={d.type} onValueChange={v => updateDefectEntry(i, 'type', v)}>
-                    <SelectTrigger className="h-8"><SelectValue placeholder="Select type" /></SelectTrigger>
-                    <SelectContent>
-                      {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Net Weight (Kg)</Label>
-                  <Input type="number" className="h-8" value={d.weight} onChange={e => updateDefectEntry(i, 'weight', e.target.value)} placeholder="0" />
-                </div>
-                {defectEntries.length > 1 && (
-                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => removeDefectEntry(i)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            {inlineDefectiveTotal > 0 && (
-              <div className="text-xs text-muted-foreground text-right">Total Defective: {inlineDefectiveTotal.toFixed(2)} Kg</div>
-            )}
-          </div>
-
-
-          {/* Processing Quantity (auto-calculated) */}
-          <div className="bg-muted/30 rounded-md p-3 text-sm">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Processing Quantity:</span>
-              <span className="text-sm font-mono-num font-semibold">{processingQty.toFixed(2)} Kg</span>
-            </div>
-            {inlineDeductions > 0 && (
-              <div className="text-xs text-muted-foreground mt-1">
-                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective)
-              </div>
-            )}
-          </div>
-
           {/* Process Type */}
           <div>
             <Label className="text-xs">Process</Label>
@@ -484,6 +415,76 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               </div>
             </div>
           )}
+
+          {/* Scrap Section — compact grid */}
+          <div className="border rounded-md p-3 space-y-1.5">
+            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Scrap (Kg)</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {SCRAP_TYPES_NO_TRIM.map(type => (
+                <div key={type} className="flex items-center gap-1.5">
+                  <Label className="text-xs whitespace-nowrap min-w-[80px]">{type}</Label>
+                  <Input
+                    type="number"
+                    className="h-7 text-xs"
+                    value={scrapEntries[type]}
+                    onChange={e => setScrapEntries(v => ({ ...v, [type]: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+              ))}
+            </div>
+            {inlineScrapTotal > 0 && (
+              <div className="text-xs text-muted-foreground text-right">Total: {inlineScrapTotal.toFixed(2)} Kg</div>
+            )}
+          </div>
+
+          {/* Defective Section */}
+          <div className="border rounded-md p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Defective</p>
+              <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={addDefectEntry}>
+                <Plus className="h-3 w-3" /> Add
+              </Button>
+            </div>
+            {defectEntries.map((d, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                <div>
+                  <Label className="text-xs">Defect Type</Label>
+                  <Select value={d.type} onValueChange={v => updateDefectEntry(i, 'type', v)}>
+                    <SelectTrigger className="h-8"><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Net Weight (Kg)</Label>
+                  <Input type="number" className="h-8" value={d.weight} onChange={e => updateDefectEntry(i, 'weight', e.target.value)} placeholder="0" />
+                </div>
+                {defectEntries.length > 1 && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => removeDefectEntry(i)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {inlineDefectiveTotal > 0 && (
+              <div className="text-xs text-muted-foreground text-right">Total: {inlineDefectiveTotal.toFixed(2)} Kg</div>
+            )}
+          </div>
+
+          {/* Processing Quantity (auto-calculated) */}
+          <div className="bg-muted/30 rounded-md p-3 text-sm">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">Processing Quantity:</span>
+              <span className="text-sm font-mono-num font-semibold">{processingQty.toFixed(2)} Kg</span>
+            </div>
+            {inlineDeductions > 0 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                = {usableQty.toFixed(2)} − {inlineDeductions.toFixed(2)} (scrap + defective)
+              </div>
+            )}
+          </div>
 
           {exceedsUsable && (
             <div className="bg-destructive/10 text-destructive text-xs rounded-md p-2 font-medium">
