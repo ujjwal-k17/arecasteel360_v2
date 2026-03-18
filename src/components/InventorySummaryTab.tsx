@@ -510,7 +510,7 @@ export default function InventorySummaryTab() {
                         <TableHead className="text-xs font-semibold">Material</TableHead>
                         <TableHead className="text-xs font-semibold">Input Dimensions</TableHead>
                         <TableHead className="text-xs font-semibold">Output Dimensions</TableHead>
-                        <TableHead className="text-xs font-semibold">Order</TableHead>
+                        
                         <TableHead className="text-xs font-semibold text-right">Input Qty (kg)</TableHead>
                       </TableRow>
                     </TableHeader>
