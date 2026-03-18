@@ -107,12 +107,12 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
       try {
         await packCoilSale.mutateAsync({
           batchId: batch.id,
-          usableQty,
+          usableQty: packSaleQty,
           orderId,
           invoiceNumber,
           salesDate,
         });
-        toast.success(`Pack Coil sold for batch ${batch.batch_number} — ${usableQty.toFixed(2)} Kg`);
+        toast.success(`Pack Coil sold for batch ${batch.batch_number} — ${packSaleQty.toFixed(2)} Kg`);
         onClose();
       } catch (err) {
         console.error('Pack Coil Sale error:', err);

@@ -234,9 +234,7 @@ export default function FGInventoryTab() {
   const handleSaleSubmit = async () => {
     if (!saleDialog) return;
     const qty = Number(saleForm.quantity) || 0;
-    const available = getAvailableQty(saleDialog);
     if (qty <= 0) { toast.error('Enter a valid quantity'); return; }
-    if (qty > available + 0.01) { toast.error(`Quantity exceeds available (${available.toFixed(2)} Kg)`); return; }
     try {
       await insertFGSale.mutateAsync({
         fg_item_id: saleDialog.id,

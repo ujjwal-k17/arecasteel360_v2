@@ -336,11 +336,25 @@ export default function CoilsInventoryTab() {
         <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2">
           <Download className="h-4 w-4" /> Download Excel
         </Button>
-        {selectedBatchIds.size > 0 && (
-          <Button variant="destructive" size="sm" onClick={handleBulkDeleteBatches} className="gap-2">
-            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
-          </Button>
-        )}
+          {selectedBatchIds.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={handleBulkDeleteBatches} className="gap-2">
+              <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          {(['open', 'closed', 'all'] as const).map(v => (
+            <Button
+              key={v}
+              size="sm"
+              variant={batchView === v ? 'default' : 'ghost'}
+              className="text-xs h-7 px-3 capitalize"
+              onClick={() => setBatchView(v)}
+            >
+              {v}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <div className="flex items-center gap-4 text-sm">
