@@ -165,26 +165,61 @@ export default function CoilsInventoryTab() {
     });
   };
 
-  const handleRevertToTransit = async (id: string, batchNumber: string) => {
-    if (!confirm(`Move batch ${batchNumber} back to In-Transit?`)) return;
-    try {
-      await updateBatch.mutateAsync({ id, status: 'in-transit' });
-      toast.success(`Batch ${batchNumber} moved back to In-Transit`);
-      setSelectedBatchIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-    } catch { toast.error('Failed to move batch'); }
+  const handleDeleteBatch = async (batch: Batch) => {
+    if (isAdmin) {
+      // Admin can delete directly with undo
+      const batchData = { ...batch };
+      await performAction({
+        execute: async () => {
+          await deleteBatch.mutateAsync(batch.id);
+          logAction.mutate({ action_type: 'delete', entity_type: 'batch', entity_id: batch.id, description: `Deleted batch ${batch.batch_number}` });
+        },
+        undo: async () => {
+          await insertBatches.mutateAsync([batchData as any]);
+          queryClient.invalidateQueries({ queryKey: ['batches'] });
+        },
+        successMessage: `Batch ${batch.batch_number} deleted`,
+        undoMessage: `Batch ${batch.batch_number} restored`,
+      });
+      setSelectedBatchIds(prev => { const next = new Set(prev); next.delete(batch.id); return next; });
+    } else {
+      // Non-admin: submit for approval
+      await submitApproval.mutateAsync({
+        action_type: 'delete',
+        entity_type: 'batch',
+        entity_id: batch.id,
+        description: `Delete batch ${batch.batch_number}`,
+      });
+      toast.success('Deletion request submitted for admin approval');
+    }
   };
 
-  const handleBulkRevert = async () => {
+  const handleBulkDeleteBatches = async () => {
     if (selectedBatchIds.size === 0) return;
-    if (!confirm(`Move ${selectedBatchIds.size} selected batch(es) back to In-Transit?`)) return;
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { error } = await supabase.from('batches').update({ status: 'in-transit' }).in('id', Array.from(selectedBatchIds));
-      if (error) throw error;
-      toast.success(`${selectedBatchIds.size} batch(es) moved back to In-Transit`);
+    if (!confirm(`Delete ${selectedBatchIds.size} selected batch(es)?`)) return;
+    if (isAdmin) {
+      try {
+        const ids = Array.from(selectedBatchIds);
+        await bulkDeleteBatches.mutateAsync(ids);
+        logAction.mutate({ action_type: 'bulk_delete', entity_type: 'batch', description: `Bulk deleted ${ids.length} batches` });
+        toast.success(`${ids.length} batch(es) deleted`);
+        setSelectedBatchIds(new Set());
+      } catch { toast.error('Failed to delete batches'); }
+    } else {
+      for (const id of selectedBatchIds) {
+        const batch = filteredBatches.find(b => b.id === id);
+        if (batch) {
+          await submitApproval.mutateAsync({
+            action_type: 'delete',
+            entity_type: 'batch',
+            entity_id: id,
+            description: `Delete batch ${batch.batch_number}`,
+          });
+        }
+      }
+      toast.success('Deletion requests submitted for admin approval');
       setSelectedBatchIds(new Set());
-      queryClient.invalidateQueries({ queryKey: ['batches'] });
-    } catch { toast.error('Failed to move batches'); }
+    }
   };
 
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
