@@ -24,6 +24,7 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const packCoilSale = usePackCoilSale();
   const insertAction = useInsertAction();
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
+  const packSaleQty = batch.net_weight || 0;
   const { data: customers } = useCustomers();
   const { data: orders } = useOrders();
   const { data: allDispatches } = useAllDispatches();
