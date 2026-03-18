@@ -320,15 +320,16 @@ export default function CoilsInventoryTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="outline" size="sm" onClick={() => {
-          queryClient.invalidateQueries({ queryKey: ['batches'] });
-          queryClient.invalidateQueries({ queryKey: ['inventory_actions'] });
-          queryClient.invalidateQueries({ queryKey: ['processing_records'] });
-          toast.success('Refreshed');
-        }} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => {
+            queryClient.invalidateQueries({ queryKey: ['batches'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory_actions'] });
+            queryClient.invalidateQueries({ queryKey: ['processing_records'] });
+            toast.success('Refreshed');
+          }} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
         <Button onClick={() => { setShowAddDialog(true); setAddMode(null); }} className="gap-2">
           <Plus className="h-4 w-4" /> Add New Item
         </Button>
