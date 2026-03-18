@@ -384,6 +384,10 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           {processType === 'Slit' && (
             <div className="space-y-3 border rounded-md p-3">
               <div>
+                <Label className="text-xs">Process Qty (Kg)</Label>
+                <Input type="number" value={slitProcessQty} onChange={e => setSlitProcessQty(e.target.value)} placeholder={processingQty.toFixed(2)} />
+              </div>
+              <div>
                 <Label className="text-xs"># of Sizes</Label>
                 <Input type="number" value={numSizes} onChange={e => handleNumSizesChange(e.target.value)} className="w-24" />
               </div>
