@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useAllBatches, useAllActions, useUpdateBatch, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Undo2, Download } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Download, Trash2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useActionLog, useSubmitApproval } from '@/hooks/useActionLog';
+import { useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
+import { useUndoAction } from '@/hooks/useUndoAction';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
@@ -60,9 +64,15 @@ export default function CoilsInventoryTab() {
   const { data: actions } = useAllActions();
   const { data: processingRecords } = useAllProcessingRecords();
   const { data: orders } = useOrders();
+  const deleteBatch = useDeleteBatch();
+  const bulkDeleteBatches = useBulkDeleteBatches();
+  const { isAdmin } = useAuth();
+  const logAction = useActionLog();
+  const submitApproval = useSubmitApproval();
+  const { performAction } = useUndoAction();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
-  const updateBatch = useUpdateBatch();
+  
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -155,26 +165,61 @@ export default function CoilsInventoryTab() {
     });
   };
 
-  const handleRevertToTransit = async (id: string, batchNumber: string) => {
-    if (!confirm(`Move batch ${batchNumber} back to In-Transit?`)) return;
-    try {
-      await updateBatch.mutateAsync({ id, status: 'in-transit' });
-      toast.success(`Batch ${batchNumber} moved back to In-Transit`);
-      setSelectedBatchIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-    } catch { toast.error('Failed to move batch'); }
+  const handleDeleteBatch = async (batch: Batch) => {
+    if (isAdmin) {
+      // Admin can delete directly with undo
+      const batchData = { ...batch };
+      await performAction({
+        execute: async () => {
+          await deleteBatch.mutateAsync(batch.id);
+          logAction.mutate({ action_type: 'delete', entity_type: 'batch', entity_id: batch.id, description: `Deleted batch ${batch.batch_number}` });
+        },
+        undo: async () => {
+          await insertBatches.mutateAsync([batchData as any]);
+          queryClient.invalidateQueries({ queryKey: ['batches'] });
+        },
+        successMessage: `Batch ${batch.batch_number} deleted`,
+        undoMessage: `Batch ${batch.batch_number} restored`,
+      });
+      setSelectedBatchIds(prev => { const next = new Set(prev); next.delete(batch.id); return next; });
+    } else {
+      // Non-admin: submit for approval
+      await submitApproval.mutateAsync({
+        action_type: 'delete',
+        entity_type: 'batch',
+        entity_id: batch.id,
+        description: `Delete batch ${batch.batch_number}`,
+      });
+      toast.success('Deletion request submitted for admin approval');
+    }
   };
 
-  const handleBulkRevert = async () => {
+  const handleBulkDeleteBatches = async () => {
     if (selectedBatchIds.size === 0) return;
-    if (!confirm(`Move ${selectedBatchIds.size} selected batch(es) back to In-Transit?`)) return;
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { error } = await supabase.from('batches').update({ status: 'in-transit' }).in('id', Array.from(selectedBatchIds));
-      if (error) throw error;
-      toast.success(`${selectedBatchIds.size} batch(es) moved back to In-Transit`);
+    if (!confirm(`Delete ${selectedBatchIds.size} selected batch(es)?`)) return;
+    if (isAdmin) {
+      try {
+        const ids = Array.from(selectedBatchIds);
+        await bulkDeleteBatches.mutateAsync(ids);
+        logAction.mutate({ action_type: 'bulk_delete', entity_type: 'batch', description: `Bulk deleted ${ids.length} batches` });
+        toast.success(`${ids.length} batch(es) deleted`);
+        setSelectedBatchIds(new Set());
+      } catch { toast.error('Failed to delete batches'); }
+    } else {
+      for (const id of selectedBatchIds) {
+        const batch = filteredBatches.find(b => b.id === id);
+        if (batch) {
+          await submitApproval.mutateAsync({
+            action_type: 'delete',
+            entity_type: 'batch',
+            entity_id: id,
+            description: `Delete batch ${batch.batch_number}`,
+          });
+        }
+      }
+      toast.success('Deletion requests submitted for admin approval');
       setSelectedBatchIds(new Set());
-      queryClient.invalidateQueries({ queryKey: ['batches'] });
-    } catch { toast.error('Failed to move batches'); }
+    }
   };
 
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
@@ -282,8 +327,8 @@ export default function CoilsInventoryTab() {
           <Download className="h-4 w-4" /> Download Excel
         </Button>
         {selectedBatchIds.size > 0 && (
-          <Button variant="secondary" size="sm" onClick={handleBulkRevert} className="gap-2">
-            <Undo2 className="h-4 w-4" /> Move to In-Transit ({selectedBatchIds.size})
+          <Button variant="destructive" size="sm" onClick={handleBulkDeleteBatches} className="gap-2">
+            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
           </Button>
         )}
       </div>
@@ -429,11 +474,9 @@ export default function CoilsInventoryTab() {
                                         <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setExpandedBatchActions(isExpanded ? null : b.id); }}>
                                           <Eye className="h-3.5 w-3.5" />
                                         </Button>
-                                        {batchActions.length === 0 && !allProcRecords.some((p: any) => p.batch_id === b.id) && (
-                                          <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); handleRevertToTransit(b.id, b.batch_number); }}>
-                                            <Undo2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                          </Button>
-                                        )}
+                                        <Button size="sm" variant="ghost" className="text-xs h-7 text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteBatch(b); }} title="Delete Batch">
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
                                       </div>
                                     </TableCell>
                                   </TableRow>
