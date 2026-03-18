@@ -173,7 +173,7 @@ export default function InventorySummaryTab() {
     queryFn: async () => {
       const { data } = await supabase
         .from('processing_records')
-        .select('id, input_qty, created_at, process_type, source_type, output_type, order_id, batch_id, batches(batch_number, material, thickness, width, make, coating, grade)')
+        .select('id, input_qty, created_at, process_type, source_type, output_type, order_id, batch_id, batches(batch_number, material, thickness, width, make, coating, grade), processing_output_items(width, length)')
         .order('created_at', { ascending: false });
       return data || [];
     },
