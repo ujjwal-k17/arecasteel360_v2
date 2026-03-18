@@ -3,8 +3,11 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, max, ...props }, ref) => {
+  ({ className, type, max, onWheel, ...props }, ref) => {
     const dateMax = type === "date" && !max ? new Date().toISOString().slice(0, 10) : max;
+    const handleWheel = type === "number"
+      ? (e: React.WheelEvent<HTMLInputElement>) => { e.currentTarget.blur(); onWheel?.(e); }
+      : onWheel;
     return (
       <input
         type={type}
@@ -14,6 +17,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className,
         )}
         ref={ref}
+        onWheel={handleWheel}
         {...props}
       />
     );
