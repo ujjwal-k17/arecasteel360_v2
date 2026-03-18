@@ -97,11 +97,6 @@ export function AppSidebar() {
             </SidebarMenuItem>
           </SidebarMenu>
         )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="p-2 border-t border-sidebar-border">
         {!collapsed && user && (
           <p className="text-[10px] text-sidebar-foreground/50 truncate px-2 mb-1">{user.email}</p>
         )}
