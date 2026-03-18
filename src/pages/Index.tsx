@@ -1,5 +1,5 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle, BarChart3 } from 'lucide-react';
+import { Package, Warehouse, Trash2, AlertTriangle, Layers, CheckCircle, ArrowDownUp, LayoutGrid } from 'lucide-react';
 import InTransitTab from '@/components/InTransitTab';
 import CoilsInventoryTab from '@/components/CoilsInventoryTab';
 import ScrapManagementTab from '@/components/ScrapManagementTab';
@@ -7,35 +7,44 @@ import DefectiveManagementTab from '@/components/DefectiveManagementTab';
 import WIPInventoryTab from '@/components/WIPInventoryTab';
 import FGInventoryTab from '@/components/FGInventoryTab';
 import SalesDataTab from '@/components/SalesDataTab';
+import InventorySummaryTab from '@/components/InventorySummaryTab';
+
+const tabClass = "gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all";
 
 const Index = () => {
   return (
     <div className="container py-6">
-      <Tabs defaultValue="in-transit">
+      <Tabs defaultValue="summary">
         <TabsList className="mb-6 h-auto gap-1 bg-transparent p-0 flex flex-wrap">
-          <TabsTrigger value="in-transit" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+          <TabsTrigger value="summary" className={tabClass}>
+            <LayoutGrid className="h-4 w-4" /> Summary
+          </TabsTrigger>
+          <TabsTrigger value="in-transit" className={tabClass}>
             <Package className="h-4 w-4" /> In-Transit
           </TabsTrigger>
-          <TabsTrigger value="coils" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+          <TabsTrigger value="coils" className={tabClass}>
             <Warehouse className="h-4 w-4" /> Coils Inventory
           </TabsTrigger>
-          <TabsTrigger value="wip" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+          <TabsTrigger value="wip" className={tabClass}>
             <Layers className="h-4 w-4" /> WIP Inventory
           </TabsTrigger>
-          <TabsTrigger value="fg" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+          <TabsTrigger value="fg" className={tabClass}>
             <CheckCircle className="h-4 w-4" /> FG Inventory
           </TabsTrigger>
-          <TabsTrigger value="scrap" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+          <TabsTrigger value="scrap" className={tabClass}>
             <Trash2 className="h-4 w-4" /> Scrap
           </TabsTrigger>
-          <TabsTrigger value="defective" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
+          <TabsTrigger value="defective" className={tabClass}>
             <AlertTriangle className="h-4 w-4" /> Defective
           </TabsTrigger>
-          <TabsTrigger value="sales-data" className="gap-2 text-xs sm:text-sm rounded-lg border border-border bg-card px-3 py-2 shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-md transition-all">
-            <BarChart3 className="h-4 w-4" /> Sales Data
+          <TabsTrigger value="dispatch-data" className="gap-2 text-xs sm:text-sm rounded-lg border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/30 px-3 py-2 shadow-sm text-rose-700 dark:text-rose-300 data-[state=active]:bg-rose-600 data-[state=active]:text-white data-[state=active]:border-rose-600 data-[state=active]:shadow-md transition-all">
+            <ArrowDownUp className="h-4 w-4" /> Dispatch Data
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="summary">
+          <InventorySummaryTab />
+        </TabsContent>
         <TabsContent value="in-transit">
           <InTransitTab />
         </TabsContent>
@@ -54,7 +63,7 @@ const Index = () => {
         <TabsContent value="defective">
           <DefectiveManagementTab />
         </TabsContent>
-        <TabsContent value="sales-data">
+        <TabsContent value="dispatch-data">
           <SalesDataTab />
         </TabsContent>
       </Tabs>
