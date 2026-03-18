@@ -101,9 +101,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       return autoCalcSlitWidths.reduce((s, w) => s + (Number(w.qty) || 0), 0);
     } else if (processType === 'CTL') {
       return ctlLengths.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+    } else if (processType === 'Profile' || processType === 'GC') {
+      return Number(profileGcQty) || 0;
     }
     return processingQty;
-  }, [processType, autoCalcSlitWidths, ctlLengths, processingQty]);
+  }, [processType, autoCalcSlitWidths, ctlLengths, processingQty, profileGcQty]);
 
   const totalCommitted = totalOutputQty + inlineDeductions;
   const exceedsUsable = totalCommitted > usableQty + 0.01;
