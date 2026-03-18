@@ -16,6 +16,7 @@ import InventoryFieldSelect from './InventoryFieldSelect';
 import ProcessingDialog from './ProcessingDialog';
 import PackCoilSaleDialog from './PackCoilSaleDialog';
 import { isFieldValueValid } from '@/lib/field-validation';
+import { useOrders } from '@/hooks/useOrders';
 import * as XLSX from 'xlsx';
 
 interface SKUGroup {
