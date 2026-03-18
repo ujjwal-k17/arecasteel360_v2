@@ -16,9 +16,8 @@ export default function SetupPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if any admin exists
-    supabase.from('user_roles').select('id').eq('role', 'admin').limit(1).then(({ data }) => {
-      if (data && data.length > 0) {
+    supabase.rpc('admin_exists').then(({ data }) => {
+      if (data) {
         setHasAdmin(true);
         navigate('/login');
       } else {
