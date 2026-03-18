@@ -537,7 +537,10 @@ export default function OrderBookPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Order</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete order <strong>{deleteOrder?.order_number}</strong>? This will also remove all items and dispatch records. This action cannot be undone.
+              {isAdmin
+                ? <>Are you sure you want to delete order <strong>{deleteOrder?.order_number}</strong>? This will also remove all items and dispatch records.</>
+                : <>Request deletion of order <strong>{deleteOrder?.order_number}</strong>? This will be sent to admin for approval.</>
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -546,15 +549,46 @@ export default function OrderBookPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 try {
-                  await deleteOrderMutation.mutateAsync(deleteOrder.id);
-                  toast.success('Order deleted');
+                  if (isAdmin) {
+                    const orderData = deleteOrder;
+                    await performAction({
+                      execute: async () => {
+                        await deleteOrderMutation.mutateAsync(orderData.id);
+                        logAction.mutate({ action_type: 'delete', entity_type: 'order', entity_id: orderData.id, description: `Deleted order ${orderData.order_number}` });
+                      },
+                      undo: async () => {
+                        // Re-insert the order
+                        const { error } = await supabase.from('orders').insert({
+                          id: orderData.id,
+                          order_number: orderData.order_number,
+                          customer_id: orderData.customer_id,
+                          comments: orderData.comments,
+                          order_date: orderData.order_date,
+                          po_number: orderData.po_number,
+                          status: orderData.status,
+                        });
+                        if (error) throw error;
+                        qc.invalidateQueries({ queryKey: ['orders'] });
+                      },
+                      successMessage: `Order ${orderData.order_number} deleted`,
+                      undoMessage: `Order ${orderData.order_number} restored`,
+                    });
+                  } else {
+                    await submitApproval.mutateAsync({
+                      action_type: 'delete',
+                      entity_type: 'order',
+                      entity_id: deleteOrder.id,
+                      description: `Delete order ${deleteOrder.order_number}`,
+                    });
+                    toast.success('Deletion request submitted for admin approval');
+                  }
                   setDeleteOrder(null);
                 } catch (e: any) {
-                  toast.error(e.message || 'Failed to delete order');
+                  toast.error(e.message || 'Failed to process request');
                 }
               }}
             >
-              Delete
+              {isAdmin ? 'Delete' : 'Request Deletion'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
