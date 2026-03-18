@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, startOfMonth } from 'date-fns';
-import { CalendarIcon, Package, Layers, CheckCircle, Warehouse, TruckIcon, ArrowDownUp } from 'lucide-react';
+import { CalendarIcon, Package, Layers, CheckCircle, Warehouse, TruckIcon, ArrowDownUp, ChevronDown } from 'lucide-react';
 
 type DateRange = { from: Date | undefined; to: Date | undefined };
 
@@ -70,6 +72,8 @@ export default function InventorySummaryTab() {
   const today = new Date();
   const [prodRange, setProdRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
   const [dispatchRange, setDispatchRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
+  const [prodOpen, setProdOpen] = useState(false);
+  const [dispatchOpen, setDispatchOpen] = useState(false);
 
   // In-transit total
   const { data: inTransitData } = useQuery({
@@ -116,36 +120,60 @@ export default function InventorySummaryTab() {
     },
   });
 
-  // Processing records for production
-  const { data: processingData } = useQuery({
-    queryKey: ['summary-processing'],
+  // Processing records with details for production breakdown
+  const { data: processingDetailData } = useQuery({
+    queryKey: ['summary-processing-detail'],
     queryFn: async () => {
-      const { data } = await supabase.from('processing_records').select('input_qty, created_at');
+      const { data } = await supabase
+        .from('processing_records')
+        .select('id, input_qty, created_at, process_type, source_type, output_type, order_id, batch_id, batches(batch_number, material, thickness, width, make, coating, grade)')
+        .order('created_at', { ascending: false });
       return data || [];
     },
   });
 
-  // Dispatch data: inventory_actions (coil sales) + fg_sales + defective_sales
-  const { data: coilSalesData } = useQuery({
-    queryKey: ['summary-coil-sales'],
+  // Dispatch details: coil sales with batch info
+  const { data: coilSalesDetailData } = useQuery({
+    queryKey: ['summary-coil-sales-detail'],
     queryFn: async () => {
-      const { data } = await supabase.from('inventory_actions').select('net_weight, sales_date').eq('action_type', 'sell');
+      const { data } = await supabase
+        .from('inventory_actions')
+        .select('net_weight, sales_date, order_id, invoice_number, batch_id, batches(batch_number, material, thickness, width, length, make, coating, grade)')
+        .in('action_type', ['pack_coil_sale', 'loose_coil_sale', 'sell', 'sales'])
+        .order('sales_date', { ascending: false });
       return data || [];
     },
   });
 
-  const { data: fgSalesAllData } = useQuery({
-    queryKey: ['summary-fg-sales-all'],
+  // FG sales with fg_item + sku info
+  const { data: fgSalesDetailData } = useQuery({
+    queryKey: ['summary-fg-sales-detail'],
     queryFn: async () => {
-      const { data } = await supabase.from('fg_sales').select('quantity, sales_date');
+      const { data } = await supabase
+        .from('fg_sales')
+        .select('quantity, sales_date, order_id, invoice_number, fg_item_id, fg_items(material, thickness, width, length, process, make, coating, grade)')
+        .order('sales_date', { ascending: false });
       return data || [];
     },
   });
 
-  const { data: defSalesData } = useQuery({
-    queryKey: ['summary-def-sales'],
+  // Defective sales with batch info
+  const { data: defSalesDetailData } = useQuery({
+    queryKey: ['summary-def-sales-detail'],
     queryFn: async () => {
-      const { data } = await supabase.from('defective_sales').select('quantity, sales_date');
+      const { data } = await supabase
+        .from('defective_sales')
+        .select('quantity, sales_date, order_id, invoice_number, batch_id, batches(batch_number, material, thickness, width, make, coating, grade)')
+        .order('sales_date', { ascending: false });
+      return data || [];
+    },
+  });
+
+  // Fetch orders with customers for dispatch details
+  const { data: ordersData } = useQuery({
+    queryKey: ['summary-orders'],
+    queryFn: async () => {
+      const { data } = await supabase.from('orders').select('id, order_number, customers(customer_name)');
       return data || [];
     },
   });
@@ -161,25 +189,90 @@ export default function InventorySummaryTab() {
     return totalProduced - totalSold;
   }, [fgData, fgSalesData]);
 
-  const productionTotal = useMemo(() => {
-    if (!prodRange.from) return (processingData || []).reduce((s, r) => s + (r.input_qty || 0), 0);
-    return (processingData || []).filter(r => {
-      const d = new Date(r.created_at);
-      return d >= prodRange.from! && (!prodRange.to || d <= prodRange.to);
-    }).reduce((s, r) => s + (r.input_qty || 0), 0);
-  }, [processingData, prodRange]);
+  const inDateRange = (dateStr: string | null | undefined, range: DateRange) => {
+    if (!range.from) return true;
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return d >= range.from && (!range.to || d <= range.to);
+  };
 
-  const dispatchTotal = useMemo(() => {
-    const inRange = (dateStr: string | null) => {
-      if (!dateStr || !dispatchRange.from) return !dispatchRange.from;
-      const d = new Date(dateStr);
-      return d >= dispatchRange.from! && (!dispatchRange.to || d <= dispatchRange.to);
-    };
-    const coilSales = (coilSalesData || []).filter(r => inRange(r.sales_date)).reduce((s, r) => s + (r.net_weight || 0), 0);
-    const fgSales = (fgSalesAllData || []).filter(r => inRange(r.sales_date)).reduce((s, r) => s + (r.quantity || 0), 0);
-    const defSales = (defSalesData || []).filter(r => inRange(r.sales_date)).reduce((s, r) => s + (r.quantity || 0), 0);
-    return coilSales + fgSales + defSales;
-  }, [coilSalesData, fgSalesAllData, defSalesData, dispatchRange]);
+  // Production filtered details
+  const filteredProduction = useMemo(() => {
+    return (processingDetailData || []).filter(r => inDateRange(r.created_at, prodRange));
+  }, [processingDetailData, prodRange]);
+
+  const productionTotal = useMemo(() => filteredProduction.reduce((s, r) => s + (r.input_qty || 0), 0), [filteredProduction]);
+
+  // Dispatch filtered details
+  const filteredDispatch = useMemo(() => {
+    const orderMap = new Map<string, { order_number: string; customer_name: string }>();
+    (ordersData || []).forEach((o: any) => {
+      orderMap.set(o.id, { order_number: o.order_number, customer_name: o.customers?.customer_name || '-' });
+    });
+
+    const records: Array<{
+      date: string;
+      type: string;
+      order_id: string;
+      order_number: string;
+      customer_name: string;
+      sku: string;
+      qty: number;
+      invoice: string;
+    }> = [];
+
+    // Coil sales
+    (coilSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
+      const batch = r.batches;
+      const order = r.order_id ? orderMap.get(r.order_id) : null;
+      records.push({
+        date: r.sales_date || '-',
+        type: 'Coil',
+        order_id: r.order_id || '-',
+        order_number: order?.order_number || r.order_id || '-',
+        customer_name: order?.customer_name || '-',
+        sku: batch ? `${batch.material || ''} ${batch.thickness || ''}x${batch.width || ''}${batch.coating ? ' ' + batch.coating : ''}${batch.grade ? ' ' + batch.grade : ''}` : '-',
+        qty: r.net_weight || 0,
+        invoice: r.invoice_number || '-',
+      });
+    });
+
+    // FG sales
+    (fgSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
+      const fg = r.fg_items;
+      const order = r.order_id ? orderMap.get(r.order_id) : null;
+      records.push({
+        date: r.sales_date || '-',
+        type: 'FG',
+        order_id: r.order_id || '-',
+        order_number: order?.order_number || r.order_id || '-',
+        customer_name: order?.customer_name || '-',
+        sku: fg ? `${fg.material || ''} ${fg.thickness || ''}x${fg.width || ''}x${fg.length || ''}${fg.coating ? ' ' + fg.coating : ''}${fg.grade ? ' ' + fg.grade : ''}` : '-',
+        qty: r.quantity || 0,
+        invoice: r.invoice_number || '-',
+      });
+    });
+
+    // Defective sales
+    (defSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
+      const batch = r.batches;
+      const order = r.order_id ? orderMap.get(r.order_id) : null;
+      records.push({
+        date: r.sales_date || '-',
+        type: 'Defective',
+        order_id: r.order_id || '-',
+        order_number: order?.order_number || r.order_id || '-',
+        customer_name: order?.customer_name || '-',
+        sku: batch ? `${batch.material || ''} ${batch.thickness || ''}x${batch.width || ''}${batch.coating ? ' ' + batch.coating : ''}` : '-',
+        qty: r.quantity || 0,
+        invoice: r.invoice_number || '-',
+      });
+    });
+
+    return records.sort((a, b) => (b.date > a.date ? 1 : -1));
+  }, [coilSalesDetailData, fgSalesDetailData, defSalesDetailData, ordersData, dispatchRange]);
+
+  const dispatchTotal = useMemo(() => filteredDispatch.reduce((s, r) => s + r.qty, 0), [filteredDispatch]);
 
   const formatWeight = (val: number) => `${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg`;
 
@@ -211,33 +304,135 @@ export default function InventorySummaryTab() {
         ))}
       </div>
 
-      {/* Production with date filter */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-indigo-600" />
-              <CardTitle className="text-base">Total Production</CardTitle>
-              <span className="ml-auto text-xl font-bold text-indigo-600">{formatWeight(productionTotal)}</span>
+      {/* Production with date filter + expandable details */}
+      <Collapsible open={prodOpen} onOpenChange={setProdOpen}>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-indigo-600" />
+                <CardTitle className="text-base">Total Production</CardTitle>
+                <span className="ml-auto text-xl font-bold text-indigo-600">{formatWeight(productionTotal)}</span>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", prodOpen && "rotate-180")} />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <DateRangeFilter dateRange={prodRange} setDateRange={setProdRange} label="Period" />
             </div>
-            <DateRangeFilter dateRange={prodRange} setDateRange={setProdRange} label="Period" />
-          </div>
-        </CardHeader>
-      </Card>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              {filteredProduction.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No production records for selected period</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs font-semibold">Date</TableHead>
+                        <TableHead className="text-xs font-semibold">Type</TableHead>
+                        <TableHead className="text-xs font-semibold">Source → Output</TableHead>
+                        <TableHead className="text-xs font-semibold">Batch</TableHead>
+                        <TableHead className="text-xs font-semibold">Material</TableHead>
+                        <TableHead className="text-xs font-semibold">Dimensions</TableHead>
+                        <TableHead className="text-xs font-semibold">Order</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Input Qty (kg)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProduction.map((r: any) => {
+                        const batch = r.batches;
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell className="text-xs">{format(new Date(r.created_at), 'dd/MM/yy')}</TableCell>
+                            <TableCell className="text-xs">{r.process_type}</TableCell>
+                            <TableCell className="text-xs">
+                              <span className="capitalize">{r.source_type}</span> → <span className="capitalize">{r.output_type}</span>
+                            </TableCell>
+                            <TableCell className="text-xs font-mono">{batch?.batch_number || '-'}</TableCell>
+                            <TableCell className="text-xs">{batch?.material || '-'}</TableCell>
+                            <TableCell className="text-xs">{batch ? `${batch.thickness ?? '-'} x ${batch.width ?? '-'}` : '-'}</TableCell>
+                            <TableCell className="text-xs">{r.order_id || '-'}</TableCell>
+                            <TableCell className="text-xs text-right font-medium">{(r.input_qty || 0).toLocaleString('en-IN')}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
-      {/* Dispatch with date filter */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <ArrowDownUp className="h-5 w-5 text-rose-600" />
-              <CardTitle className="text-base">Total Dispatch</CardTitle>
-              <span className="ml-auto text-xl font-bold text-rose-600">{formatWeight(dispatchTotal)}</span>
+      {/* Dispatch with date filter + expandable details */}
+      <Collapsible open={dispatchOpen} onOpenChange={setDispatchOpen}>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <ArrowDownUp className="h-5 w-5 text-rose-600" />
+                <CardTitle className="text-base">Total Dispatch</CardTitle>
+                <span className="ml-auto text-xl font-bold text-rose-600">{formatWeight(dispatchTotal)}</span>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", dispatchOpen && "rotate-180")} />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <DateRangeFilter dateRange={dispatchRange} setDateRange={setDispatchRange} label="Period" />
             </div>
-            <DateRangeFilter dateRange={dispatchRange} setDateRange={setDispatchRange} label="Period" />
-          </div>
-        </CardHeader>
-      </Card>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              {filteredDispatch.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No dispatch records for selected period</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs font-semibold">Date</TableHead>
+                        <TableHead className="text-xs font-semibold">Type</TableHead>
+                        <TableHead className="text-xs font-semibold">Order #</TableHead>
+                        <TableHead className="text-xs font-semibold">Customer</TableHead>
+                        <TableHead className="text-xs font-semibold">SKU</TableHead>
+                        <TableHead className="text-xs font-semibold">Invoice</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Qty (kg)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDispatch.map((r, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-xs">{r.date !== '-' ? format(new Date(r.date), 'dd/MM/yy') : '-'}</TableCell>
+                          <TableCell className="text-xs">
+                            <span className={cn(
+                              "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                              r.type === 'Coil' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                              r.type === 'FG' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                              'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                            )}>
+                              {r.type}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs">{r.order_number}</TableCell>
+                          <TableCell className="text-xs">{r.customer_name}</TableCell>
+                          <TableCell className="text-xs font-mono">{r.sku}</TableCell>
+                          <TableCell className="text-xs">{r.invoice}</TableCell>
+                          <TableCell className="text-xs text-right font-medium">{r.qty.toLocaleString('en-IN')}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </div>
   );
 }
