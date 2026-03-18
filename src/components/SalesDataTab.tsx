@@ -169,8 +169,24 @@ export default function SalesDataTab() {
     return records;
   }, [inventoryActions, fgSales, defectiveSales, orderMap]);
 
-  // Filter by date range
+  // Filter by date range + column filters
   const filteredSales = useMemo(() => {
+    return allSales.filter(s => {
+      if (!s.invoice_date) return false;
+      if (dateFrom && s.invoice_date < dateFrom) return false;
+      if (dateTo && s.invoice_date > dateTo) return false;
+      if (filterInvoice && s.invoice_number !== filterInvoice) return false;
+      if (filterOrderId && s.order_id !== filterOrderId) return false;
+      if (filterCustomer && s.customer_name !== filterCustomer) return false;
+      if (filterProcess && s.process_form !== filterProcess) return false;
+      return true;
+    });
+  }, [allSales, dateFrom, dateTo, filterInvoice, filterOrderId, filterCustomer, filterProcess]);
+
+  const totalQty = useMemo(() => filteredSales.reduce((s, r) => s + r.qty, 0), [filteredSales]);
+
+  // Unique filter options (derived from date-filtered data)
+  const dateFilteredSales = useMemo(() => {
     return allSales.filter(s => {
       if (!s.invoice_date) return false;
       if (dateFrom && s.invoice_date < dateFrom) return false;
@@ -179,7 +195,13 @@ export default function SalesDataTab() {
     });
   }, [allSales, dateFrom, dateTo]);
 
-  const totalQty = useMemo(() => filteredSales.reduce((s, r) => s + r.qty, 0), [filteredSales]);
+  const uniqueInvoices = useMemo(() => [...new Set(dateFilteredSales.map(s => s.invoice_number).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+  const uniqueOrderIds = useMemo(() => [...new Set(dateFilteredSales.map(s => s.order_id).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+  const uniqueCustomers = useMemo(() => [...new Set(dateFilteredSales.map(s => s.customer_name).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+  const uniqueProcesses = useMemo(() => [...new Set(dateFilteredSales.map(s => s.process_form).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+
+  const hasActiveFilters = filterInvoice || filterOrderId || filterCustomer || filterProcess;
+  const clearColumnFilters = () => { setFilterInvoice(''); setFilterOrderId(''); setFilterCustomer(''); setFilterProcess(''); };
 
   const handleDownloadExcel = () => {
     if (filteredSales.length === 0) {
