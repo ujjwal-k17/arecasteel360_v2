@@ -33,6 +33,7 @@ export default function FGInventoryTab() {
   const { data: fgItems } = useFGItems();
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [fgView, setFgView] = useState<'open' | 'closed'>('open');
 
   // Filters
   const [filterMaterial, setFilterMaterial] = useState('all');
@@ -185,15 +186,18 @@ export default function FGInventoryTab() {
   }), [items]);
 
   const filteredItems = useMemo(() => {
-    return items.filter(i =>
-      (filterMaterial === 'all' || (i.material || '-') === filterMaterial) &&
-      (filterMake === 'all' || (i.make || '-') === filterMake) &&
-      (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
-      (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
-      (filterGrade === 'all' || (i.grade || '-') === filterGrade) &&
-      (filterDimension === 'all' || getDimLabel(i) === filterDimension)
-    );
-  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension]);
+    return items.filter(i => {
+      const availQty = getAvailableQty(i);
+      if (fgView === 'open' && availQty <= 0) return false;
+      if (fgView === 'closed' && availQty > 0) return false;
+      return (filterMaterial === 'all' || (i.material || '-') === filterMaterial) &&
+        (filterMake === 'all' || (i.make || '-') === filterMake) &&
+        (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
+        (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
+        (filterGrade === 'all' || (i.grade || '-') === filterGrade) &&
+        (filterDimension === 'all' || getDimLabel(i) === filterDimension);
+    });
+  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
 
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
@@ -230,9 +234,7 @@ export default function FGInventoryTab() {
   const handleSaleSubmit = async () => {
     if (!saleDialog) return;
     const qty = Number(saleForm.quantity) || 0;
-    const available = getAvailableQty(saleDialog);
     if (qty <= 0) { toast.error('Enter a valid quantity'); return; }
-    if (qty > available + 0.01) { toast.error(`Quantity exceeds available (${available.toFixed(2)} Kg)`); return; }
     try {
       await insertFGSale.mutateAsync({
         fg_item_id: saleDialog.id,
@@ -289,9 +291,24 @@ export default function FGInventoryTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            {(['open', 'closed'] as const).map(v => (
+              <Button
+                key={v}
+                size="sm"
+                variant={fgView === v ? 'default' : 'ghost'}
+                className="text-xs h-7 px-3 capitalize"
+                onClick={() => setFgView(v)}
+              >
+                {v === 'open' ? 'Open SKUs' : 'Closed SKUs'}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
           Total: {grandTotalQty.toFixed(2)} Kg · {grandTotalPcs} Pcs ({filteredItems.length} items)
         </div>

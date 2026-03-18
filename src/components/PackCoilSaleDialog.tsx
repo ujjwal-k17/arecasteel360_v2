@@ -24,6 +24,7 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const packCoilSale = usePackCoilSale();
   const insertAction = useInsertAction();
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
+  const packSaleQty = batch.net_weight || 0;
   const { data: customers } = useCustomers();
   const { data: orders } = useOrders();
   const { data: allDispatches } = useAllDispatches();
@@ -106,12 +107,12 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
       try {
         await packCoilSale.mutateAsync({
           batchId: batch.id,
-          usableQty,
+          usableQty: packSaleQty,
           orderId,
           invoiceNumber,
           salesDate,
         });
-        toast.success(`Pack Coil sold for batch ${batch.batch_number} — ${usableQty.toFixed(2)} Kg`);
+        toast.success(`Pack Coil sold for batch ${batch.batch_number} — ${packSaleQty.toFixed(2)} Kg`);
         onClose();
       } catch (err) {
         console.error('Pack Coil Sale error:', err);
@@ -140,8 +141,8 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
             </div>
           ) : (
             <div className="bg-muted/50 rounded-md p-3 text-sm">
-              <span className="text-muted-foreground">Sales Qty (full coil):</span>{' '}
-              <span className="font-semibold font-mono-num">{usableQty.toFixed(2)} Kg</span>
+              <span className="text-muted-foreground">Sales Qty (Net Weight):</span>{' '}
+              <span className="font-semibold font-mono-num">{packSaleQty.toFixed(2)} Kg</span>
             </div>
           )}
           <div>

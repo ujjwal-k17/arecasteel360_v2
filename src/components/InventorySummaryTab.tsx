@@ -173,7 +173,7 @@ export default function InventorySummaryTab() {
     queryFn: async () => {
       const { data } = await supabase
         .from('processing_records')
-        .select('id, input_qty, created_at, process_type, source_type, output_type, order_id, batch_id, batches(batch_number, material, thickness, width, make, coating, grade)')
+        .select('id, input_qty, created_at, process_type, source_type, output_type, order_id, batch_id, batches(batch_number, material, thickness, width, make, coating, grade), processing_output_items(width, length)')
         .order('created_at', { ascending: false });
       return data || [];
     },
@@ -269,7 +269,16 @@ export default function InventorySummaryTab() {
     return d >= range.from && (!range.to || d <= range.to);
   };
 
-  // Production filtered details
+  // Also fetch WIP items for input dimensions when source is WIP
+  const { data: wipLookupData } = useQuery({
+    queryKey: ['summary-wip-lookup'],
+    queryFn: async () => {
+      const { data } = await supabase.from('wip_items').select('id, source_batch_id, thickness, width, length');
+      return data || [];
+    },
+  });
+
+  // Processing filtered details
   const filteredProduction = useMemo(() => {
     return (processingDetailData || []).filter(r => inDateRange(r.created_at, prodRange));
   }, [processingDetailData, prodRange]);
@@ -496,7 +505,8 @@ export default function InventorySummaryTab() {
                         <TableHead className="text-xs font-semibold">Source → Output</TableHead>
                         <TableHead className="text-xs font-semibold">Batch</TableHead>
                         <TableHead className="text-xs font-semibold">Material</TableHead>
-                        <TableHead className="text-xs font-semibold">Dimensions</TableHead>
+                        <TableHead className="text-xs font-semibold">Input Dimensions</TableHead>
+                        <TableHead className="text-xs font-semibold">Output Dimensions</TableHead>
                         <TableHead className="text-xs font-semibold">Order</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Input Qty (kg)</TableHead>
                       </TableRow>
@@ -504,6 +514,23 @@ export default function InventorySummaryTab() {
                     <TableBody>
                       {filteredProduction.map((r: any) => {
                         const batch = r.batches;
+                        const outputItems = r.processing_output_items || [];
+                        // Input dimensions: from coil (batch) if source=coil, else from WIP
+                        let inputDims = '-';
+                        if (r.source_type === 'wip') {
+                          // find WIP item by source_batch_id matching batch_id
+                          const wipItem = (wipLookupData || []).find((w: any) => w.source_batch_id === r.batch_id);
+                          if (wipItem) inputDims = `${wipItem.thickness ?? '-'} x ${wipItem.width ?? '-'}`;
+                        } else if (batch) {
+                          inputDims = `${batch.thickness ?? '-'} x ${batch.width ?? '-'}`;
+                        }
+                        // Output dimensions: from processing_output_items
+                        let outputDims = '-';
+                        if (outputItems.length > 0) {
+                          const dimStrs = outputItems.map((oi: any) => `${oi.width ?? '-'} x ${oi.length ?? 'Coil'}`);
+                          const unique = [...new Set(dimStrs)];
+                          outputDims = unique.join(', ');
+                        }
                         return (
                           <TableRow key={r.id}>
                             <TableCell className="text-xs">{format(new Date(r.created_at), 'dd/MM/yy')}</TableCell>
@@ -513,7 +540,8 @@ export default function InventorySummaryTab() {
                             </TableCell>
                             <TableCell className="text-xs font-mono">{batch?.batch_number || '-'}</TableCell>
                             <TableCell className="text-xs">{batch?.material || '-'}</TableCell>
-                            <TableCell className="text-xs">{batch ? `${batch.thickness ?? '-'} x ${batch.width ?? '-'}` : '-'}</TableCell>
+                            <TableCell className="text-xs">{inputDims}</TableCell>
+                            <TableCell className="text-xs">{outputDims}</TableCell>
                             <TableCell className="text-xs">{r.order_id || '-'}</TableCell>
                             <TableCell className="text-xs text-right font-medium">{(r.input_qty || 0).toLocaleString('en-IN')}</TableCell>
                           </TableRow>

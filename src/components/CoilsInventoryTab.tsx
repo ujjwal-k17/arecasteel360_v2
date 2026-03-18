@@ -85,6 +85,7 @@ export default function CoilsInventoryTab() {
   const [processingBatch, setProcessingBatch] = useState<Batch | null>(null);
   const [packCoilBatch, setPackCoilBatch] = useState<Batch | null>(null);
   const [coilSaleMode, setCoilSaleMode] = useState<'pack' | 'loose'>('pack');
+  const [batchView, setBatchView] = useState<'open' | 'closed' | 'all'>('open');
   const [filters, setFilters] = useState<Record<string, string>>({});
 
   const setFilter = (field: string, value: string) => {
@@ -119,12 +120,20 @@ export default function CoilsInventoryTab() {
 
   const filteredBatches = useMemo(() => {
     return receivedBatches.filter(b => {
+      // Open/Closed/All filter
+      if (batchView === 'open') {
+        const usable = calcUsableBalanceQty(b, allActions, allProcRecords);
+        if (usable <= 0) return false;
+      } else if (batchView === 'closed') {
+        const usable = calcUsableBalanceQty(b, allActions, allProcRecords);
+        if (usable > 0) return false;
+      }
       for (const [field, val] of Object.entries(filters)) {
         if (String((b as any)[field] ?? '') !== val) return false;
       }
       return true;
     });
-  }, [receivedBatches, filters]);
+  }, [receivedBatches, filters, batchView, allActions, allProcRecords]);
 
   const skuGroups: SKUGroup[] = useMemo(() => {
     const skuMap = new Map<string, Batch[]>();
@@ -311,26 +320,41 @@ export default function CoilsInventoryTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="outline" size="sm" onClick={() => {
-          queryClient.invalidateQueries({ queryKey: ['batches'] });
-          queryClient.invalidateQueries({ queryKey: ['inventory_actions'] });
-          queryClient.invalidateQueries({ queryKey: ['processing_records'] });
-          toast.success('Refreshed');
-        }} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => {
+            queryClient.invalidateQueries({ queryKey: ['batches'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory_actions'] });
+            queryClient.invalidateQueries({ queryKey: ['processing_records'] });
+            toast.success('Refreshed');
+          }} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
         <Button onClick={() => { setShowAddDialog(true); setAddMode(null); }} className="gap-2">
           <Plus className="h-4 w-4" /> Add New Item
         </Button>
         <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2">
           <Download className="h-4 w-4" /> Download Excel
         </Button>
-        {selectedBatchIds.size > 0 && (
-          <Button variant="destructive" size="sm" onClick={handleBulkDeleteBatches} className="gap-2">
-            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
-          </Button>
-        )}
+          {selectedBatchIds.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={handleBulkDeleteBatches} className="gap-2">
+              <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          {(['open', 'closed', 'all'] as const).map(v => (
+            <Button
+              key={v}
+              size="sm"
+              variant={batchView === v ? 'default' : 'ghost'}
+              className="text-xs h-7 px-3 capitalize"
+              onClick={() => setBatchView(v)}
+            >
+              {v}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <div className="flex items-center gap-4 text-sm">
