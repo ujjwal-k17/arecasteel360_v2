@@ -16,6 +16,7 @@ import InventoryFieldSelect from './InventoryFieldSelect';
 import ProcessingDialog from './ProcessingDialog';
 import PackCoilSaleDialog from './PackCoilSaleDialog';
 import { isFieldValueValid } from '@/lib/field-validation';
+import { useOrders } from '@/hooks/useOrders';
 import * as XLSX from 'xlsx';
 
 interface SKUGroup {
@@ -58,6 +59,7 @@ export default function CoilsInventoryTab() {
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
   const { data: processingRecords } = useAllProcessingRecords();
+  const { data: orders } = useOrders();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
@@ -459,11 +461,12 @@ export default function CoilsInventoryTab() {
                                                   <div>
                                                     <p className="text-xs font-semibold text-muted-foreground mb-1">Coil Sales</p>
                                                     {packCoilSales.length > 0 && (
-                                                      <div className="mb-2">
+                                                       <div className="mb-2">
                                                         <p className="text-[11px] font-medium text-muted-foreground ml-2 mb-0.5">Pack Coil Sale</p>
                                                         <Table>
                                                           <TableHeader>
                                                             <TableRow>
+                                                              <TableHead className="text-xs">Customer</TableHead>
                                                               <TableHead className="text-xs">Weight (Kg)</TableHead>
                                                               <TableHead className="text-xs">Invoice</TableHead>
                                                               <TableHead className="text-xs">Order ID</TableHead>
@@ -471,14 +474,19 @@ export default function CoilsInventoryTab() {
                                                             </TableRow>
                                                           </TableHeader>
                                                           <TableBody>
-                                                            {packCoilSales.map(a => (
+                                                            {packCoilSales.map(a => {
+                                                              const matchedOrder = orders?.find((o: any) => o.order_number === a.order_id);
+                                                              const customerName = matchedOrder?.customers?.customer_name || '-';
+                                                              return (
                                                               <TableRow key={a.id}>
+                                                                <TableCell className="text-xs">{customerName}</TableCell>
                                                                 <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
                                                                 <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
                                                                 <TableCell className="text-xs">{a.order_id || '-'}</TableCell>
                                                                 <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
                                                               </TableRow>
-                                                            ))}
+                                                              );
+                                                            })}
                                                           </TableBody>
                                                         </Table>
                                                       </div>
@@ -489,6 +497,7 @@ export default function CoilsInventoryTab() {
                                                         <Table>
                                                           <TableHeader>
                                                             <TableRow>
+                                                              <TableHead className="text-xs">Customer</TableHead>
                                                               <TableHead className="text-xs">Weight (Kg)</TableHead>
                                                               <TableHead className="text-xs">Invoice</TableHead>
                                                               <TableHead className="text-xs">Order ID</TableHead>
@@ -496,14 +505,19 @@ export default function CoilsInventoryTab() {
                                                             </TableRow>
                                                           </TableHeader>
                                                           <TableBody>
-                                                            {looseCoilSales.map(a => (
+                                                            {looseCoilSales.map(a => {
+                                                              const matchedOrder = orders?.find((o: any) => o.order_number === a.order_id);
+                                                              const customerName = matchedOrder?.customers?.customer_name || '-';
+                                                              return (
                                                               <TableRow key={a.id}>
+                                                                <TableCell className="text-xs">{customerName}</TableCell>
                                                                 <TableCell className="text-xs font-mono-num">{a.net_weight ?? '-'}</TableCell>
                                                                 <TableCell className="text-xs">{a.invoice_number || '-'}</TableCell>
                                                                 <TableCell className="text-xs">{a.order_id || '-'}</TableCell>
                                                                 <TableCell className="text-xs">{a.sales_date || '-'}</TableCell>
                                                               </TableRow>
-                                                            ))}
+                                                              );
+                                                            })}
                                                           </TableBody>
                                                         </Table>
                                                       </div>

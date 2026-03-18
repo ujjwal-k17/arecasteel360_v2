@@ -40,6 +40,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [numSizes, setNumSizes] = useState('');
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
+  const [profileGcQty, setProfileGcQty] = useState('');
   const [trimOption, setTrimOption] = useState<'yes' | 'no' | ''>('');
 
   // Inline scrap & defective state
@@ -100,9 +101,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       return autoCalcSlitWidths.reduce((s, w) => s + (Number(w.qty) || 0), 0);
     } else if (processType === 'CTL') {
       return ctlLengths.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+    } else if (processType === 'Profile' || processType === 'GC') {
+      return Number(profileGcQty) || 0;
     }
     return processingQty;
-  }, [processType, autoCalcSlitWidths, ctlLengths, processingQty]);
+  }, [processType, autoCalcSlitWidths, ctlLengths, processingQty, profileGcQty]);
 
   const totalCommitted = totalOutputQty + inlineDeductions;
   const exceedsUsable = totalCommitted > usableQty + 0.01;
@@ -140,6 +143,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       } else if (processType === 'CTL') {
         if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
           toast.error('Please fill all CTL entries (length, qty & pcs are required)');
+          return;
+        }
+      } else if (processType === 'Profile' || processType === 'GC') {
+        if (!profileGcQty || Number(profileGcQty) <= 0) {
+          toast.error('Please enter Process Qty');
           return;
         }
       }
@@ -201,6 +209,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
         } else if (processType === 'CTL') {
           outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
+        } else if (processType === 'Profile' || processType === 'GC') {
+          outputItems = [{ qty_kg: Number(profileGcQty) }];
         }
 
         await insertProcessing.mutateAsync({
@@ -333,7 +343,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           {/* Process Type */}
           <div>
             <Label className="text-xs">Process</Label>
-            <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); setTrimOption(''); if (v === 'Slit') setOutputType(''); else setOutputType('FG'); }}>
+            <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); setTrimOption(''); setProfileGcQty(''); if (v === 'Slit') setOutputType(''); else setOutputType('FG'); }}>
               <SelectTrigger><SelectValue placeholder="Select process" /></SelectTrigger>
               <SelectContent>
                 {PROCESSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -454,7 +464,16 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             </div>
           )}
 
-          {/* Validation warning */}
+          {/* Profile / GC — simple Process Qty input */}
+          {(processType === 'Profile' || processType === 'GC') && (
+            <div className="space-y-3 border rounded-md p-3">
+              <div>
+                <Label className="text-xs">Process Qty (Kg)</Label>
+                <Input type="number" value={profileGcQty} onChange={e => setProfileGcQty(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+          )}
+
           {exceedsUsable && (
             <div className="bg-destructive/10 text-destructive text-xs rounded-md p-2 font-medium">
               ⚠ Total committed ({totalCommitted.toFixed(2)} Kg) exceeds usable qty ({usableQty.toFixed(2)} Kg)
