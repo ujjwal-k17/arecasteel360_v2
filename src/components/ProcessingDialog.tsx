@@ -72,6 +72,9 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     setDefectEntries(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d));
   };
 
+  // Effective slit processing qty: user-entered or fallback to auto processingQty
+  const effectiveSlitProcessQty = slitProcessQty ? Number(slitProcessQty) : processingQty;
+
   // Auto-calculate slit quantities when widths change
   const autoCalcSlitWidths = useMemo(() => {
     if (processType !== 'Slit' || coilWidth <= 0) return slitWidths;
@@ -80,15 +83,13 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       const w = Number(s.width) || 0;
       if (w <= 0) return s;
       if (trimOption === 'no' && sumWidths > 0) {
-        // No trim: divide processing qty by ratio of widths
-        const autoQty = (processingQty * w) / sumWidths;
+        const autoQty = (effectiveSlitProcessQty * w) / sumWidths;
         return { ...s, qty: autoQty.toFixed(2) };
       }
-      // Trim = yes (default): use coil width ratio
-      const autoQty = (processingQty * w) / coilWidth;
+      const autoQty = (effectiveSlitProcessQty * w) / coilWidth;
       return { ...s, qty: autoQty.toFixed(2) };
     });
-  }, [slitWidths.map(s => s.width).join(','), processingQty, coilWidth, processType, trimOption]);
+  }, [slitWidths.map(s => s.width).join(','), effectiveSlitProcessQty, coilWidth, processType, trimOption]);
 
   // Trim qty for slit
   const trimQty = useMemo(() => {
