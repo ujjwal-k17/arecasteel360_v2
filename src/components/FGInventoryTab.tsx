@@ -293,9 +293,24 @@ export default function FGInventoryTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            {(['open', 'closed'] as const).map(v => (
+              <Button
+                key={v}
+                size="sm"
+                variant={fgView === v ? 'default' : 'ghost'}
+                className="text-xs h-7 px-3 capitalize"
+                onClick={() => setFgView(v)}
+              >
+                {v === 'open' ? 'Open SKUs' : 'Closed SKUs'}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
           Total: {grandTotalQty.toFixed(2)} Kg · {grandTotalPcs} Pcs ({filteredItems.length} items)
         </div>
