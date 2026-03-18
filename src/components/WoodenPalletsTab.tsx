@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrders } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,7 @@ interface PalletConsumption {
 
 export default function WoodenPalletsTab() {
   const queryClient = useQueryClient();
+  const { data: orders } = useOrders();
   const fileRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sizeFilter, setSizeFilter] = useState<string>('all');
@@ -588,7 +590,18 @@ export default function WoodenPalletsTab() {
             </div>
             <div>
               <Label className="text-xs">Order ID</Label>
-              <Input value={consumptionForm.orderId} onChange={e => setConsumptionForm(v => ({ ...v, orderId: e.target.value }))} />
+              <Select value={consumptionForm.orderId} onValueChange={v => setConsumptionForm(f => ({ ...f, orderId: v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select order..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(orders || []).map((o: any) => (
+                    <SelectItem key={o.id} value={o.order_number}>
+                      {o.order_number} — {o.customers?.customer_name || ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs">Weight (Kg) *</Label>
