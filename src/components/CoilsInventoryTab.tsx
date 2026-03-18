@@ -85,6 +85,7 @@ export default function CoilsInventoryTab() {
   const [processingBatch, setProcessingBatch] = useState<Batch | null>(null);
   const [packCoilBatch, setPackCoilBatch] = useState<Batch | null>(null);
   const [coilSaleMode, setCoilSaleMode] = useState<'pack' | 'loose'>('pack');
+  const [batchView, setBatchView] = useState<'open' | 'closed' | 'all'>('open');
   const [filters, setFilters] = useState<Record<string, string>>({});
 
   const setFilter = (field: string, value: string) => {
