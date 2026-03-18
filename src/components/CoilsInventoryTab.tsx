@@ -120,12 +120,20 @@ export default function CoilsInventoryTab() {
 
   const filteredBatches = useMemo(() => {
     return receivedBatches.filter(b => {
+      // Open/Closed/All filter
+      if (batchView === 'open') {
+        const usable = calcUsableBalanceQty(b, allActions, allProcRecords);
+        if (usable <= 0) return false;
+      } else if (batchView === 'closed') {
+        const usable = calcUsableBalanceQty(b, allActions, allProcRecords);
+        if (usable > 0) return false;
+      }
       for (const [field, val] of Object.entries(filters)) {
         if (String((b as any)[field] ?? '') !== val) return false;
       }
       return true;
     });
-  }, [receivedBatches, filters]);
+  }, [receivedBatches, filters, batchView, allActions, allProcRecords]);
 
   const skuGroups: SKUGroup[] = useMemo(() => {
     const skuMap = new Map<string, Batch[]>();
