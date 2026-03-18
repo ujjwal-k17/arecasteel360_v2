@@ -327,8 +327,8 @@ export default function CoilsInventoryTab() {
           <Download className="h-4 w-4" /> Download Excel
         </Button>
         {selectedBatchIds.size > 0 && (
-          <Button variant="secondary" size="sm" onClick={handleBulkRevert} className="gap-2">
-            <Undo2 className="h-4 w-4" /> Move to In-Transit ({selectedBatchIds.size})
+          <Button variant="destructive" size="sm" onClick={handleBulkDeleteBatches} className="gap-2">
+            <Trash2 className="h-4 w-4" /> Delete Selected ({selectedBatchIds.size})
           </Button>
         )}
       </div>
