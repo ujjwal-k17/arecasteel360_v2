@@ -111,7 +111,7 @@ export default function DefectiveManagementTab() {
     if (!sellDialog) return;
     try {
       await insertDefSale.mutateAsync({
-        batch_id: sellDialog.batchIds[0] || null,
+        batch_id: sellDialog.source === 'coil' ? sellDialog.batchId : null,
         order_id: saleForm.order_id || null,
         invoice_number: saleForm.invoice_number || null,
         sales_date: saleForm.sales_date || null,
