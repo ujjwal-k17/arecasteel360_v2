@@ -71,30 +71,32 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              {isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive('/admin')}
-                    tooltip="Admin"
-                  >
-                    <NavLink
-                      to="/admin"
-                      end
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    >
-                      <Settings className="h-4 w-4" />
-                      {!collapsed && <span>Admin</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-sidebar-border">
+        {isAdmin && (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive('/admin')}
+                tooltip="Admin"
+              >
+                <NavLink
+                  to="/admin"
+                  end
+                  className="hover:bg-sidebar-accent/50"
+                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                >
+                  <Settings className="h-4 w-4" />
+                  {!collapsed && <span>Admin</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
         {!collapsed && user && (
           <p className="text-[10px] text-sidebar-foreground/50 truncate px-2 mb-1">{user.email}</p>
         )}
