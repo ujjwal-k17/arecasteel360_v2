@@ -142,6 +142,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           toast.error('Please fill all slit width entries');
           return;
         }
+        const sumW = slitWidths.reduce((s, w) => s + (Number(w.width) || 0), 0);
+        if (trimOption === 'no' && Math.abs(sumW - coilWidth) > 0.01) {
+          toast.error(`When Trim = No, sum of slit widths (${sumW} mm) must equal coil width (${coilWidth} mm)`);
+          return;
+        }
       } else if (processType === 'CTL') {
         if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
           toast.error('Please fill all CTL entries (length, qty & pcs are required)');
