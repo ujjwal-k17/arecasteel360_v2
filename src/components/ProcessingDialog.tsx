@@ -41,6 +41,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
   const [profileGcQty, setProfileGcQty] = useState('');
+  const [slitProcessQty, setSlitProcessQty] = useState('');
   const [trimOption, setTrimOption] = useState<'yes' | 'no' | ''>('');
 
   // Inline scrap & defective state
