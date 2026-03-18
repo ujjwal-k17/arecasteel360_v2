@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, Download } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RefreshCw, Download, X } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -35,6 +36,10 @@ export default function SalesDataTab() {
   const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [filterInvoice, setFilterInvoice] = useState('');
+  const [filterOrderId, setFilterOrderId] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterProcess, setFilterProcess] = useState('');
 
   // Fetch orders with customers for mapping order_id → customer_name
   const { data: orders } = useQuery({
@@ -164,8 +169,24 @@ export default function SalesDataTab() {
     return records;
   }, [inventoryActions, fgSales, defectiveSales, orderMap]);
 
-  // Filter by date range
+  // Filter by date range + column filters
   const filteredSales = useMemo(() => {
+    return allSales.filter(s => {
+      if (!s.invoice_date) return false;
+      if (dateFrom && s.invoice_date < dateFrom) return false;
+      if (dateTo && s.invoice_date > dateTo) return false;
+      if (filterInvoice && s.invoice_number !== filterInvoice) return false;
+      if (filterOrderId && s.order_id !== filterOrderId) return false;
+      if (filterCustomer && s.customer_name !== filterCustomer) return false;
+      if (filterProcess && s.process_form !== filterProcess) return false;
+      return true;
+    });
+  }, [allSales, dateFrom, dateTo, filterInvoice, filterOrderId, filterCustomer, filterProcess]);
+
+  const totalQty = useMemo(() => filteredSales.reduce((s, r) => s + r.qty, 0), [filteredSales]);
+
+  // Unique filter options (derived from date-filtered data)
+  const dateFilteredSales = useMemo(() => {
     return allSales.filter(s => {
       if (!s.invoice_date) return false;
       if (dateFrom && s.invoice_date < dateFrom) return false;
@@ -174,7 +195,13 @@ export default function SalesDataTab() {
     });
   }, [allSales, dateFrom, dateTo]);
 
-  const totalQty = useMemo(() => filteredSales.reduce((s, r) => s + r.qty, 0), [filteredSales]);
+  const uniqueInvoices = useMemo(() => [...new Set(dateFilteredSales.map(s => s.invoice_number).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+  const uniqueOrderIds = useMemo(() => [...new Set(dateFilteredSales.map(s => s.order_id).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+  const uniqueCustomers = useMemo(() => [...new Set(dateFilteredSales.map(s => s.customer_name).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+  const uniqueProcesses = useMemo(() => [...new Set(dateFilteredSales.map(s => s.process_form).filter(Boolean) as string[])].sort(), [dateFilteredSales]);
+
+  const hasActiveFilters = filterInvoice || filterOrderId || filterCustomer || filterProcess;
+  const clearColumnFilters = () => { setFilterInvoice(''); setFilterOrderId(''); setFilterCustomer(''); setFilterProcess(''); };
 
   const handleDownloadExcel = () => {
     if (filteredSales.length === 0) {
@@ -239,7 +266,7 @@ export default function SalesDataTab() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Qty:</span>{' '}
           <span className="font-semibold font-mono-num">{totalQty.toFixed(2)} Kg</span>
@@ -248,6 +275,11 @@ export default function SalesDataTab() {
           <span className="text-muted-foreground">Records:</span>{' '}
           <span className="font-semibold">{filteredSales.length}</span>
         </div>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={clearColumnFilters}>
+            <X className="h-3 w-3" /> Clear filters
+          </Button>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-md border bg-card">
@@ -261,6 +293,47 @@ export default function SalesDataTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process / Form</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">SKU</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
+            </TableRow>
+            <TableRow className="bg-muted/30">
+              <TableHead className="p-1">
+                <Select value={filterInvoice} onValueChange={v => setFilterInvoice(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueInvoices.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">{/* date range filter above */}</TableHead>
+              <TableHead className="p-1">
+                <Select value={filterOrderId} onValueChange={v => setFilterOrderId(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[80px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueOrderIds.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">
+                <Select value={filterCustomer} onValueChange={v => setFilterCustomer(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueCustomers.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">
+                <Select value={filterProcess} onValueChange={v => setFilterProcess(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[80px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueProcesses.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">{/* SKU - no filter */}</TableHead>
+              <TableHead className="p-1">{/* Qty - no filter */}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
