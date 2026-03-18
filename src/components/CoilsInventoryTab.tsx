@@ -122,11 +122,11 @@ export default function CoilsInventoryTab() {
     return receivedBatches.filter(b => {
       // Open/Closed/All filter
       if (batchView === 'open') {
-        const usable = calcUsableBalanceQty(b, allActions, allProcRecords);
-        if (usable <= 0) return false;
+        const balance = calcBalanceQty(b, allActions, allProcRecords);
+        if (balance <= 0) return false;
       } else if (batchView === 'closed') {
-        const usable = calcUsableBalanceQty(b, allActions, allProcRecords);
-        if (usable > 0) return false;
+        const balance = calcBalanceQty(b, allActions, allProcRecords);
+        if (balance > 0) return false;
       }
       for (const [field, val] of Object.entries(filters)) {
         if (String((b as any)[field] ?? '') !== val) return false;
