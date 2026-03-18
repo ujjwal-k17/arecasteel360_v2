@@ -9,22 +9,55 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 interface SalesRecord {
-  sales_date: string | null;
-  material: string | null;
-  make: string | null;
-  process_form: string | null;
-  dimensions: string;
-  coating: string | null;
-  grade: string | null;
-  qty: number;
   invoice_number: string | null;
+  invoice_date: string | null;
+  order_id: string | null;
+  customer_name: string | null;
+  process_form: string | null;
+  sku: string;
+  qty: number;
   source: string;
+}
+
+function buildSku(item: { material?: string | null; thickness?: number | null; width?: number | null; length?: number | string | null; coating?: string | null; grade?: string | null }) {
+  const parts = [
+    item.material,
+    item.thickness != null ? `${item.thickness}mm` : null,
+    item.width != null ? `${item.width}W` : null,
+    item.length != null ? `${item.length}L` : null,
+    item.coating,
+    item.grade,
+  ].filter(Boolean);
+  return parts.join(' / ') || '-';
 }
 
 export default function SalesDataTab() {
   const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  // Fetch orders with customers for mapping order_id → customer_name
+  const { data: orders } = useQuery({
+    queryKey: ['orders_for_sales'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_number, customers(customer_name)');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const orderMap = useMemo(() => {
+    const map: Record<string, { order_number: string; customer_name: string }> = {};
+    (orders || []).forEach((o: any) => {
+      map[o.id] = {
+        order_number: o.order_number,
+        customer_name: o.customers?.customer_name || '-',
+      };
+    });
+    return map;
+  }, [orders]);
 
   // Fetch inventory actions (coil sales)
   const { data: inventoryActions } = useQuery({
@@ -74,16 +107,15 @@ export default function SalesDataTab() {
     (inventoryActions || []).forEach((action: any) => {
       const batch = action.batches;
       if (!batch) return;
+      const orderInfo = action.order_id ? orderMap[action.order_id] : null;
       records.push({
-        sales_date: action.sales_date,
-        material: batch.material,
-        make: batch.make,
-        process_form: action.action_type === 'pack_coil_sale' ? 'Pack Coil' : action.action_type === 'loose_coil_sale' ? 'Loose Coil' : (batch.form || 'Coil'),
-        dimensions: `${batch.thickness ?? '-'} x ${batch.width ?? '-'} x ${batch.length ?? '-'}`,
-        coating: batch.coating,
-        grade: batch.grade,
-        qty: action.net_weight || 0,
         invoice_number: action.invoice_number,
+        invoice_date: action.sales_date,
+        order_id: orderInfo?.order_number || action.order_id || null,
+        customer_name: orderInfo?.customer_name || null,
+        process_form: action.action_type === 'pack_coil_sale' ? 'Pack Coil' : action.action_type === 'loose_coil_sale' ? 'Loose Coil' : (batch.form || 'Coil'),
+        sku: buildSku(batch),
+        qty: action.net_weight || 0,
         source: 'Coil',
       });
     });
@@ -92,16 +124,15 @@ export default function SalesDataTab() {
     (fgSales || []).forEach((sale: any) => {
       const fg = sale.fg_items;
       if (!fg) return;
+      const orderInfo = sale.order_id ? orderMap[sale.order_id] : null;
       records.push({
-        sales_date: sale.sales_date,
-        material: fg.material,
-        make: fg.make,
-        process_form: fg.process || 'FG',
-        dimensions: `${fg.thickness ?? '-'} x ${fg.width ?? '-'} x ${fg.length ?? '-'}`,
-        coating: fg.coating,
-        grade: fg.grade,
-        qty: sale.quantity || 0,
         invoice_number: sale.invoice_number,
+        invoice_date: sale.sales_date,
+        order_id: orderInfo?.order_number || sale.order_id || null,
+        customer_name: orderInfo?.customer_name || null,
+        process_form: fg.process || 'FG',
+        sku: buildSku(fg),
+        qty: sale.quantity || 0,
         source: 'FG',
       });
     });
@@ -110,36 +141,35 @@ export default function SalesDataTab() {
     (defectiveSales || []).forEach((sale: any) => {
       const batch = sale.batches;
       if (!batch) return;
+      const orderInfo = sale.order_id ? orderMap[sale.order_id] : null;
       records.push({
-        sales_date: sale.sales_date,
-        material: batch.material,
-        make: batch.make,
-        process_form: 'Defective',
-        dimensions: `${batch.thickness ?? '-'} x ${batch.width ?? '-'} x ${batch.length ?? '-'}`,
-        coating: batch.coating,
-        grade: batch.grade,
-        qty: sale.quantity || 0,
         invoice_number: sale.invoice_number,
+        invoice_date: sale.sales_date,
+        order_id: orderInfo?.order_number || sale.order_id || null,
+        customer_name: orderInfo?.customer_name || null,
+        process_form: 'Defective',
+        sku: buildSku(batch),
+        qty: sale.quantity || 0,
         source: 'Defective',
       });
     });
 
-    // Sort by sales_date descending
+    // Sort by invoice_date descending
     records.sort((a, b) => {
-      if (!a.sales_date) return 1;
-      if (!b.sales_date) return -1;
-      return b.sales_date.localeCompare(a.sales_date);
+      if (!a.invoice_date) return 1;
+      if (!b.invoice_date) return -1;
+      return b.invoice_date.localeCompare(a.invoice_date);
     });
 
     return records;
-  }, [inventoryActions, fgSales, defectiveSales]);
+  }, [inventoryActions, fgSales, defectiveSales, orderMap]);
 
   // Filter by date range
   const filteredSales = useMemo(() => {
     return allSales.filter(s => {
-      if (!s.sales_date) return false;
-      if (dateFrom && s.sales_date < dateFrom) return false;
-      if (dateTo && s.sales_date > dateTo) return false;
+      if (!s.invoice_date) return false;
+      if (dateFrom && s.invoice_date < dateFrom) return false;
+      if (dateTo && s.invoice_date > dateTo) return false;
       return true;
     });
   }, [allSales, dateFrom, dateTo]);
@@ -152,20 +182,18 @@ export default function SalesDataTab() {
       return;
     }
     const rows = filteredSales.map(s => ({
-      'Sales Date': s.sales_date || '-',
-      'Material': s.material || '-',
-      'Make': s.make || '-',
-      'Process / Form': s.process_form || '-',
-      'Dimensions': s.dimensions,
-      'Coating': s.coating || '-',
-      'Grade': s.grade || '-',
-      'Qty (Kg)': s.qty,
       'Invoice Number': s.invoice_number || '-',
+      'Invoice Date': s.invoice_date || '-',
+      'Order ID': s.order_id || '-',
+      'Customer Name': s.customer_name || '-',
+      'Process / Form': s.process_form || '-',
+      'SKU': s.sku,
+      'Qty (Kg)': s.qty,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sales Data');
-    const fileName = `sales_data_${dateFrom || 'all'}_to_${dateTo || 'all'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.utils.book_append_sheet(wb, ws, 'Dispatch Data');
+    const fileName = `dispatch_data_${dateFrom || 'all'}_to_${dateTo || 'all'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, fileName);
     toast.success('Downloaded');
   };
@@ -174,6 +202,7 @@ export default function SalesDataTab() {
     queryClient.invalidateQueries({ queryKey: ['inventory_actions_sales'] });
     queryClient.invalidateQueries({ queryKey: ['fg_sales_all'] });
     queryClient.invalidateQueries({ queryKey: ['defective_sales_all'] });
+    queryClient.invalidateQueries({ queryKey: ['orders_for_sales'] });
     toast.success('Refreshed');
   };
 
@@ -225,36 +254,32 @@ export default function SalesDataTab() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Sales Date</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Make</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Process / Form</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Dimensions</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Invoice Number</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Invoice Date</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Order ID</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Customer Name</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Process / Form</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">SKU</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSales.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                  {dateFrom || dateTo ? 'No sales found for selected date range.' : 'No sales data found. Select a date range to filter.'}
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  {dateFrom || dateTo ? 'No dispatches found for selected date range.' : 'No dispatch data found. Select a date range to filter.'}
                 </TableCell>
               </TableRow>
             )}
             {filteredSales.map((s, idx) => (
               <TableRow key={idx}>
-                <TableCell className="text-sm">{s.sales_date ? new Date(s.sales_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                <TableCell className="text-sm">{s.material || '-'}</TableCell>
-                <TableCell className="text-sm">{s.make || '-'}</TableCell>
-                <TableCell className="text-sm">{s.process_form || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num whitespace-nowrap">{s.dimensions}</TableCell>
-                <TableCell className="text-sm">{s.coating || '-'}</TableCell>
-                <TableCell className="text-sm">{s.grade || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{s.qty.toFixed(2)}</TableCell>
                 <TableCell className="text-sm">{s.invoice_number || '-'}</TableCell>
+                <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
+                <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
+                <TableCell className="text-sm">{s.process_form || '-'}</TableCell>
+                <TableCell className="text-sm font-mono-num whitespace-nowrap">{s.sku}</TableCell>
+                <TableCell className="text-sm font-mono-num">{s.qty.toFixed(2)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
