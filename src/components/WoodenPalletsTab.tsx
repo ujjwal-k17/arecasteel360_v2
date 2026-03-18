@@ -596,7 +596,6 @@ export default function WoodenPalletsTab() {
                 orders={(orders || []) as any[]}
               />
             </div>
-            </div>
             <div>
               <Label className="text-xs">Weight (Kg) *</Label>
               <Input type="number" value={consumptionForm.weight} onChange={e => setConsumptionForm(v => ({ ...v, weight: e.target.value }))} />
