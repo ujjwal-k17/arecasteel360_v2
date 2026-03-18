@@ -491,6 +491,7 @@ export default function CoilsInventoryTab() {
                                                         </Table>
                                                       </div>
                                                     )}
+                                                    {looseCoilSales.length > 0 && (
                                                       <div className="mb-2">
                                                         <p className="text-[11px] font-medium text-muted-foreground ml-2 mb-0.5">Loose Coil Sale</p>
                                                         <Table>
