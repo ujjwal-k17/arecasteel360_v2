@@ -545,7 +545,7 @@ export default function InventorySummaryTab() {
                             <TableCell className="text-xs">{batch?.material || '-'}</TableCell>
                             <TableCell className="text-xs">{inputDims}</TableCell>
                             <TableCell className="text-xs">{outputDims}</TableCell>
-                            <TableCell className="text-xs">{r.order_id || '-'}</TableCell>
+                            
                             <TableCell className="text-xs text-right font-medium">{(r.input_qty || 0).toLocaleString('en-IN')}</TableCell>
                           </TableRow>
                         );
