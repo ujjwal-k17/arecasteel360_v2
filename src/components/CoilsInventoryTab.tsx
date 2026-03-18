@@ -59,6 +59,7 @@ export default function CoilsInventoryTab() {
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
   const { data: processingRecords } = useAllProcessingRecords();
+  const { data: orders } = useOrders();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
   const updateBatch = useUpdateBatch();
