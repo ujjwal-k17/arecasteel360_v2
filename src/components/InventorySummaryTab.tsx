@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, startOfMonth } from 'date-fns';
-import { CalendarIcon, Package, Layers, CheckCircle, Warehouse, TruckIcon, ArrowDownUp, ChevronDown } from 'lucide-react';
+import { CalendarIcon, Package, Layers, CheckCircle, Warehouse, TruckIcon, ArrowDownUp, ChevronDown, AlertTriangle, Trash2, ArrowDownToLine } from 'lucide-react';
 
 type DateRange = { from: Date | undefined; to: Date | undefined };
 
@@ -72,8 +72,10 @@ export default function InventorySummaryTab() {
   const today = new Date();
   const [prodRange, setProdRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
   const [dispatchRange, setDispatchRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
+  const [inwardRange, setInwardRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
   const [prodOpen, setProdOpen] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
+  const [inwardOpen, setInwardOpen] = useState(false);
 
   // In-transit total
   const { data: inTransitData } = useQuery({
@@ -116,6 +118,51 @@ export default function InventorySummaryTab() {
     queryKey: ['summary-fg-sales'],
     queryFn: async () => {
       const { data } = await supabase.from('fg_sales').select('quantity');
+      return data || [];
+    },
+  });
+
+  // Scrap inventory total (from inventory_actions with scrap_type)
+  const { data: scrapData } = useQuery({
+    queryKey: ['summary-scrap'],
+    queryFn: async () => {
+      const { data } = await supabase.from('inventory_actions').select('net_weight').not('scrap_type', 'is', null);
+      return data || [];
+    },
+  });
+
+  // Scrap sold total
+  const { data: scrapSoldData } = useQuery({
+    queryKey: ['summary-scrap-sold'],
+    queryFn: async () => {
+      const { data } = await supabase.from('scrap_sales').select('qty_sold');
+      return data || [];
+    },
+  });
+
+  // Defective inventory total (from inventory_actions with defect_type)
+  const { data: defectiveActionData } = useQuery({
+    queryKey: ['summary-defective-actions'],
+    queryFn: async () => {
+      const { data } = await supabase.from('inventory_actions').select('net_weight').not('defect_type', 'is', null);
+      return data || [];
+    },
+  });
+
+  // Defective sold
+  const { data: defectiveSoldData } = useQuery({
+    queryKey: ['summary-defective-sold'],
+    queryFn: async () => {
+      const { data } = await supabase.from('defective_sales').select('quantity');
+      return data || [];
+    },
+  });
+
+  // FG defectives total
+  const { data: fgDefectivesData } = useQuery({
+    queryKey: ['summary-fg-defectives'],
+    queryFn: async () => {
+      const { data } = await supabase.from('fg_defectives').select('quantity');
       return data || [];
     },
   });
@@ -178,6 +225,19 @@ export default function InventorySummaryTab() {
     },
   });
 
+  // Inward details: batches with status='received', using updated_at as received date
+  const { data: inwardDetailData } = useQuery({
+    queryKey: ['summary-inward-detail'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('batches')
+        .select('id, batch_number, material, thickness, width, length, make, coating, grade, net_weight, gross_weight, purchase_from, updated_at, created_at, status')
+        .eq('status', 'received')
+        .order('updated_at', { ascending: false });
+      return data || [];
+    },
+  });
+
   // Computed values
   const inTransitTotal = useMemo(() => (inTransitData || []).reduce((s, r) => s + (r.net_weight || 0), 0), [inTransitData]);
   const coilsTotal = useMemo(() => (coilsData || []).reduce((s, r) => s + (r.net_weight || 0), 0), [coilsData]);
@@ -188,6 +248,19 @@ export default function InventorySummaryTab() {
     const totalSold = (fgSalesData || []).reduce((s, r) => s + (r.quantity || 0), 0);
     return totalProduced - totalSold;
   }, [fgData, fgSalesData]);
+
+  const scrapTotal = useMemo(() => {
+    const totalScrap = (scrapData || []).reduce((s, r) => s + (r.net_weight || 0), 0);
+    const totalSold = (scrapSoldData || []).reduce((s, r) => s + (r.qty_sold || 0), 0);
+    return totalScrap - totalSold;
+  }, [scrapData, scrapSoldData]);
+
+  const defectiveTotal = useMemo(() => {
+    const fromActions = (defectiveActionData || []).reduce((s, r) => s + (r.net_weight || 0), 0);
+    const fromFG = (fgDefectivesData || []).reduce((s, r) => s + (r.quantity || 0), 0);
+    const sold = (defectiveSoldData || []).reduce((s, r) => s + (r.quantity || 0), 0);
+    return fromActions + fromFG - sold;
+  }, [defectiveActionData, fgDefectivesData, defectiveSoldData]);
 
   const inDateRange = (dateStr: string | null | undefined, range: DateRange) => {
     if (!range.from) return true;
@@ -221,7 +294,6 @@ export default function InventorySummaryTab() {
       invoice: string;
     }> = [];
 
-    // Coil sales
     (coilSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
       const batch = r.batches;
       const order = r.order_id ? orderMap.get(r.order_id) : null;
@@ -237,7 +309,6 @@ export default function InventorySummaryTab() {
       });
     });
 
-    // FG sales
     (fgSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
       const fg = r.fg_items;
       const order = r.order_id ? orderMap.get(r.order_id) : null;
@@ -253,7 +324,6 @@ export default function InventorySummaryTab() {
       });
     });
 
-    // Defective sales
     (defSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
       const batch = r.batches;
       const order = r.order_id ? orderMap.get(r.order_id) : null;
@@ -274,6 +344,13 @@ export default function InventorySummaryTab() {
 
   const dispatchTotal = useMemo(() => filteredDispatch.reduce((s, r) => s + r.qty, 0), [filteredDispatch]);
 
+  // Inward filtered details
+  const filteredInward = useMemo(() => {
+    return (inwardDetailData || []).filter(r => inDateRange(r.updated_at, inwardRange));
+  }, [inwardDetailData, inwardRange]);
+
+  const inwardTotal = useMemo(() => filteredInward.reduce((s, r) => s + (r.net_weight || 0), 0), [filteredInward]);
+
   const formatWeight = (val: number) => `${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg`;
 
   const summaryCards = [
@@ -283,9 +360,14 @@ export default function InventorySummaryTab() {
     { label: 'FG Inventory', value: fgTotal, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-200 dark:border-green-800' },
   ];
 
+  const smallCards = [
+    { label: 'Scrap', value: scrapTotal, icon: Trash2, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-200 dark:border-orange-800' },
+    { label: 'Defective', value: defectiveTotal, icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-200 dark:border-red-800' },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Static summary cards */}
+      {/* Main summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {summaryCards.map((card) => (
           <Card key={card.label} className={cn("border", card.border, card.bg)}>
@@ -303,6 +385,84 @@ export default function InventorySummaryTab() {
           </Card>
         ))}
       </div>
+
+      {/* Smaller Scrap & Defective cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {smallCards.map((card) => (
+          <Card key={card.label} className={cn("border", card.border, card.bg)}>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <card.icon className={cn("h-4 w-4", card.color)} />
+                <div>
+                  <p className="text-[10px] text-muted-foreground">{card.label}</p>
+                  <p className={cn("text-sm font-semibold", card.color)}>{formatWeight(card.value)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Total Inward with date filter + expandable details */}
+      <Collapsible open={inwardOpen} onOpenChange={setInwardOpen}>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <ArrowDownToLine className="h-5 w-5 text-teal-600" />
+                <CardTitle className="text-base">Total Inward</CardTitle>
+                <span className="ml-auto text-xl font-bold text-teal-600">{formatWeight(inwardTotal)}</span>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", inwardOpen && "rotate-180")} />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <DateRangeFilter dateRange={inwardRange} setDateRange={setInwardRange} label="Period" />
+            </div>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              {filteredInward.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No inward records for selected period</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs font-semibold">Date</TableHead>
+                        <TableHead className="text-xs font-semibold">Batch #</TableHead>
+                        <TableHead className="text-xs font-semibold">Material</TableHead>
+                        <TableHead className="text-xs font-semibold">Dimensions</TableHead>
+                        <TableHead className="text-xs font-semibold">Make</TableHead>
+                        <TableHead className="text-xs font-semibold">Coating</TableHead>
+                        <TableHead className="text-xs font-semibold">Grade</TableHead>
+                        <TableHead className="text-xs font-semibold">Supplier</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Net Wt (kg)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredInward.map((r: any) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-xs">{format(new Date(r.updated_at), 'dd/MM/yy')}</TableCell>
+                          <TableCell className="text-xs font-mono">{r.batch_number}</TableCell>
+                          <TableCell className="text-xs">{r.material || '-'}</TableCell>
+                          <TableCell className="text-xs">{`${r.thickness ?? '-'} x ${r.width ?? '-'}`}</TableCell>
+                          <TableCell className="text-xs">{r.make || '-'}</TableCell>
+                          <TableCell className="text-xs">{r.coating || '-'}</TableCell>
+                          <TableCell className="text-xs">{r.grade || '-'}</TableCell>
+                          <TableCell className="text-xs">{r.purchase_from || '-'}</TableCell>
+                          <TableCell className="text-xs text-right font-medium">{(r.net_weight || 0).toLocaleString('en-IN')}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Production with date filter + expandable details */}
       <Collapsible open={prodOpen} onOpenChange={setProdOpen}>
