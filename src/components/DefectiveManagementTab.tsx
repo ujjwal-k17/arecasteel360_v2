@@ -2,12 +2,14 @@ import { useState, useMemo } from 'react';
 import { useAllBatches, useAllActions, getSKUKey, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useDefectiveSales, useInsertDefectiveSale } from '@/hooks/useScrapSales';
+import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChevronDown, ChevronRight, RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -27,8 +29,9 @@ export default function DefectiveManagementTab() {
   const queryClient = useQueryClient();
   const { data: actions } = useAllActions();
   const { data: defSales } = useDefectiveSales();
+  const { data: orders } = useOrders();
   const insertDefSale = useInsertDefectiveSale();
-  const [sellDialog, setSellDialog] = useState<{ defectType: string; batchIds: string[] } | null>(null);
+  const [sellDialog, setSellDialog] = useState<DefectiveBatchDetail | null>(null);
   const [saleForm, setSaleForm] = useState({ order_id: '', invoice_number: '', sales_date: '', quantity: '' });
   const [expandedType, setExpandedType] = useState<string | null>(null);
 
@@ -108,7 +111,7 @@ export default function DefectiveManagementTab() {
     if (!sellDialog) return;
     try {
       await insertDefSale.mutateAsync({
-        batch_id: sellDialog.batchIds[0] || null,
+        batch_id: sellDialog.source === 'coil' ? sellDialog.batchId : null,
         order_id: saleForm.order_id || null,
         invoice_number: saleForm.invoice_number || null,
         sales_date: saleForm.sales_date || null,
@@ -159,12 +162,11 @@ export default function DefectiveManagementTab() {
               <TableHead className="w-8"></TableHead>
               <TableHead className="text-xs font-semibold">Defect Type</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {defectTypeMap.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No defective material recorded.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No defective material recorded.</TableCell></TableRow>
             )}
             {defectTypeMap.map(r => {
               const isExpanded = expandedType === r.defectType;
@@ -174,15 +176,10 @@ export default function DefectiveManagementTab() {
                     <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell className="text-sm font-medium">{r.defectType}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{r.totalWeight.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(r); }}>
-                        Sell
-                      </Button>
-                    </TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${r.defectType}-detail`}>
-                      <TableCell colSpan={4} className="p-0">
+                      <TableCell colSpan={3} className="p-0">
                         <div className="bg-muted/10 border-t px-6 py-2">
                           <p className="text-xs font-semibold text-muted-foreground mb-1">Details</p>
                           <Table>
@@ -193,6 +190,7 @@ export default function DefectiveManagementTab() {
                                 <TableHead className="text-xs">SKU</TableHead>
                                 <TableHead className="text-xs">Net Wt (Kg)</TableHead>
                                 <TableHead className="text-xs">Date</TableHead>
+                                <TableHead className="text-xs">Action</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -203,6 +201,11 @@ export default function DefectiveManagementTab() {
                                   <TableCell className="text-xs">{bd.skuKey}</TableCell>
                                   <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
                                   <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
+                                  <TableCell>
+                                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(bd); }}>
+                                      Sell
+                                    </Button>
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -252,9 +255,24 @@ export default function DefectiveManagementTab() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Sell Defective Material</DialogTitle>
+            {sellDialog && <p className="text-xs text-muted-foreground mt-1">SKU: {sellDialog.skuKey} | {sellDialog.defectType}</p>}
           </DialogHeader>
           <div className="space-y-3">
-            <div><Label className="text-xs">Order ID</Label><Input value={saleForm.order_id} onChange={e => setSaleForm(v => ({ ...v, order_id: e.target.value }))} /></div>
+            <div>
+              <Label className="text-xs">Order ID</Label>
+              <Select value={saleForm.order_id} onValueChange={v => setSaleForm(f => ({ ...f, order_id: v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select order..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(orders || []).map((o: any) => (
+                    <SelectItem key={o.id} value={o.order_number}>
+                      {o.order_number} — {o.customers?.customer_name || ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
             <div><Label className="text-xs">Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
             <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={saleForm.quantity} onChange={e => setSaleForm(v => ({ ...v, quantity: e.target.value }))} /></div>
