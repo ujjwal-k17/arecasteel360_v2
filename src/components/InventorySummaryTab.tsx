@@ -289,7 +289,10 @@ export default function InventorySummaryTab() {
   const filteredDispatch = useMemo(() => {
     const orderMap = new Map<string, { order_number: string; customer_name: string }>();
     (ordersData || []).forEach((o: any) => {
-      orderMap.set(o.id, { order_number: o.order_number, customer_name: o.customers?.customer_name || '-' });
+      const entry = { order_number: o.order_number, customer_name: o.customers?.customer_name || '-' };
+      orderMap.set(o.id, entry);
+      // Also key by order_number since order_id in sales tables stores order_number text
+      if (o.order_number) orderMap.set(o.order_number, entry);
     });
 
     const records: Array<{
