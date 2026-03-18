@@ -141,8 +141,8 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
             </div>
           ) : (
             <div className="bg-muted/50 rounded-md p-3 text-sm">
-              <span className="text-muted-foreground">Sales Qty (full coil):</span>{' '}
-              <span className="font-semibold font-mono-num">{usableQty.toFixed(2)} Kg</span>
+              <span className="text-muted-foreground">Sales Qty (Net Weight):</span>{' '}
+              <span className="font-semibold font-mono-num">{packSaleQty.toFixed(2)} Kg</span>
             </div>
           )}
           <div>
