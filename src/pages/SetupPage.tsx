@@ -49,7 +49,9 @@ export default function SetupPage() {
           setLoading(false);
           return;
         }
-        toast.success('Admin account created! You can now sign in.');
+        // Sign out so user goes through proper login flow with role loaded
+        await supabase.auth.signOut();
+        toast.success('Admin account created! Please sign in.');
         navigate('/login');
       }
     } catch (err: any) {
