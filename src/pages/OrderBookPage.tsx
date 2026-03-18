@@ -42,6 +42,10 @@ export default function OrderBookPage() {
   const qc = useQueryClient();
   const insertOrder = useInsertOrder();
   const deleteOrderMutation = useDeleteOrder();
+  const { isAdmin } = useAuth();
+  const logAction = useActionLog();
+  const submitApproval = useSubmitApproval();
+  const { performAction } = useUndoAction();
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Filters
