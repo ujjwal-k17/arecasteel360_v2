@@ -29,8 +29,9 @@ export default function DefectiveManagementTab() {
   const queryClient = useQueryClient();
   const { data: actions } = useAllActions();
   const { data: defSales } = useDefectiveSales();
+  const { data: orders } = useOrders();
   const insertDefSale = useInsertDefectiveSale();
-  const [sellDialog, setSellDialog] = useState<{ defectType: string; batchIds: string[] } | null>(null);
+  const [sellDialog, setSellDialog] = useState<DefectiveBatchDetail | null>(null);
   const [saleForm, setSaleForm] = useState({ order_id: '', invoice_number: '', sales_date: '', quantity: '' });
   const [expandedType, setExpandedType] = useState<string | null>(null);
 
