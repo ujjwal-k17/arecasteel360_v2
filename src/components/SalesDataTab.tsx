@@ -294,6 +294,47 @@ export default function SalesDataTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">SKU</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
             </TableRow>
+            <TableRow className="bg-muted/30">
+              <TableHead className="p-1">
+                <Select value={filterInvoice} onValueChange={v => setFilterInvoice(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueInvoices.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">{/* date range filter above */}</TableHead>
+              <TableHead className="p-1">
+                <Select value={filterOrderId} onValueChange={v => setFilterOrderId(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[80px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueOrderIds.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">
+                <Select value={filterCustomer} onValueChange={v => setFilterCustomer(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueCustomers.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">
+                <Select value={filterProcess} onValueChange={v => setFilterProcess(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-7 text-xs w-full min-w-[80px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueProcesses.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="p-1">{/* SKU - no filter */}</TableHead>
+              <TableHead className="p-1">{/* Qty - no filter */}</TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSales.length === 0 && (
