@@ -266,7 +266,7 @@ export default function SalesDataTab() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Qty:</span>{' '}
           <span className="font-semibold font-mono-num">{totalQty.toFixed(2)} Kg</span>
@@ -275,6 +275,11 @@ export default function SalesDataTab() {
           <span className="text-muted-foreground">Records:</span>{' '}
           <span className="font-semibold">{filteredSales.length}</span>
         </div>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={clearColumnFilters}>
+            <X className="h-3 w-3" /> Clear filters
+          </Button>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-md border bg-card">
