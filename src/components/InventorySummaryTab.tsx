@@ -269,7 +269,16 @@ export default function InventorySummaryTab() {
     return d >= range.from && (!range.to || d <= range.to);
   };
 
-  // Production filtered details
+  // Also fetch WIP items for input dimensions when source is WIP
+  const { data: wipLookupData } = useQuery({
+    queryKey: ['summary-wip-lookup'],
+    queryFn: async () => {
+      const { data } = await supabase.from('wip_items').select('id, source_batch_id, thickness, width, length');
+      return data || [];
+    },
+  });
+
+  // Processing filtered details
   const filteredProduction = useMemo(() => {
     return (processingDetailData || []).filter(r => inDateRange(r.created_at, prodRange));
   }, [processingDetailData, prodRange]);
