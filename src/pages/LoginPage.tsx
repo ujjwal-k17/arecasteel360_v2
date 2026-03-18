@@ -23,8 +23,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if any admin exists, if not redirect to setup
-    supabase.from('user_roles').select('id').eq('role', 'admin').limit(1).then(({ data }) => {
-      if (!data || data.length === 0) {
+    supabase.rpc('admin_exists').then(({ data }) => {
+      if (!data) {
         navigate('/setup');
       }
     });
