@@ -2,9 +2,9 @@ import { useState, useMemo, useRef } from 'react';
 import { useOrders, useCustomers, useInsertOrder, useAllDispatches, useDeleteOrder } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2, Filter, X } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2, X, XCircle, RotateCcw } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import NewOrderDialog from '@/components/NewOrderDialog';
 import { parseOrderExcel, downloadOrdersExcel, generateOrderTemplate } from '@/lib/order-excel-utils';
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +31,8 @@ export default function OrderBookPage() {
   const [showNew, setShowNew] = useState(false);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [deleteOrder, setDeleteOrder] = useState<any>(null);
+  const [closeOrder, setCloseOrder] = useState<any>(null);
+  const [reopenOrder, setReopenOrder] = useState<any>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const qc = useQueryClient();
   const insertOrder = useInsertOrder();
@@ -60,6 +63,17 @@ export default function OrderBookPage() {
         return { from: undefined, to: undefined };
     }
   }, [datePreset, customFrom, customTo]);
+
+  // Close/Reopen order mutations
+  const updateOrderStatus = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
 
   // Fetch coil sales
   const { data: coilSales } = useQuery({
@@ -156,15 +170,17 @@ export default function OrderBookPage() {
     return rows;
   };
 
-  // Filtered orders
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-    return orders.filter((o: any) => {
+  // Split orders into open and closed
+  const openOrders = useMemo(() => (orders || []).filter((o: any) => o.status !== 'closed'), [orders]);
+  const closedOrders = useMemo(() => (orders || []).filter((o: any) => o.status === 'closed'), [orders]);
+
+  // Apply filters to a list of orders
+  const applyFilters = (orderList: any[]) => {
+    return orderList.filter((o: any) => {
       if (filterOrderId && !o.order_number?.toLowerCase().includes(filterOrderId.toLowerCase())) return false;
       if (filterPoNumber && !(o.po_number || '').toLowerCase().includes(filterPoNumber.toLowerCase())) return false;
       if (filterCustomer && !(o.customers as any)?.customer_name?.toLowerCase().includes(filterCustomer.toLowerCase())) return false;
       if (filterOrderDate && !(o.order_date || '').includes(filterOrderDate)) return false;
-      // Date range filter
       if (dateRange.from || dateRange.to) {
         const od = o.order_date ? new Date(o.order_date) : null;
         if (!od) return false;
@@ -173,18 +189,21 @@ export default function OrderBookPage() {
       }
       return true;
     });
-  }, [orders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
+  };
+
+  const filteredOpenOrders = useMemo(() => applyFilters(openOrders), [openOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
+  const filteredClosedOrders = useMemo(() => applyFilters(closedOrders), [closedOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
 
   // Summary totals
   const summaryTotals = useMemo(() => {
     let totalOrder = 0, totalDispatch = 0;
-    for (const o of filteredOrders) {
+    for (const o of filteredOpenOrders) {
       const t = getOrderTotals(o);
       totalOrder += t.total;
       totalDispatch += t.dispatched;
     }
     return { totalOrder, totalDispatch, totalBalance: totalOrder - totalDispatch };
-  }, [filteredOrders, salesByOrder]);
+  }, [filteredOpenOrders, salesByOrder]);
 
   const hasFilters = filterOrderId || filterPoNumber || filterCustomer || filterOrderDate;
   const clearFilters = () => {
@@ -223,6 +242,143 @@ export default function OrderBookPage() {
       toast.error(err.message || 'Failed to parse Excel');
     }
     e.target.value = '';
+  };
+
+  const renderFilterHeaders = () => (
+    <TableRow>
+      <TableHead className="w-8"></TableHead>
+      <TableHead>
+        <div className="space-y-1">
+          <span>Order ID</span>
+          <Input placeholder="Filter..." value={filterOrderId} onChange={e => setFilterOrderId(e.target.value)} className="h-7 text-xs" />
+        </div>
+      </TableHead>
+      <TableHead>
+        <div className="space-y-1">
+          <span>PO Number</span>
+          <Input placeholder="Filter..." value={filterPoNumber} onChange={e => setFilterPoNumber(e.target.value)} className="h-7 text-xs" />
+        </div>
+      </TableHead>
+      <TableHead>
+        <div className="space-y-1">
+          <span>Customer Name</span>
+          <Input placeholder="Filter..." value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} className="h-7 text-xs" />
+        </div>
+      </TableHead>
+      <TableHead>
+        <div className="space-y-1">
+          <span>Order Date</span>
+          <Input placeholder="YYYY-MM-DD" value={filterOrderDate} onChange={e => setFilterOrderDate(e.target.value)} className="h-7 text-xs" />
+        </div>
+      </TableHead>
+      <TableHead className="text-right">Total Order Qty (Kg)</TableHead>
+      <TableHead className="text-right">Dispatch Qty (Kg)</TableHead>
+      <TableHead className="text-right">Balance Qty (Kg)</TableHead>
+      <TableHead className="text-right">
+        Actions
+        {hasFilters && (
+          <Button variant="ghost" size="sm" className="ml-1 h-6 px-1 text-xs" onClick={clearFilters}>
+            <X className="h-3 w-3 mr-0.5" /> Clear
+          </Button>
+        )}
+      </TableHead>
+    </TableRow>
+  );
+
+  const renderSubRows = (o: any) => {
+    const subRows = getSubRows(o);
+    if (subRows.length === 0) return null;
+    return (
+      <TableRow key={`${o.id}-sub`}>
+        <TableCell colSpan={9} className="p-0 bg-muted/20">
+          <div className="px-8 py-2">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">SKU</TableHead>
+                  <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
+                  <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
+                  <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {subRows.filter(r => !r.isExtra).map(row => (
+                  <TableRow key={row.key}>
+                    <TableCell className="text-xs">{row.label}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+                {subRows.some(r => r.isExtra) && (
+                  <>
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
+                        Additional dispatches (not in order)
+                      </TableCell>
+                    </TableRow>
+                    {subRows.filter(r => r.isExtra).map(row => (
+                      <TableRow key={row.key}>
+                        <TableCell className="text-xs">
+                          {row.label}
+                          <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">New</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
+                        <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
+  const renderOrderRow = (o: any, mode: 'open' | 'closed') => {
+    const totals = getOrderTotals(o);
+    const isExpanded = expanded.has(o.id);
+    return (
+      <>
+        <TableRow key={o.id} className="cursor-pointer" onClick={() => toggleExpand(o.id)}>
+          <TableCell className="w-8 px-2">
+            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </TableCell>
+          <TableCell className="font-mono text-xs">{o.order_number}</TableCell>
+          <TableCell className="text-xs">{o.po_number || '-'}</TableCell>
+          <TableCell>{(o.customers as any)?.customer_name || '-'}</TableCell>
+          <TableCell className="text-xs">{o.order_date || '-'}</TableCell>
+          <TableCell className="text-right font-mono">{totals.total.toFixed(2)}</TableCell>
+          <TableCell className="text-right font-mono">{totals.dispatched.toFixed(2)}</TableCell>
+          <TableCell className="text-right font-mono">{totals.balance.toFixed(2)}</TableCell>
+          <TableCell className="text-right">
+            <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
+              {mode === 'open' ? (
+                <>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditOrder(o); setShowNew(true); }} title="Edit">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:text-amber-700" onClick={() => setCloseOrder(o)} title="Close Order">
+                    <XCircle className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteOrder(o)} title="Delete">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              ) : (
+                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-green-600 hover:text-green-700" onClick={() => setReopenOrder(o)} title="Re-open Order">
+                  <RotateCcw className="h-3.5 w-3.5" /> Re-open
+                </Button>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+        {isExpanded && renderSubRows(o)}
+      </>
+    );
   };
 
   return (
@@ -316,139 +472,57 @@ export default function OrderBookPage() {
         </Card>
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8"></TableHead>
-              <TableHead>
-                <div className="space-y-1">
-                  <span>Order ID</span>
-                  <Input placeholder="Filter..." value={filterOrderId} onChange={e => setFilterOrderId(e.target.value)} className="h-7 text-xs" />
-                </div>
-              </TableHead>
-              <TableHead>
-                <div className="space-y-1">
-                  <span>PO Number</span>
-                  <Input placeholder="Filter..." value={filterPoNumber} onChange={e => setFilterPoNumber(e.target.value)} className="h-7 text-xs" />
-                </div>
-              </TableHead>
-              <TableHead>
-                <div className="space-y-1">
-                  <span>Customer Name</span>
-                  <Input placeholder="Filter..." value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} className="h-7 text-xs" />
-                </div>
-              </TableHead>
-              <TableHead>
-                <div className="space-y-1">
-                  <span>Order Date</span>
-                  <Input placeholder="YYYY-MM-DD" value={filterOrderDate} onChange={e => setFilterOrderDate(e.target.value)} className="h-7 text-xs" />
-                </div>
-              </TableHead>
-              <TableHead className="text-right">Total Order Qty (Kg)</TableHead>
-              <TableHead className="text-right">Dispatch Qty (Kg)</TableHead>
-              <TableHead className="text-right">Balance Qty (Kg)</TableHead>
-              <TableHead className="text-right">
-                Actions
-                {hasFilters && (
-                  <Button variant="ghost" size="sm" className="ml-1 h-6 px-1 text-xs" onClick={clearFilters}>
-                    <X className="h-3 w-3 mr-0.5" /> Clear
-                  </Button>
-                )}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
-            ) : filteredOrders.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No orders found</TableCell></TableRow>
-            ) : filteredOrders.map((o: any) => {
-              const totals = getOrderTotals(o);
-              const isExpanded = expanded.has(o.id);
-              const subRows = isExpanded ? getSubRows(o) : [];
-              return (
-                <> 
-                  <TableRow key={o.id} className="cursor-pointer" onClick={() => toggleExpand(o.id)}>
-                    <TableCell className="w-8 px-2">
-                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{o.order_number}</TableCell>
-                    <TableCell className="text-xs">{o.po_number || '-'}</TableCell>
-                    <TableCell>{(o.customers as any)?.customer_name || '-'}</TableCell>
-                    <TableCell className="text-xs">{o.order_date || '-'}</TableCell>
-                    <TableCell className="text-right font-mono">{totals.total.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">{totals.dispatched.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">{totals.balance.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditOrder(o); setShowNew(true); }} title="Edit">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteOrder(o)} title="Delete">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {isExpanded && subRows.length > 0 && (
-                    <TableRow key={`${o.id}-sub`}>
-                      <TableCell colSpan={9} className="p-0 bg-muted/20">
-                        <div className="px-8 py-2">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="text-xs">SKU</TableHead>
-                                <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
-                                <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
-                                <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {subRows.filter(r => !r.isExtra).map(row => (
-                                <TableRow key={row.key}>
-                                  <TableCell className="text-xs">{row.label}</TableCell>
-                                  <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
-                                  <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
-                                  <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
-                                </TableRow>
-                              ))}
-                              {subRows.some(r => r.isExtra) && (
-                                <>
-                                  <TableRow>
-                                    <TableCell colSpan={4} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
-                                      Additional dispatches (not in order)
-                                    </TableCell>
-                                  </TableRow>
-                                  {subRows.filter(r => r.isExtra).map(row => (
-                                    <TableRow key={row.key}>
-                                      <TableCell className="text-xs">
-                                        {row.label}
-                                        <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">New</Badge>
-                                      </TableCell>
-                                      <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
-                                      <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
-                                      <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </>
-                              )}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Tabs for Open / Closed Orders */}
+      <Tabs defaultValue="open">
+        <TabsList>
+          <TabsTrigger value="open" className="gap-1.5">
+            Open Orders
+            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{filteredOpenOrders.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="closed" className="gap-1.5">
+            Closed Orders
+            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{filteredClosedOrders.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="open">
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                {renderFilterHeaders()}
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
+                ) : filteredOpenOrders.length === 0 ? (
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No open orders found</TableCell></TableRow>
+                ) : filteredOpenOrders.map((o: any) => renderOrderRow(o, 'open'))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="closed">
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                {renderFilterHeaders()}
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>
+                ) : filteredClosedOrders.length === 0 ? (
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No closed orders</TableCell></TableRow>
+                ) : filteredClosedOrders.map((o: any) => renderOrderRow(o, 'closed'))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <NewOrderDialog open={showNew} onOpenChange={setShowNew} editOrder={editOrder} />
 
+      {/* Delete confirmation */}
       <AlertDialog open={!!deleteOrder} onOpenChange={(open) => { if (!open) setDeleteOrder(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -472,6 +546,62 @@ export default function OrderBookPage() {
               }}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Close order confirmation */}
+      <AlertDialog open={!!closeOrder} onOpenChange={(open) => { if (!open) setCloseOrder(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to close order <strong>{closeOrder?.order_number}</strong>? It will be moved to the Closed Orders tab. You can re-open it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                try {
+                  await updateOrderStatus.mutateAsync({ orderId: closeOrder.id, status: 'closed' });
+                  toast.success(`Order ${closeOrder.order_number} closed`);
+                  setCloseOrder(null);
+                } catch (e: any) {
+                  toast.error(e.message || 'Failed to close order');
+                }
+              }}
+            >
+              Close Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Re-open order confirmation */}
+      <AlertDialog open={!!reopenOrder} onOpenChange={(open) => { if (!open) setReopenOrder(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-open Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to re-open order <strong>{reopenOrder?.order_number}</strong>? It will be moved back to Open Orders.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                try {
+                  await updateOrderStatus.mutateAsync({ orderId: reopenOrder.id, status: 'open' });
+                  toast.success(`Order ${reopenOrder.order_number} re-opened`);
+                  setReopenOrder(null);
+                } catch (e: any) {
+                  toast.error(e.message || 'Failed to re-open order');
+                }
+              }}
+            >
+              Re-open
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
