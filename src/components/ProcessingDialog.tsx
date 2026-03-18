@@ -209,6 +209,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           outputItems = autoCalcSlitWidths.map(s => ({ width: Number(s.width), qty_kg: Number(s.qty) }));
         } else if (processType === 'CTL') {
           outputItems = ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) }));
+        } else if (processType === 'Profile' || processType === 'GC') {
+          outputItems = [{ qty_kg: Number(profileGcQty) }];
         }
 
         await insertProcessing.mutateAsync({
