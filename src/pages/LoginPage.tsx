@@ -21,12 +21,23 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      // Check IP first
-      const { data: ipData } = await supabase.functions.invoke('check-ip');
-      if (ipData && !ipData.allowed) {
-        toast.error('Access denied: Your network is not authorized to access this application.');
-        setLoading(false);
-        return;
+      // Check IP - use fetch directly since user isn't authenticated yet
+      try {
+        const ipRes = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-ip`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+          }
+        );
+        const ipData = await ipRes.json();
+        if (ipData && !ipData.allowed) {
+          toast.error('Access denied: Your network is not authorized to access this application.');
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // If IP check fails, allow login (graceful degradation)
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email, password });
