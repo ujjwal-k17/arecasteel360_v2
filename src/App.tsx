@@ -16,6 +16,8 @@ import AdminPage from "./pages/AdminPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
+import SetupPage from "./pages/SetupPage";
+
 const queryClient = new QueryClient();
 
 const App = () => (

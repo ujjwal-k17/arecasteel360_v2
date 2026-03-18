@@ -960,6 +960,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      setup_first_admin: { Args: { admin_user_id: string }; Returns: undefined }
       upsert_sku: {
         Args: {
           p_coating: string
