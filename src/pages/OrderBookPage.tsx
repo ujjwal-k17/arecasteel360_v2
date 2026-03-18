@@ -18,6 +18,18 @@ import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useActionLog, useSubmitApproval } from '@/hooks/useActionLog';
+import { useUndoAction } from '@/hooks/useUndoAction';
+import { getSkuLabel } from '@/lib/sku-utils';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const skuKey = (item: { material?: string | null; thickness?: number | null; width?: number | null; length?: number | null; coating?: string | null; grade?: string | null }) =>
   [item.material || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].join('|');
