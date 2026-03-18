@@ -16,7 +16,7 @@ const Index = () => {
     <div className="container py-6">
       <Tabs defaultValue="summary">
         <TabsList className="mb-6 h-auto gap-1 bg-transparent p-0 flex flex-wrap">
-          <TabsTrigger value="summary" className={tabClass}>
+          <TabsTrigger value="summary" className="gap-2 text-xs sm:text-sm rounded-lg border-2 border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-2 shadow-sm text-indigo-700 dark:text-indigo-300 font-semibold data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:border-indigo-600 data-[state=active]:shadow-md transition-all">
             <LayoutGrid className="h-4 w-4" /> Summary
           </TabsTrigger>
           <TabsTrigger value="in-transit" className={tabClass}>
