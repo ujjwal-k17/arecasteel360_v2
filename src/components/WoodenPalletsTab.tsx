@@ -41,6 +41,7 @@ interface PalletConsumption {
 
 export default function WoodenPalletsTab() {
   const queryClient = useQueryClient();
+  const { data: orders } = useOrders();
   const fileRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sizeFilter, setSizeFilter] = useState<string>('all');
