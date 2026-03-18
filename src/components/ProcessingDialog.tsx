@@ -41,6 +41,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const [slitWidths, setSlitWidths] = useState<{ width: string; qty: string }[]>([]);
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
   const [profileGcQty, setProfileGcQty] = useState('');
+  const [slitProcessQty, setSlitProcessQty] = useState('');
   const [trimOption, setTrimOption] = useState<'yes' | 'no' | ''>('');
 
   // Inline scrap & defective state
@@ -71,6 +72,9 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     setDefectEntries(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d));
   };
 
+  // Effective slit processing qty: user-entered or fallback to auto processingQty
+  const effectiveSlitProcessQty = slitProcessQty ? Number(slitProcessQty) : processingQty;
+
   // Auto-calculate slit quantities when widths change
   const autoCalcSlitWidths = useMemo(() => {
     if (processType !== 'Slit' || coilWidth <= 0) return slitWidths;
@@ -79,22 +83,20 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       const w = Number(s.width) || 0;
       if (w <= 0) return s;
       if (trimOption === 'no' && sumWidths > 0) {
-        // No trim: divide processing qty by ratio of widths
-        const autoQty = (processingQty * w) / sumWidths;
+        const autoQty = (effectiveSlitProcessQty * w) / sumWidths;
         return { ...s, qty: autoQty.toFixed(2) };
       }
-      // Trim = yes (default): use coil width ratio
-      const autoQty = (processingQty * w) / coilWidth;
+      const autoQty = (effectiveSlitProcessQty * w) / coilWidth;
       return { ...s, qty: autoQty.toFixed(2) };
     });
-  }, [slitWidths.map(s => s.width).join(','), processingQty, coilWidth, processType, trimOption]);
+  }, [slitWidths.map(s => s.width).join(','), effectiveSlitProcessQty, coilWidth, processType, trimOption]);
 
   // Trim qty for slit
   const trimQty = useMemo(() => {
     if (processType !== 'Slit' || coilWidth <= 0 || trimOption === 'no') return 0;
     const sumWidths = slitWidths.reduce((s, w) => s + (Number(w.width) || 0), 0);
-    return (processingQty * (coilWidth - sumWidths)) / coilWidth;
-  }, [slitWidths.map(s => s.width).join(','), processingQty, coilWidth, processType, trimOption]);
+    return (effectiveSlitProcessQty * (coilWidth - sumWidths)) / coilWidth;
+  }, [slitWidths.map(s => s.width).join(','), effectiveSlitProcessQty, coilWidth, processType, trimOption]);
 
   const totalOutputQty = useMemo(() => {
     if (processType === 'Slit') {
@@ -217,7 +219,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           batchId: batch.id,
           processType,
           outputType: effectiveOutputType,
-          inputQty: processingQty,
+          inputQty: processType === 'Slit' ? effectiveSlitProcessQty : processingQty,
           orderId: '',
           outputItems,
           batch,
@@ -343,7 +345,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           {/* Process Type */}
           <div>
             <Label className="text-xs">Process</Label>
-            <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); setTrimOption(''); setProfileGcQty(''); if (v === 'Slit') setOutputType(''); else setOutputType('FG'); }}>
+            <Select value={processType} onValueChange={v => { setProcessType(v); setNumSizes(''); setSlitWidths([]); setCtlLengths([]); setTrimOption(''); setProfileGcQty(''); setSlitProcessQty(''); if (v === 'Slit') setOutputType(''); else setOutputType('FG'); }}>
               <SelectTrigger><SelectValue placeholder="Select process" /></SelectTrigger>
               <SelectContent>
                 {PROCESSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -381,6 +383,10 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           {/* Slit-specific inputs */}
           {processType === 'Slit' && (
             <div className="space-y-3 border rounded-md p-3">
+              <div>
+                <Label className="text-xs">Process Qty (Kg)</Label>
+                <Input type="number" value={slitProcessQty} onChange={e => setSlitProcessQty(e.target.value)} placeholder={processingQty.toFixed(2)} />
+              </div>
               <div>
                 <Label className="text-xs"># of Sizes</Label>
                 <Input type="number" value={numSizes} onChange={e => handleNumSizesChange(e.target.value)} className="w-24" />
