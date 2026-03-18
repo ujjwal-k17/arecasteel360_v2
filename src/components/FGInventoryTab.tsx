@@ -186,15 +186,18 @@ export default function FGInventoryTab() {
   }), [items]);
 
   const filteredItems = useMemo(() => {
-    return items.filter(i =>
-      (filterMaterial === 'all' || (i.material || '-') === filterMaterial) &&
-      (filterMake === 'all' || (i.make || '-') === filterMake) &&
-      (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
-      (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
-      (filterGrade === 'all' || (i.grade || '-') === filterGrade) &&
-      (filterDimension === 'all' || getDimLabel(i) === filterDimension)
-    );
-  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension]);
+    return items.filter(i => {
+      const availQty = getAvailableQty(i);
+      if (fgView === 'open' && availQty <= 0) return false;
+      if (fgView === 'closed' && availQty > 0) return false;
+      return (filterMaterial === 'all' || (i.material || '-') === filterMaterial) &&
+        (filterMake === 'all' || (i.make || '-') === filterMake) &&
+        (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
+        (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
+        (filterGrade === 'all' || (i.grade || '-') === filterGrade) &&
+        (filterDimension === 'all' || getDimLabel(i) === filterDimension);
+    });
+  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
 
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
