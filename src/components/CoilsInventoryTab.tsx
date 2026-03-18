@@ -72,7 +72,7 @@ export default function CoilsInventoryTab() {
   const { performAction } = useUndoAction();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
-  const updateBatch = useUpdateBatch();
+  
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
