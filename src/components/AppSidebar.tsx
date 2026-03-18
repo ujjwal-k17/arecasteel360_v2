@@ -1,6 +1,7 @@
-import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard } from 'lucide-react';
+import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard, Settings, LogOut } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import arecaLogo from '@/assets/areca-steel-logo.png';
 import {
   Sidebar,
@@ -11,24 +12,29 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
 
 const modules = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard },
-  { title: 'Inventory', url: '/inventory', icon: Package },
-  { title: 'Consumables', url: '/consumables', icon: Wrench },
-  { title: 'Order Book', url: '/order-book', icon: ClipboardList },
-  { title: 'Working Capital', url: '/working-capital', icon: Wallet },
-  { title: 'Freight & Job Work', url: '/freight-jobwork', icon: Truck },
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard, page: 'dashboard' },
+  { title: 'Inventory', url: '/inventory', icon: Package, page: 'inventory' },
+  { title: 'Consumables', url: '/consumables', icon: Wrench, page: 'consumables' },
+  { title: 'Order Book', url: '/order-book', icon: ClipboardList, page: 'order-book' },
+  { title: 'Working Capital', url: '/working-capital', icon: Wallet, page: 'working-capital' },
+  { title: 'Freight & Job Work', url: '/freight-jobwork', icon: Truck, page: 'freight-jobwork' },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
+  const { isAdmin, canView, signOut, user } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+
+  const visibleModules = modules.filter(m => isAdmin || canView(m.page));
 
   return (
     <Sidebar collapsible="icon">
@@ -46,7 +52,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {modules.map((item) => (
+              {visibleModules.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -65,10 +71,43 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive('/admin')}
+                    tooltip="Admin"
+                  >
+                    <NavLink
+                      to="/admin"
+                      end
+                      className="hover:bg-sidebar-accent/50"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    >
+                      <Settings className="h-4 w-4" />
+                      {!collapsed && <span>Admin</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-2 border-t border-sidebar-border">
+        {!collapsed && user && (
+          <p className="text-[10px] text-sidebar-foreground/50 truncate px-2 mb-1">{user.email}</p>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground"
+          onClick={signOut}
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          {!collapsed && <span>Sign Out</span>}
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }
