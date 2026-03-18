@@ -510,7 +510,7 @@ export default function InventorySummaryTab() {
                         <TableHead className="text-xs font-semibold">Material</TableHead>
                         <TableHead className="text-xs font-semibold">Input Dimensions</TableHead>
                         <TableHead className="text-xs font-semibold">Output Dimensions</TableHead>
-                        <TableHead className="text-xs font-semibold">Order</TableHead>
+                        
                         <TableHead className="text-xs font-semibold text-right">Input Qty (kg)</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -545,7 +545,7 @@ export default function InventorySummaryTab() {
                             <TableCell className="text-xs">{batch?.material || '-'}</TableCell>
                             <TableCell className="text-xs">{inputDims}</TableCell>
                             <TableCell className="text-xs">{outputDims}</TableCell>
-                            <TableCell className="text-xs">{r.order_id || '-'}</TableCell>
+                            
                             <TableCell className="text-xs text-right font-medium">{(r.input_qty || 0).toLocaleString('en-IN')}</TableCell>
                           </TableRow>
                         );
