@@ -43,7 +43,7 @@ export function AppSidebar() {
           <img src={arecaLogo} alt="Areca Steel" className="h-8 shrink-0" />
           {!collapsed && (
             <span className="text-xs text-sidebar-foreground/60 whitespace-nowrap">
-              Inventory Management
+              ArecaSteel 360
             </span>
           )}
         </div>
