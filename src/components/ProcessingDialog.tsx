@@ -95,7 +95,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const trimQty = useMemo(() => {
     if (processType !== 'Slit' || coilWidth <= 0 || trimOption === 'no') return 0;
     const sumWidths = slitWidths.reduce((s, w) => s + (Number(w.width) || 0), 0);
-    return (effectiveSlitProcessQty * (coilWidth - sumWidths)) / coilWidth;
+    return (effectiveSlitProcessQty * (coilWidth + 5 - sumWidths)) / coilWidth;
   }, [slitWidths.map(s => s.width).join(','), effectiveSlitProcessQty, coilWidth, processType, trimOption]);
 
   const totalOutputQty = useMemo(() => {
