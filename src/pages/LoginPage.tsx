@@ -77,7 +77,7 @@ export default function LoginPage() {
             <img src={arecaLogo} alt="Areca Steel" className="h-12" />
           </div>
           <CardTitle className="text-xl">Sign In</CardTitle>
-          <p className="text-sm text-muted-foreground">Inventory Management System</p>
+          <p className="text-sm text-muted-foreground">ArecaSteel 360</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
