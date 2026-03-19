@@ -39,7 +39,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2 overflow-hidden">
+        <div className="flex flex-col items-center gap-1 overflow-hidden">
           <img src={arecaLogo} alt="Areca Steel" className="h-8 shrink-0" />
           {!collapsed && (
             <span className="text-xs text-sidebar-foreground/60 whitespace-nowrap">
