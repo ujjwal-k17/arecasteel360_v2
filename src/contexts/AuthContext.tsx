@@ -58,25 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissions((perms as UserPermission[]) || []);
   };
 
-  const checkIpAllowed = async (): Promise<boolean> => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-ip`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        }
-      );
-      const data = await res.json();
-      return data?.allowed !== false;
-    } catch {
-      // If IP check fails, allow access (graceful degradation)
-      return true;
-    }
-  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
