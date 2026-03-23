@@ -77,15 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Then get initial session and check IP
-    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+    // Then get initial session
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (s?.user) {
-        const ipAllowed = await checkIpAllowed();
-        if (!ipAllowed) {
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
         setSession(s);
         setUser(s.user);
         fetchUserData(s.user.id);
