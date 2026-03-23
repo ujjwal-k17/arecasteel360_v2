@@ -86,17 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          // Check IP on every auth state change
-          const ipAllowed = await checkIpAllowed();
-          if (!ipAllowed) {
-            await supabase.auth.signOut();
-            setUser(null);
-            setSession(null);
-            setIsAdmin(false);
-            setPermissions([]);
-            setLoading(false);
-            return;
-          }
           // Use setTimeout to avoid deadlocks with Supabase client
           setTimeout(() => fetchUserData(newSession.user.id), 0);
         } else {
@@ -107,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Then get initial session
+    // Then get initial session and check IP
     supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       if (s?.user) {
         const ipAllowed = await checkIpAllowed();
