@@ -1,0 +1,1 @@
+ALTER TABLE public.batches ADD CONSTRAINT batches_batch_number_unique UNIQUE (batch_number);
