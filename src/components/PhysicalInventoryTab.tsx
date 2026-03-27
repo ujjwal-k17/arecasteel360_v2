@@ -489,7 +489,7 @@ export default function PhysicalInventoryTab() {
               ))}
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setAddMode(null)}>← Back</Button>
-                <Button onClick={handleAddNew} disabled={!isNewBatchValid()}>Add Batch</Button>
+                <Button onClick={handleAddNew} disabled={!isNewBatchValid() || insertBatches.isPending}>Add Batch</Button>
               </DialogFooter>
             </div>
           )}
