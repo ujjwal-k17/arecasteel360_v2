@@ -72,6 +72,7 @@ export default function CoilsInventoryTab() {
   const { performAction } = useUndoAction();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
+  const updateBatch = useUpdateBatch();
   
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
@@ -500,6 +501,17 @@ export default function CoilsInventoryTab() {
                                         </Button>
                                         <Button size="sm" variant="ghost" className="text-xs h-7 text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteBatch(b); }} title="Delete Batch">
                                           <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="text-xs h-7 text-warning" onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (!confirm(`Move batch ${b.batch_number} back to In-Transit?`)) return;
+                                          try {
+                                            await updateBatch.mutateAsync({ id: b.id, status: 'in-transit' } as any);
+                                            toast.success(`Batch ${b.batch_number} moved to In-Transit`);
+                                            queryClient.invalidateQueries({ queryKey: ['batches'] });
+                                          } catch { toast.error('Failed to move batch'); }
+                                        }} title="Move to In-Transit">
+                                          <Undo2 className="h-3.5 w-3.5" />
                                         </Button>
                                       </div>
                                     </TableCell>
