@@ -9,10 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Download, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Download, Trash2, Undo2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActionLog, useSubmitApproval } from '@/hooks/useActionLog';
-import { useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
+import { useDeleteBatch, useBulkDeleteBatches, useUpdateBatch } from '@/hooks/useBatches';
 import { useUndoAction } from '@/hooks/useUndoAction';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
@@ -43,7 +43,7 @@ const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_wei
 
 const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
   'batch_number', 'material', 'make', 'thickness', 'width',
-  'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number',
+  'coating', 'grade', 'gross_weight', 'net_weight',
   'purchase_date', 'purchase_from',
 ];
 

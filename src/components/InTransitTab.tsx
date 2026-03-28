@@ -63,7 +63,7 @@ export default function InTransitTab() {
 
   const uniqueValues = useMemo(() => {
     if (!batches) return {} as Record<string, string[]>;
-    const fields = ['material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
+    const fields = ['batch_number', 'material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
       const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
@@ -175,7 +175,7 @@ export default function InTransitTab() {
   };
 
   const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
-  const filterableFields = ['material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
+  const filterableFields = ['batch_number', 'material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
     const val = String((editValues as any)[field] ?? '');
@@ -348,8 +348,7 @@ export default function InTransitTab() {
                     <TableCell>
                       <Badge
                         variant={b.status === 'received' ? 'default' : 'secondary'}
-                        className={`${!isReceived ? 'cursor-pointer' : ''} ${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
-                        onClick={() => !isReceived && toggleStatus(b)}
+                        className={`${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
                       >
                         {b.status === 'received' ? 'Received' : 'In-Transit'}
                       </Badge>
