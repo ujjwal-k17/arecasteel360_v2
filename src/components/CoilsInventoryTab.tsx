@@ -709,7 +709,7 @@ export default function CoilsInventoryTab() {
 
       {/* Add Item Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Add New Item</DialogTitle></DialogHeader>
           {!addMode ? (
             <div className="flex flex-col gap-3">
