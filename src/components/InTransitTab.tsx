@@ -126,7 +126,7 @@ export default function InTransitTab() {
         batch_number: r.batch_number, material: r.material || null, make: r.make || null,
         thickness: r.thickness || null, width: r.width || null,
         length: r.length != null ? String(r.length) : null,
-        coating: r.coating || null, grade: r.grade || null, gsm: r.gsm || null,
+        coating: r.coating || null, grade: r.grade || null, form: r.form || null,
         gross_weight: r.gross_weight || null, net_weight: r.net_weight || null,
         coil_number: r.coil_number || null, purchase_date: r.purchase_date || null, purchase_from: r.purchase_from || null,
       })));

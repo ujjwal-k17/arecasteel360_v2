@@ -33,9 +33,7 @@ const COLUMN_MAP: Record<string, keyof BatchExcelRow> = {
   'length': 'length',
   'coating': 'coating',
   'grade': 'grade',
-  'gsm': 'gsm',
-  'colour': 'colour',
-  'color': 'colour',
+  'form': 'form',
   'gross weight': 'gross_weight',
   'gross_weight': 'gross_weight',
   'grossweight': 'gross_weight',
@@ -63,7 +61,7 @@ const COLUMN_MAP: Record<string, keyof BatchExcelRow> = {
   'vendor': 'purchase_from',
 };
 
-const NUMERIC_FIELDS: (keyof BatchExcelRow)[] = ['thickness', 'width', 'length', 'gsm', 'gross_weight', 'net_weight'];
+const NUMERIC_FIELDS: (keyof BatchExcelRow)[] = ['thickness', 'width', 'length', 'gross_weight', 'net_weight'];
 
 function normalizeHeader(header: unknown): string {
   if (!header) return '';
