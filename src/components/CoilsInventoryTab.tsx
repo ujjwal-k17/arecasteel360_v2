@@ -728,15 +728,28 @@ export default function CoilsInventoryTab() {
                   const isDuplicate = existingBatchNumbers.has(b.batch_number);
                   return (
                     <div key={b.id}
-                      className={`flex items-center gap-2 p-2 border rounded ${isDuplicate ? 'opacity-50 cursor-not-allowed border-destructive/30' : !complete ? 'opacity-70 cursor-not-allowed border-warning/30' : selectedImportIds.has(b.id) ? 'bg-primary/10 border-primary cursor-pointer' : 'hover:bg-muted/30 cursor-pointer'}`}
+                      className={`flex flex-col gap-1 p-2.5 border rounded ${isDuplicate ? 'opacity-50 cursor-not-allowed border-destructive/30' : !complete ? 'opacity-70 cursor-not-allowed border-warning/30' : selectedImportIds.has(b.id) ? 'bg-primary/10 border-primary cursor-pointer' : 'hover:bg-muted/30 cursor-pointer'}`}
                       onClick={() => { if (complete && !isDuplicate) toggleImportSelection(b.id); }}>
-                      <input type="checkbox" checked={selectedImportIds.has(b.id)} readOnly className="accent-primary" disabled={!complete || isDuplicate} />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium">{b.batch_number} — {b.material} {b.make}</span>
-                        {isDuplicate && <p className="text-xs text-destructive">Duplicate — already in inventory</p>}
-                        {!complete && !isDuplicate && <p className="text-xs text-warning">Missing: {missing.join(', ')}</p>}
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" checked={selectedImportIds.has(b.id)} readOnly className="accent-primary" disabled={!complete || isDuplicate} />
+                        <span className="text-sm font-semibold">{b.batch_number}</span>
+                        <span className="ml-auto text-xs text-muted-foreground font-mono-num">{b.net_weight} Kg</span>
                       </div>
-                      <span className="text-xs text-muted-foreground font-mono-num">{b.net_weight} Kg</span>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-6 text-xs text-muted-foreground">
+                        {b.material && <span><strong>Material:</strong> {b.material}</span>}
+                        {b.make && <span><strong>Make:</strong> {b.make}</span>}
+                        {(b as any).form && <span><strong>Form:</strong> {(b as any).form}</span>}
+                        {b.thickness && <span><strong>Thickness:</strong> {b.thickness}mm</span>}
+                        {b.width && <span><strong>Width:</strong> {b.width}</span>}
+                        {b.length && <span><strong>Length:</strong> {b.length}</span>}
+                        {b.coating && <span><strong>Coating:</strong> {b.coating}</span>}
+                        {b.grade && <span><strong>Grade:</strong> {b.grade}</span>}
+                        {b.gross_weight && <span><strong>Gross Wt:</strong> {b.gross_weight} Kg</span>}
+                        {b.purchase_date && <span><strong>Purchase Date:</strong> {b.purchase_date}</span>}
+                        {b.purchase_from && <span><strong>From:</strong> {b.purchase_from}</span>}
+                      </div>
+                      {isDuplicate && <p className="text-xs text-destructive pl-6">Duplicate — already in inventory</p>}
+                      {!complete && !isDuplicate && <p className="text-xs text-warning pl-6">Missing: {missing.join(', ')}</p>}
                     </div>
                   );
                 })}
