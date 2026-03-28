@@ -9,10 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Download, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Download, Trash2, Undo2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActionLog, useSubmitApproval } from '@/hooks/useActionLog';
-import { useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
+import { useDeleteBatch, useBulkDeleteBatches, useUpdateBatch } from '@/hooks/useBatches';
 import { useUndoAction } from '@/hooks/useUndoAction';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
@@ -43,7 +43,7 @@ const NUMERIC_FIELDS = ['thickness', 'width', 'length', 'gross_weight', 'net_wei
 
 const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
   'batch_number', 'material', 'make', 'thickness', 'width',
-  'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number',
+  'coating', 'grade', 'gross_weight', 'net_weight',
   'purchase_date', 'purchase_from',
 ];
 
@@ -72,6 +72,7 @@ export default function CoilsInventoryTab() {
   const { performAction } = useUndoAction();
   const queryClient = useQueryClient();
   const insertBatches = useInsertBatches();
+  const updateBatch = useUpdateBatch();
   
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
@@ -500,6 +501,17 @@ export default function CoilsInventoryTab() {
                                         </Button>
                                         <Button size="sm" variant="ghost" className="text-xs h-7 text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteBatch(b); }} title="Delete Batch">
                                           <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="text-xs h-7 text-warning" onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (!confirm(`Move batch ${b.batch_number} back to In-Transit?`)) return;
+                                          try {
+                                            await updateBatch.mutateAsync({ id: b.id, status: 'in-transit' } as any);
+                                            toast.success(`Batch ${b.batch_number} moved to In-Transit`);
+                                            queryClient.invalidateQueries({ queryKey: ['batches'] });
+                                          } catch { toast.error('Failed to move batch'); }
+                                        }} title="Move to In-Transit">
+                                          <Undo2 className="h-3.5 w-3.5" />
                                         </Button>
                                       </div>
                                     </TableCell>
