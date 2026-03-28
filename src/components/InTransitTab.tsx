@@ -12,7 +12,6 @@ import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2, ChevronDown, Chev
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 import { isFieldValueValid } from '@/lib/field-validation';
-import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL, FORMS } from '@/lib/inventory-options';
 import * as XLSX from 'xlsx';
 import { differenceInDays, parseISO } from 'date-fns';
 
@@ -38,20 +37,6 @@ function getInTransitSKUKey(b: any): string {
   return [b.material, b.make, b.form, b.thickness, b.width, b.length, b.coating, b.grade].map(v => v ?? '').join('|');
 }
 
-function getInTransitSKULabel(g: SKUGroup): string {
-  const parts = [
-    g.material,
-    g.make,
-    g.form,
-    g.thickness ? `${g.thickness}mm` : null,
-    g.width ? `${g.width}W` : null,
-    g.length ? `${g.length}L` : null,
-    g.coating,
-    g.grade,
-  ].filter(Boolean);
-  return parts.join(' | ') || 'Unspecified';
-}
-
 export default function InTransitTab() {
   const [statusFilter, setStatusFilter] = useState<string>('in-transit');
   const { data: batches, isLoading } = useBatches(statusFilter);
@@ -64,7 +49,7 @@ export default function InTransitTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [dateFrom, setDateFrom] = useState('');
@@ -114,8 +99,8 @@ export default function InTransitTab() {
         length: first.length,
         coating: first.coating,
         grade: first.grade,
-        totalNetWeight: batchList.reduce((s, b) => s + (b.net_weight || 0), 0),
-        totalGrossWeight: batchList.reduce((s, b) => s + (b.gross_weight || 0), 0),
+        totalNetWeight: batchList.reduce((s: number, b: any) => s + (b.net_weight || 0), 0),
+        totalGrossWeight: batchList.reduce((s: number, b: any) => s + (b.gross_weight || 0), 0),
         batchCount: batchList.length,
       });
     });
@@ -147,14 +132,6 @@ export default function InTransitTab() {
     } catch { return null; }
   };
 
-  const toggleExpand = (key: string) => {
-    setExpandedKeys(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
-
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -163,12 +140,15 @@ export default function InTransitTab() {
     });
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredBatches.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredBatches.map(b => b.id)));
-    }
+  const toggleSelectAllInSKU = (group: SKUGroup) => {
+    const allSelected = group.batches.every(b => selectedIds.has(b.id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      group.batches.forEach(b => {
+        if (allSelected) next.delete(b.id); else next.add(b.id);
+      });
+      return next;
+    });
   };
 
   const handleBulkDelete = async () => {
@@ -262,45 +242,10 @@ export default function InTransitTab() {
     );
   };
 
-  const renderColumnHeader = (field: string, label: string) => {
-    if (filterableFields.includes(field)) {
-      const options = uniqueValues[field] || [];
-      return (
-        <div className="space-y-1">
-          <span className="text-xs font-semibold whitespace-nowrap">{label}</span>
-          <Select value={filters[field] || '__all__'} onValueChange={v => setFilter(field, v)}>
-            <SelectTrigger className="h-6 text-[10px] w-full min-w-[70px]">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All</SelectItem>
-              {options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      );
-    }
-    return <span className="text-xs font-semibold whitespace-nowrap">{label}</span>;
-  };
-
-  const colDefs = [
-    { field: 'batch_number', label: 'Batch No' },
-    { field: 'material', label: 'Material' },
-    { field: 'make', label: 'Make' },
-    { field: 'form', label: 'Form' },
-    { field: 'thickness', label: 'Thickness' },
-    { field: 'width', label: 'Width' },
-    { field: 'length', label: 'Length' },
-    { field: 'coating', label: 'Coating' },
-    { field: 'grade', label: 'Grade' },
-    { field: 'gross_weight', label: 'Gross Wt (Kg)' },
-    { field: 'net_weight', label: 'Net Wt (Kg)' },
-    { field: 'coil_number', label: 'Coil No' },
-    { field: 'purchase_date', label: 'Purchase Date' },
-    { field: 'purchase_from', label: 'Purchase From' },
-  ];
-
-  const totalColSpan = colDefs.length + 2 + (!isReceived ? 1 : 0) + (isReceived ? 1 : 0) + (!isReceived ? 1 : 0);
+  // SKU summary columns (same structure as Coils Inventory)
+  const skuCols = ['', 'Material', 'Make', 'Form', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Net Wt (Kg)', 'Gross Wt (Kg)'];
+  // Batch detail columns
+  const batchCols = ['', 'Batch No', 'Material', 'Make', 'Form', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Transit Days', 'Status', ...(isReceived ? ['Received Date'] : ['Actions'])];
 
   return (
     <div className="space-y-4">
@@ -361,121 +306,145 @@ export default function InTransitTab() {
         )}
       </div>
 
+      {/* Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {filterableFields.map(f => (
+          <Select key={f} value={filters[f] || '__all__'} onValueChange={v => setFilter(f, v)}>
+            <SelectTrigger className="h-8 w-32 text-xs">
+              <SelectValue placeholder={f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, ' ')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All {f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, ' ')}</SelectItem>
+              {(uniqueValues[f] || []).map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ))}
+        {Object.keys(filters).length > 0 && (
+          <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => setFilters({})}>Clear Filters</Button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-muted-foreground py-8 text-center">Loading...</div>
       ) : (
         <div className="overflow-x-auto rounded-md border bg-card">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/50">
-                {!isReceived && <TableHead className="w-10" />}
-                <TableHead className="w-10" />
-                {colDefs.map(c => (
-                  <TableHead key={c.field}>{renderColumnHeader(c.field, c.label)}</TableHead>
-                ))}
-                <TableHead><span className="text-xs font-semibold whitespace-nowrap">Transit Days</span></TableHead>
-                <TableHead><span className="text-xs font-semibold whitespace-nowrap">Status</span></TableHead>
-                {isReceived && <TableHead><span className="text-xs font-semibold whitespace-nowrap">Received Date</span></TableHead>}
-                {!isReceived && <TableHead><span className="text-xs font-semibold whitespace-nowrap">Actions</span></TableHead>}
+              <TableRow className="bg-[hsl(var(--sku-row))]">
+                {skuCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
               {skuGroups.length === 0 && (
-                <TableRow><TableCell colSpan={totalColSpan} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={skuCols.length} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
               )}
-              {skuGroups.map(group => {
-                const isExpanded = expandedKeys.has(group.key);
-                return (
-                  <>
-                    {/* SKU Summary Row */}
-                    <TableRow
-                      key={`sku-${group.key}`}
-                      className="bg-muted/30 cursor-pointer hover:bg-muted/50 font-medium"
-                      onClick={() => toggleExpand(group.key)}
-                    >
-                      {!isReceived && <TableCell />}
-                      <TableCell>
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </TableCell>
-                      <TableCell colSpan={colDefs.length} className="text-sm">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">{getInTransitSKULabel(group)}</span>
-                          <Badge variant="outline" className="text-xs">{group.batchCount} batch{group.batchCount > 1 ? 'es' : ''}</Badge>
-                          <span className="text-muted-foreground text-xs">
-                            Net: <span className="font-mono-num font-semibold text-foreground">{group.totalNetWeight.toFixed(2)} Kg</span>
-                          </span>
-                          <span className="text-muted-foreground text-xs">
-                            Gross: <span className="font-mono-num font-semibold text-foreground">{group.totalGrossWeight.toFixed(2)} Kg</span>
-                          </span>
+              {skuGroups.map(group => (
+                <>
+                  {/* SKU Summary Row */}
+                  <TableRow
+                    key={`sku-${group.key}`}
+                    className="cursor-pointer bg-[hsl(var(--sku-row))] hover:bg-[hsl(var(--sku-row))/0.7] font-medium"
+                    onClick={() => setExpandedSKU(expandedSKU === group.key ? null : group.key)}
+                  >
+                    <TableCell>
+                      {expandedSKU === group.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </TableCell>
+                    <TableCell className="text-sm">{group.material || '-'}</TableCell>
+                    <TableCell className="text-sm">{group.make || '-'}</TableCell>
+                    <TableCell className="text-sm">{group.form || '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num">{group.thickness ?? '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num">{group.width ?? '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num">{group.length ?? '-'}</TableCell>
+                    <TableCell className="text-sm">{group.coating || '-'}</TableCell>
+                    <TableCell className="text-sm">{group.grade || '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{group.totalNetWeight.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{group.totalGrossWeight.toFixed(2)}</TableCell>
+                  </TableRow>
+
+                  {/* Expanded batch detail table */}
+                  {expandedSKU === group.key && (
+                    <TableRow key={`${group.key}-detail`}>
+                      <TableCell colSpan={skuCols.length} className="p-0">
+                        <div className="bg-[hsl(var(--batch-row))] p-3">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                {!isReceived && (
+                                  <TableHead className="w-10">
+                                    <Checkbox
+                                      checked={group.batches.length > 0 && group.batches.every(b => selectedIds.has(b.id))}
+                                      onCheckedChange={() => toggleSelectAllInSKU(group)}
+                                    />
+                                  </TableHead>
+                                )}
+                                {batchCols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.batches.map(b => {
+                                const transitDays = calcTransitDays(b);
+                                return (
+                                  <TableRow key={b.id} className={selectedIds.has(b.id) ? 'bg-primary/5' : ''}>
+                                    {!isReceived && (
+                                      <TableCell>
+                                        <Checkbox checked={selectedIds.has(b.id)} onCheckedChange={() => toggleSelect(b.id)} />
+                                      </TableCell>
+                                    )}
+                                    {fields.map(f => (
+                                      <TableCell key={f} className="whitespace-nowrap text-sm">
+                                        {editingId === b.id ? renderEditCell(f) : (
+                                          <span className={['gross_weight', 'net_weight', 'thickness', 'width', 'length'].includes(f) ? 'font-mono-num' : ''}>
+                                            {(b as any)[f] ?? '-'}
+                                          </span>
+                                        )}
+                                      </TableCell>
+                                    ))}
+                                    <TableCell className="text-sm font-mono-num">
+                                      {transitDays !== null ? (
+                                        <Badge variant={transitDays > 7 ? 'destructive' : transitDays > 3 ? 'secondary' : 'default'} className="text-xs">
+                                          {transitDays}d
+                                        </Badge>
+                                      ) : '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge
+                                        variant={b.status === 'received' ? 'default' : 'secondary'}
+                                        className={`${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
+                                      >
+                                        {b.status === 'received' ? 'Received' : 'In-Transit'}
+                                      </Badge>
+                                    </TableCell>
+                                    {isReceived && (
+                                      <TableCell className="whitespace-nowrap text-sm">
+                                        {b.updated_at ? new Date(b.updated_at).toLocaleDateString('en-IN') : '-'}
+                                      </TableCell>
+                                    )}
+                                    {!isReceived && (
+                                      <TableCell>
+                                        {editingId === b.id ? (
+                                          <div className="flex gap-1">
+                                            <Button size="sm" variant="ghost" onClick={saveEdit}><Check className="h-3.5 w-3.5 text-success" /></Button>
+                                            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex gap-1">
+                                            <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                                            <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                          </div>
+                                        )}
+                                      </TableCell>
+                                    )}
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
                         </div>
                       </TableCell>
-                      <TableCell />
-                      <TableCell />
-                      {isReceived && <TableCell />}
-                      {!isReceived && <TableCell />}
                     </TableRow>
-
-                    {/* Individual Batch Rows */}
-                    {isExpanded && group.batches.map(b => {
-                      const transitDays = calcTransitDays(b);
-                      return (
-                        <TableRow key={b.id} className={`${selectedIds.has(b.id) ? 'bg-primary/5' : ''}`}>
-                          {!isReceived && (
-                            <TableCell>
-                              <Checkbox checked={selectedIds.has(b.id)} onCheckedChange={() => toggleSelect(b.id)} />
-                            </TableCell>
-                          )}
-                          <TableCell />
-                          {fields.map(f => (
-                            <TableCell key={f} className="whitespace-nowrap text-sm">
-                              {editingId === b.id ? renderEditCell(f) : (
-                                <span className={['gross_weight', 'net_weight', 'thickness', 'width', 'length'].includes(f) ? 'font-mono-num' : ''}>
-                                  {(b as any)[f] ?? '-'}
-                                </span>
-                              )}
-                            </TableCell>
-                          ))}
-                          <TableCell className="text-sm font-mono-num">
-                            {transitDays !== null ? (
-                              <Badge variant={transitDays > 7 ? 'destructive' : transitDays > 3 ? 'secondary' : 'default'} className="text-xs">
-                                {transitDays}d
-                              </Badge>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={b.status === 'received' ? 'default' : 'secondary'}
-                              className={`${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
-                            >
-                              {b.status === 'received' ? 'Received' : 'In-Transit'}
-                            </Badge>
-                          </TableCell>
-                          {isReceived && (
-                            <TableCell className="whitespace-nowrap text-sm">
-                              {b.updated_at ? new Date(b.updated_at).toLocaleDateString('en-IN') : '-'}
-                            </TableCell>
-                          )}
-                          {!isReceived && (
-                            <TableCell>
-                              {editingId === b.id ? (
-                                <div className="flex gap-1">
-                                  <Button size="sm" variant="ghost" onClick={saveEdit}><Check className="h-3.5 w-3.5 text-success" /></Button>
-                                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
-                                </div>
-                              ) : (
-                                <div className="flex gap-1">
-                                  <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
-                                  <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                                </div>
-                              )}
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      );
-                    })}
-                  </>
-                );
-              })}
+                  )}
+                </>
+              ))}
             </TableBody>
           </Table>
         </div>
