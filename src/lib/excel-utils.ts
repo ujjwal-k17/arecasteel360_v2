@@ -159,11 +159,43 @@ export function parseExcelFile(file: File): Promise<BatchExcelRow[]> {
 
 export function generateTemplate(): void {
   const headers = [
-    'Batch Number', 'Material', 'Make', 'Thickness', 'Width', 'Length',
-    'Coating', 'Grade', 'GSM', 'Colour', 'Gross Weight', 'Net Weight',
+    'Batch Number', 'Material', 'Make', 'Form', 'Thickness', 'Width', 'Length',
+    'Coating', 'Grade', 'Gross Weight', 'Net Weight',
     'Coil Number', 'Purchase Date', 'Purchase From'
   ];
   const ws = XLSX.utils.aoa_to_sheet([headers]);
+
+  // Column indices for dropdown fields
+  const colIndexMap: Record<string, number> = {};
+  headers.forEach((h, i) => { colIndexMap[h] = i; });
+
+  const allCoatings = [...new Set(Object.values(COATING_BY_MATERIAL).flat())];
+  const allGrades = [...new Set(Object.values(GRADE_BY_MATERIAL).flat())];
+
+  const dropdowns: { col: number; options: string[] }[] = [
+    { col: colIndexMap['Material'], options: MATERIALS },
+    { col: colIndexMap['Make'], options: MAKES },
+    { col: colIndexMap['Form'], options: FORMS },
+    { col: colIndexMap['Coating'], options: allCoatings },
+    { col: colIndexMap['Grade'], options: allGrades },
+  ];
+
+  // Apply data validation for rows 2-1001
+  for (const { col, options } of dropdowns) {
+    if (options.length === 0) continue;
+    const colLetter = XLSX.utils.encode_col(col);
+    const range = `${colLetter}2:${colLetter}1001`;
+    if (!ws['!dataValidation']) ws['!dataValidation'] = [];
+    (ws['!dataValidation'] as unknown[]).push({
+      sqref: range,
+      type: 'list',
+      formula1: `"${options.join(',')}"`,
+    });
+  }
+
+  // Set column widths
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 14) }));
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Template');
   XLSX.writeFile(wb, 'areca_steel_import_template.xlsx');
