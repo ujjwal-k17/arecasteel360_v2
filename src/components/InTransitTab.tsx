@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2 } from 'lucide-react';
+import { Upload, Download, Edit2, Check, X, RefreshCw, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
 import { isFieldValueValid } from '@/lib/field-validation';
@@ -18,6 +17,40 @@ import * as XLSX from 'xlsx';
 import { differenceInDays, parseISO } from 'date-fns';
 
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade', 'form'];
+
+interface SKUGroup {
+  key: string;
+  batches: any[];
+  material: string | null;
+  make: string | null;
+  form: string | null;
+  thickness: number | null;
+  width: number | null;
+  length: string | null;
+  coating: string | null;
+  grade: string | null;
+  totalNetWeight: number;
+  totalGrossWeight: number;
+  batchCount: number;
+}
+
+function getInTransitSKUKey(b: any): string {
+  return [b.material, b.make, b.form, b.thickness, b.width, b.length, b.coating, b.grade].map(v => v ?? '').join('|');
+}
+
+function getInTransitSKULabel(g: SKUGroup): string {
+  const parts = [
+    g.material,
+    g.make,
+    g.form,
+    g.thickness ? `${g.thickness}mm` : null,
+    g.width ? `${g.width}W` : null,
+    g.length ? `${g.length}L` : null,
+    g.coating,
+    g.grade,
+  ].filter(Boolean);
+  return parts.join(' | ') || 'Unspecified';
+}
 
 export default function InTransitTab() {
   const [statusFilter, setStatusFilter] = useState<string>('in-transit');
@@ -31,6 +64,7 @@ export default function InTransitTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [dateFrom, setDateFrom] = useState('');
@@ -59,6 +93,35 @@ export default function InTransitTab() {
     });
   }, [batches, filters, dateFrom, dateTo]);
 
+  const skuGroups: SKUGroup[] = useMemo(() => {
+    const skuMap = new Map<string, any[]>();
+    filteredBatches.forEach(b => {
+      const key = getInTransitSKUKey(b);
+      if (!skuMap.has(key)) skuMap.set(key, []);
+      skuMap.get(key)!.push(b);
+    });
+    const groups: SKUGroup[] = [];
+    skuMap.forEach((batchList, key) => {
+      const first = batchList[0];
+      groups.push({
+        key,
+        batches: batchList,
+        material: first.material,
+        make: first.make,
+        form: (first as any).form,
+        thickness: first.thickness,
+        width: first.width,
+        length: first.length,
+        coating: first.coating,
+        grade: first.grade,
+        totalNetWeight: batchList.reduce((s, b) => s + (b.net_weight || 0), 0),
+        totalGrossWeight: batchList.reduce((s, b) => s + (b.gross_weight || 0), 0),
+        batchCount: batchList.length,
+      });
+    });
+    return groups;
+  }, [filteredBatches]);
+
   const totalNetWeight = useMemo(() => filteredBatches.reduce((s, b) => s + (b.net_weight || 0), 0), [filteredBatches]);
 
   const uniqueValues = useMemo(() => {
@@ -78,12 +141,18 @@ export default function InTransitTab() {
     if (!batch.purchase_date) return null;
     try {
       if (isReceived && batch.updated_at) {
-        // For received: updated_at (when moved to received) minus purchase_date
         return differenceInDays(new Date(batch.updated_at), parseISO(batch.purchase_date));
       }
-      // For in-transit: today minus purchase_date
       return differenceInDays(new Date(), parseISO(batch.purchase_date));
     } catch { return null; }
+  };
+
+  const toggleExpand = (key: string) => {
+    setExpandedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   };
 
   const toggleSelect = (id: string) => {
@@ -168,12 +237,6 @@ export default function InTransitTab() {
     } catch { toast.error('Failed to update'); }
   };
 
-  const toggleStatus = async (batch: any) => {
-    const newStatus = batch.status === 'in-transit' ? 'received' : 'in-transit';
-    await updateBatch.mutateAsync({ id: batch.id, status: newStatus });
-    toast.success(`Status changed to ${newStatus}`);
-  };
-
   const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
   const filterableFields = ['batch_number', 'material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
 
@@ -237,6 +300,8 @@ export default function InTransitTab() {
     { field: 'purchase_from', label: 'Purchase From' },
   ];
 
+  const totalColSpan = colDefs.length + 2 + (!isReceived ? 1 : 0) + (isReceived ? 1 : 0) + (!isReceived ? 1 : 0);
+
   return (
     <div className="space-y-4">
       {/* Top bar */}
@@ -285,6 +350,10 @@ export default function InTransitTab() {
           <span className="text-muted-foreground">Batches:</span>{' '}
           <span className="font-semibold">{filteredBatches.length}</span>
         </div>
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">SKUs:</span>{' '}
+          <span className="font-semibold">{skuGroups.length}</span>
+        </div>
         {Object.keys(filters).length > 0 && (
           <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setFilters({})}>
             <X className="h-3 w-3 mr-1" /> Clear Filters
@@ -299,14 +368,8 @@ export default function InTransitTab() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                {!isReceived && (
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={filteredBatches.length > 0 && selectedIds.size === filteredBatches.length}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                )}
+                {!isReceived && <TableHead className="w-10" />}
+                <TableHead className="w-10" />
                 {colDefs.map(c => (
                   <TableHead key={c.field}>{renderColumnHeader(c.field, c.label)}</TableHead>
                 ))}
@@ -317,63 +380,100 @@ export default function InTransitTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBatches.length === 0 && (
-                <TableRow><TableCell colSpan={colDefs.length + (isReceived ? 2 : 4)} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
+              {skuGroups.length === 0 && (
+                <TableRow><TableCell colSpan={totalColSpan} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
               )}
-              {filteredBatches.map(b => {
-                const transitDays = calcTransitDays(b);
+              {skuGroups.map(group => {
+                const isExpanded = expandedKeys.has(group.key);
                 return (
-                  <TableRow key={b.id} className={selectedIds.has(b.id) ? 'bg-primary/5' : ''}>
-                    {!isReceived && (
+                  <>
+                    {/* SKU Summary Row */}
+                    <TableRow
+                      key={`sku-${group.key}`}
+                      className="bg-muted/30 cursor-pointer hover:bg-muted/50 font-medium"
+                      onClick={() => toggleExpand(group.key)}
+                    >
+                      {!isReceived && <TableCell />}
                       <TableCell>
-                        <Checkbox checked={selectedIds.has(b.id)} onCheckedChange={() => toggleSelect(b.id)} />
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </TableCell>
-                    )}
-                    {fields.map(f => (
-                      <TableCell key={f} className="whitespace-nowrap text-sm">
-                        {editingId === b.id ? renderEditCell(f) : (
-                          <span className={['gross_weight', 'net_weight', 'thickness', 'width', 'length', 'gsm'].includes(f) ? 'font-mono-num' : ''}>
-                            {(b as any)[f] ?? '-'}
+                      <TableCell colSpan={colDefs.length} className="text-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">{getInTransitSKULabel(group)}</span>
+                          <Badge variant="outline" className="text-xs">{group.batchCount} batch{group.batchCount > 1 ? 'es' : ''}</Badge>
+                          <span className="text-muted-foreground text-xs">
+                            Net: <span className="font-mono-num font-semibold text-foreground">{group.totalNetWeight.toFixed(2)} Kg</span>
                           </span>
-                        )}
+                          <span className="text-muted-foreground text-xs">
+                            Gross: <span className="font-mono-num font-semibold text-foreground">{group.totalGrossWeight.toFixed(2)} Kg</span>
+                          </span>
+                        </div>
                       </TableCell>
-                    ))}
-                    <TableCell className="text-sm font-mono-num">
-                      {transitDays !== null ? (
-                        <Badge variant={transitDays > 7 ? 'destructive' : transitDays > 3 ? 'secondary' : 'default'} className="text-xs">
-                          {transitDays}d
-                        </Badge>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={b.status === 'received' ? 'default' : 'secondary'}
-                        className={`${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
-                      >
-                        {b.status === 'received' ? 'Received' : 'In-Transit'}
-                      </Badge>
-                    </TableCell>
-                    {isReceived && (
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {b.updated_at ? new Date(b.updated_at).toLocaleDateString('en-IN') : '-'}
-                      </TableCell>
-                    )}
-                    {!isReceived && (
-                      <TableCell>
-                        {editingId === b.id ? (
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" onClick={saveEdit}><Check className="h-3.5 w-3.5 text-success" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
-                          </div>
-                        ) : (
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
-                            <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    )}
-                  </TableRow>
+                      <TableCell />
+                      <TableCell />
+                      {isReceived && <TableCell />}
+                      {!isReceived && <TableCell />}
+                    </TableRow>
+
+                    {/* Individual Batch Rows */}
+                    {isExpanded && group.batches.map(b => {
+                      const transitDays = calcTransitDays(b);
+                      return (
+                        <TableRow key={b.id} className={`${selectedIds.has(b.id) ? 'bg-primary/5' : ''}`}>
+                          {!isReceived && (
+                            <TableCell>
+                              <Checkbox checked={selectedIds.has(b.id)} onCheckedChange={() => toggleSelect(b.id)} />
+                            </TableCell>
+                          )}
+                          <TableCell />
+                          {fields.map(f => (
+                            <TableCell key={f} className="whitespace-nowrap text-sm">
+                              {editingId === b.id ? renderEditCell(f) : (
+                                <span className={['gross_weight', 'net_weight', 'thickness', 'width', 'length'].includes(f) ? 'font-mono-num' : ''}>
+                                  {(b as any)[f] ?? '-'}
+                                </span>
+                              )}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-sm font-mono-num">
+                            {transitDays !== null ? (
+                              <Badge variant={transitDays > 7 ? 'destructive' : transitDays > 3 ? 'secondary' : 'default'} className="text-xs">
+                                {transitDays}d
+                              </Badge>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={b.status === 'received' ? 'default' : 'secondary'}
+                              className={`${b.status === 'received' ? 'bg-success hover:bg-success/90' : 'bg-warning hover:bg-warning/90 text-warning-foreground'}`}
+                            >
+                              {b.status === 'received' ? 'Received' : 'In-Transit'}
+                            </Badge>
+                          </TableCell>
+                          {isReceived && (
+                            <TableCell className="whitespace-nowrap text-sm">
+                              {b.updated_at ? new Date(b.updated_at).toLocaleDateString('en-IN') : '-'}
+                            </TableCell>
+                          )}
+                          {!isReceived && (
+                            <TableCell>
+                              {editingId === b.id ? (
+                                <div className="flex gap-1">
+                                  <Button size="sm" variant="ghost" onClick={saveEdit}><Check className="h-3.5 w-3.5 text-success" /></Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-3.5 w-3.5 text-destructive" /></Button>
+                                </div>
+                              ) : (
+                                <div className="flex gap-1">
+                                  <Button size="sm" variant="ghost" onClick={() => startEdit(b)}><Edit2 className="h-3.5 w-3.5" /></Button>
+                                  <Button size="sm" variant="ghost" onClick={async () => { if (confirm(`Delete batch ${b.batch_number}?`)) { try { await deleteBatch.mutateAsync(b.id); toast.success('Batch deleted'); } catch { toast.error('Failed to delete'); } } }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </>
                 );
               })}
             </TableBody>
