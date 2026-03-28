@@ -918,6 +918,100 @@ export type Database = {
         }
         Relationships: []
       }
+      steel_pallet_consumptions: {
+        Row: {
+          consumption_date: string
+          created_at: string
+          id: string
+          num_pcs: number
+          order_id: string | null
+          pallet_sku_id: string
+          weight_kg: number
+        }
+        Insert: {
+          consumption_date: string
+          created_at?: string
+          id?: string
+          num_pcs?: number
+          order_id?: string | null
+          pallet_sku_id: string
+          weight_kg?: number
+        }
+        Update: {
+          consumption_date?: string
+          created_at?: string
+          id?: string
+          num_pcs?: number
+          order_id?: string | null
+          pallet_sku_id?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "steel_pallet_consumptions_pallet_sku_id_fkey"
+            columns: ["pallet_sku_id"]
+            isOneToOne: false
+            referencedRelation: "steel_pallet_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      steel_pallet_purchases: {
+        Row: {
+          created_at: string
+          id: string
+          num_pcs: number
+          pallet_sku_id: string
+          purchase_date: string
+          rate_per_kg: number | null
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          num_pcs?: number
+          pallet_sku_id: string
+          purchase_date: string
+          rate_per_kg?: number | null
+          weight_kg?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          num_pcs?: number
+          pallet_sku_id?: string
+          purchase_date?: string
+          rate_per_kg?: number | null
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "steel_pallet_purchases_pallet_sku_id_fkey"
+            columns: ["pallet_sku_id"]
+            isOneToOne: false
+            referencedRelation: "steel_pallet_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      steel_pallet_skus: {
+        Row: {
+          created_at: string
+          id: string
+          pallet_size: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pallet_size: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pallet_size?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           can_edit: boolean | null
