@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { parse, format, isValid } from 'date-fns';
+import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL, FORMS } from '@/lib/inventory-options';
 
 export interface BatchExcelRow {
   batch_number: string;
@@ -10,8 +11,7 @@ export interface BatchExcelRow {
   length?: number;
   coating?: string;
   grade?: string;
-  gsm?: number;
-  colour?: string;
+  form?: string;
   gross_weight?: number;
   net_weight?: number;
   coil_number?: string;
