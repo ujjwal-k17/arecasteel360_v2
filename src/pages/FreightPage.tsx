@@ -656,6 +656,7 @@ function TransporterDispatchTable({
               <TableHead className="text-xs font-semibold">Approval</TableHead>
               <TableHead className="text-xs font-semibold">Paid Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Payment Status</TableHead>
+              <TableHead className="text-xs font-semibold">Comments</TableHead>
               <TableHead className="text-xs font-semibold">Action</TableHead>
             </TableRow>
             {/* Filter row */}
@@ -724,13 +725,17 @@ function TransporterDispatchTable({
                 </Select>
               </TableHead>
               <TableHead></TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                   No transporter dispatches found.
+                </TableCell>
+              </TableRow>
+            )}
                 </TableCell>
               </TableRow>
             )}
