@@ -1,7 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Outlet } from 'react-router-dom';
-import InventoryChatbot from '@/components/InventoryChatbot';
 
 export default function AppLayout() {
   return (
@@ -17,7 +16,6 @@ export default function AppLayout() {
           </main>
         </div>
       </div>
-      <InventoryChatbot />
     </SidebarProvider>
   );
 }
