@@ -346,9 +346,9 @@ function FreightPage() {
       <Tabs defaultValue="all-dispatches">
         <TabsList>
           <TabsTrigger value="all-dispatches">All Dispatches</TabsTrigger>
+          <TabsTrigger value="ex-sales">Ex-Sales</TabsTrigger>
           <TabsTrigger value="transporter">Transporter</TabsTrigger>
-          <TabsTrigger value="areca-0720">Areca 0720</TabsTrigger>
-          <TabsTrigger value="areca-2720">Areca 2720</TabsTrigger>
+          <TabsTrigger value="areca-trucks">Areca Trucks</TabsTrigger>
         </TabsList>
 
         <div className="flex items-center gap-3 flex-wrap my-4">
