@@ -464,16 +464,13 @@ function TransporterDispatchTable({
                     <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
                     <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
                     <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm">{freightData?.transporters?.name || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-sm">
-                      <Button
-                        variant={freightData ? 'outline' : 'default'}
-                        size="sm"
-                        className="h-7 text-xs gap-1"
-                        onClick={(e) => { e.stopPropagation(); onOpenFreightDialog(s.invoice_number); }}
-                      >
-                        <Truck className="h-3.5 w-3.5" />
-                        {freightData ? `₹${(freightData.total_freight || 0).toLocaleString('en-IN')}` : 'Add'}
-                      </Button>
+                      {freightData && (freightData.total_freight > 0 || freightData.gst > 0) ? (
+                        <span className="font-mono-num">₹{((freightData.total_freight || 0) + (freightData.gst || 0)).toLocaleString('en-IN')}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       {freightData ? (
@@ -492,24 +489,20 @@ function TransporterDispatchTable({
                       )}
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      {freightData ? (
+                      <div className="flex items-center gap-1">
                         <Button
-                          variant="ghost"
+                          variant={freightData ? 'outline' : 'default'}
                           size="sm"
                           className="h-7 text-xs gap-1"
-                          onClick={() => onAddComment(freightData.id)}
+                          onClick={() => onOpenFreightDialog(s.invoice_number)}
                         >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          {comments.length > 0 ? `(${comments.length})` : 'Add'}
+                          <Truck className="h-3.5 w-3.5" />
+                          {freightData ? 'Edit' : 'Add Freight'}
                         </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                        ← Move Back
-                      </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
+                          ← Move Back
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
