@@ -1,0 +1,1 @@
+ALTER TABLE public.transporter_freight ADD COLUMN gst numeric DEFAULT 0;
