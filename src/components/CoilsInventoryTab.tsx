@@ -408,7 +408,7 @@ export default function CoilsInventoryTab() {
         )}
       </div>
 
-      {/* SKU Summary */}
+      {/* Material > SKU Summary */}
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
@@ -417,13 +417,21 @@ export default function CoilsInventoryTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {skuGroups.length === 0 && (
+            {materialGroups.length === 0 && (
               <TableRow><TableCell colSpan={skuCols.length} className="text-center text-muted-foreground py-8">No inventory items. Add batches to get started.</TableCell></TableRow>
             )}
-            {skuGroups.map(g => (
+            {materialGroups.map(mg => (
+              <>
+                <TableRow key={`mat-${mg.material}`} className="cursor-pointer bg-primary/10 hover:bg-primary/15 font-semibold border-b-2 border-primary/20" onClick={() => toggleMaterial(mg.material)}>
+                  <TableCell>{expandedMaterials.has(mg.material) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                  <TableCell className="text-sm font-bold" colSpan={6}>{mg.material} ({mg.groups.reduce((s, g) => s + g.batches.length, 0)} coils)</TableCell>
+                  <TableCell className="text-sm font-mono-num font-bold">{mg.totalUsable.toFixed(2)}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-bold">{mg.totalBalance.toFixed(2)}</TableCell>
+                </TableRow>
+                {expandedMaterials.has(mg.material) && mg.groups.map(g => (
               <>
                 <TableRow key={g.key} className="cursor-pointer bg-[hsl(var(--sku-row))] hover:bg-[hsl(var(--sku-row))/0.7] font-medium" onClick={() => setExpandedSKU(expandedSKU === g.key ? null : g.key)}>
-                  <TableCell>{expandedSKU === g.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                  <TableCell className="pl-8">{expandedSKU === g.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                   <TableCell className="text-sm">{g.material || '-'}</TableCell>
                   <TableCell className="text-sm">{g.make || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.thickness ?? '-'}</TableCell>
