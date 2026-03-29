@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Undo2, Download } from
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
 import InventoryFieldSelect from './InventoryFieldSelect';
+import { COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
 import { isFieldValueValid } from '@/lib/field-validation';
 import * as XLSX from 'xlsx';
 
