@@ -1259,7 +1259,36 @@ function TransporterDispatchTable({
                               </div>
                             )}
                           </div>
-                        </div>
+
+                          {s.purchaseBatches && s.purchaseBatches.length > 0 && (
+                            <div>
+                              <span className="text-sm text-muted-foreground font-medium mb-1 block">Batch Details ({s.purchaseBatches.length})</span>
+                              <div className="overflow-x-auto rounded border">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-muted/40">
+                                      <TableHead className="text-[10px] font-semibold">Batch No.</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Purchase Date</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Supplier</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Material</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Weight (Kg)</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {s.purchaseBatches.map(b => (
+                                      <TableRow key={b.batch_number}>
+                                        <TableCell className="text-xs">{b.batch_number}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_date ? new Date(b.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_from || '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.material || '-'}</TableCell>
+                                        <TableCell className="text-xs font-mono-num">{b.gross_weight.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          )
                       </TableCell>
                     </TableRow>
                   )}
