@@ -423,6 +423,7 @@ export type Database = {
           id: string
           invoice_amount: number | null
           invoice_number: string
+          purchase_invoice_number: string | null
           source_type: string | null
           updated_at: string
         }
@@ -433,6 +434,7 @@ export type Database = {
           id?: string
           invoice_amount?: number | null
           invoice_number: string
+          purchase_invoice_number?: string | null
           source_type?: string | null
           updated_at?: string
         }
@@ -443,6 +445,7 @@ export type Database = {
           id?: string
           invoice_amount?: number | null
           invoice_number?: string
+          purchase_invoice_number?: string | null
           source_type?: string | null
           updated_at?: string
         }
