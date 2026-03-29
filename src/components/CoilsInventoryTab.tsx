@@ -17,6 +17,7 @@ import { useUndoAction } from '@/hooks/useUndoAction';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
+import { COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
 import ProcessingDialog from './ProcessingDialog';
 import PackCoilSaleDialog from './PackCoilSaleDialog';
 import { isFieldValueValid } from '@/lib/field-validation';
