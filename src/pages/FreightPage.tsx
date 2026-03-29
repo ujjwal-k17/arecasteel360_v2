@@ -200,16 +200,16 @@ function FreightPage() {
   });
 
   const saveFreightDetails = useMutation({
-    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; comments: string }) => {
+    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number }) => {
       const existing = (transporterFreightMap || {})[data.invoice_number];
       if (existing) {
         const { error } = await supabase.from('transporter_freight')
-          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, comments: data.comments })
+          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('transporter_freight')
-          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, comments: data.comments });
+          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst });
         if (error) throw error;
       }
     },
@@ -434,9 +434,9 @@ function TransporterDispatchTable({
               <TableHead className="text-xs font-semibold">Invoice Date</TableHead>
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold">Freight (₹)</TableHead>
+              <TableHead className="text-xs font-semibold">Transporter Name</TableHead>
+              <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Status</TableHead>
-              <TableHead className="text-xs font-semibold">Comments</TableHead>
               <TableHead className="text-xs font-semibold">Action</TableHead>
             </TableRow>
           </TableHeader>
