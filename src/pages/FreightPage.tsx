@@ -509,25 +509,29 @@ function TransporterDispatchTable({
                     <TableRow key={`${s.invoice_number}-detail`}>
                       <TableCell colSpan={10} className="bg-muted/30 p-4">
                         <div className="space-y-3">
-                          {/* Transporter Details */}
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground font-medium">Transporter:</span>
-                            <span className="font-semibold">{freightData?.transporters?.name || 'Not assigned'}</span>
-                            {freightData?.total_freight > 0 && (
-                              <>
-                                <span className="text-muted-foreground font-medium ml-4">Total Freight:</span>
+                          {/* Freight Details */}
+                          {freightData && (freightData.total_freight > 0 || freightData.gst > 0) && (
+                            <div className="flex items-center gap-6 text-sm flex-wrap">
+                              <div>
+                                <span className="text-muted-foreground font-medium">Basic Freight:</span>{' '}
                                 <span className="font-semibold font-mono-num">₹{(freightData.total_freight || 0).toLocaleString('en-IN')}</span>
-                              </>
-                            )}
-                            {freightData?.status && (
-                              <>
-                                <span className="text-muted-foreground font-medium ml-4">Status:</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">GST:</span>{' '}
+                                <span className="font-semibold font-mono-num">₹{(freightData.gst || 0).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">Total:</span>{' '}
+                                <span className="font-semibold font-mono-num">₹{((freightData.total_freight || 0) + (freightData.gst || 0)).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">Status:</span>{' '}
                                 <span className={`font-semibold ${freightData.status === 'approved' ? 'text-green-600' : freightData.status === 'hold' ? 'text-amber-600' : ''}`}>
                                   {freightData.status.charAt(0).toUpperCase() + freightData.status.slice(1)}
                                 </span>
-                              </>
-                            )}
-                          </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* User Comments */}
                           <div>
