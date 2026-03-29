@@ -46,6 +46,7 @@ interface PurchaseSummary {
   material: string | null;
   gross_weight: number;
   purchase_type: string | null;
+  purchase_invoice_number: string | null;
 }
 
 function FreightPage() {
