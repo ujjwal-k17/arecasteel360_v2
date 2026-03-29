@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, Download, Truck, ChevronDown, ChevronUp, MessageSquare, Plus } from 'lucide-react';
+import { RefreshCw, Download, Truck, ChevronDown, ChevronUp, Plus, IndianRupee } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { FreightDetailsDialog } from '@/components/freight/FreightDetailsDialog';
@@ -33,6 +33,7 @@ function FreightPage() {
   const [dateTo, setDateTo] = useState('');
   const [freightDialog, setFreightDialog] = useState<{ open: boolean; invoice: string }>({ open: false, invoice: '' });
   const [commentDialog, setCommentDialog] = useState<{ open: boolean; freightId: string; comment: string }>({ open: false, freightId: '', comment: '' });
+  const [paymentDialog, setPaymentDialog] = useState<{ open: boolean; freightId: string; amount: string; invoiceNumber: string }>({ open: false, freightId: '', amount: '', invoiceNumber: '' });
 
   const { data: orders } = useQuery({
     queryKey: ['freight_orders'],
@@ -132,6 +133,18 @@ function FreightPage() {
     },
   });
 
+  const { data: freightPayments } = useQuery({
+    queryKey: ['transporter_freight_payments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transporter_freight_payments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const commentsByFreightId = useMemo(() => {
     const map: Record<string, any[]> = {};
     (freightComments || []).forEach((c: any) => {
@@ -140,6 +153,23 @@ function FreightPage() {
     });
     return map;
   }, [freightComments]);
+
+  const paymentsByFreightId = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    (freightPayments || []).forEach((p: any) => {
+      if (!map[p.transporter_freight_id]) map[p.transporter_freight_id] = [];
+      map[p.transporter_freight_id].push(p);
+    });
+    return map;
+  }, [freightPayments]);
+
+  const paidAmountByFreightId = useMemo(() => {
+    const map: Record<string, number> = {};
+    Object.entries(paymentsByFreightId).forEach(([id, payments]) => {
+      map[id] = payments.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+    });
+    return map;
+  }, [paymentsByFreightId]);
 
   const invoiceSummaries: InvoiceSummary[] = useMemo(() => {
     const map: Record<string, { invoice_date: string | null; order_ids: Set<string>; total_qty: number }> = {};
@@ -249,8 +279,25 @@ function FreightPage() {
     onError: () => toast.error('Failed to add comment'),
   });
 
+  const addPayment = useMutation({
+    mutationFn: async ({ transporter_freight_id, amount }: { transporter_freight_id: string; amount: number }) => {
+      const { error } = await supabase.from('transporter_freight_payments').insert({
+        transporter_freight_id,
+        amount,
+        user_email: user?.email || 'unknown',
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_payments'] });
+      toast.success('Payment recorded');
+      setPaymentDialog({ open: false, freightId: '', amount: '', invoiceNumber: '' });
+    },
+    onError: () => toast.error('Failed to record payment'),
+  });
+
   const refreshAll = () => {
-    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments'].forEach(k =>
+    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments'].forEach(k =>
       queryClient.invalidateQueries({ queryKey: [k] })
     );
     toast.success('Refreshed');
@@ -311,9 +358,12 @@ function FreightPage() {
             onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
             transporterFreightMap={transporterFreightMap || {}}
             commentsByFreightId={commentsByFreightId}
+            paymentsByFreightId={paymentsByFreightId}
+            paidAmountByFreightId={paidAmountByFreightId}
             onOpenFreightDialog={(inv) => setFreightDialog({ open: true, invoice: inv })}
             onStatusChange={(id, status) => updateFreightStatus.mutate({ id, status })}
             onAddComment={(freightId) => setCommentDialog({ open: true, freightId, comment: '' })}
+            onAddPayment={(freightId, invoiceNumber) => setPaymentDialog({ open: true, freightId, amount: '', invoiceNumber })}
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Transporter'), 'Transporter')}
           />
         </TabsContent>
@@ -369,31 +419,70 @@ function FreightPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add Payment Dialog */}
+      <Dialog open={paymentDialog.open} onOpenChange={o => setPaymentDialog(p => ({ ...p, open: o }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Record Payment — {paymentDialog.invoiceNumber}</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Payment Amount (₹)</Label>
+            <Input
+              type="number"
+              placeholder="Enter payment amount"
+              value={paymentDialog.amount}
+              onChange={e => setPaymentDialog(p => ({ ...p, amount: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">Posting as: {user?.email}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentDialog({ open: false, freightId: '', amount: '', invoiceNumber: '' })}>Cancel</Button>
+            <Button
+              onClick={() => addPayment.mutate({ transporter_freight_id: paymentDialog.freightId, amount: parseFloat(paymentDialog.amount) || 0 })}
+              disabled={!paymentDialog.amount || parseFloat(paymentDialog.amount) <= 0}
+            >
+              Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-/* ── Transporter Dispatch Table with expandable rows ── */
+/* ── Transporter Dispatch Table with expandable rows, filters, sub-tabs ── */
 function TransporterDispatchTable({
   data,
   onMoveBack,
   transporterFreightMap,
   commentsByFreightId,
+  paymentsByFreightId,
+  paidAmountByFreightId,
   onOpenFreightDialog,
   onStatusChange,
   onAddComment,
+  onAddPayment,
   onDownload,
 }: {
   data: InvoiceSummary[];
   onMoveBack: (invoice: string) => void;
   transporterFreightMap: Record<string, any>;
   commentsByFreightId: Record<string, any[]>;
+  paymentsByFreightId: Record<string, any[]>;
+  paidAmountByFreightId: Record<string, number>;
   onOpenFreightDialog: (invoice: string) => void;
   onStatusChange: (id: string, status: string) => void;
   onAddComment: (freightId: string) => void;
+  onAddPayment: (freightId: string, invoiceNumber: string) => void;
   onDownload: () => void;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [subTab, setSubTab] = useState<'all' | 'open' | 'closed'>('all');
+  const [filterInvoice, setFilterInvoice] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterTransporter, setFilterTransporter] = useState('');
+  const [filterApproval, setFilterApproval] = useState('');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState('');
 
   const toggleRow = (inv: string) => {
     setExpandedRows(prev => {
@@ -403,26 +492,102 @@ function TransporterDispatchTable({
     });
   };
 
-  const totalFreight = data.reduce((s, r) => {
+  const getPaymentStatus = (freightData: any) => {
+    if (!freightData) return 'Unpaid';
+    const totalAmount = (freightData.total_freight || 0) + (freightData.gst || 0);
+    if (totalAmount <= 0) return 'Unpaid';
+    const paid = paidAmountByFreightId[freightData.id] || 0;
+    if (paid <= 0) return 'Unpaid';
+    if (paid >= totalAmount) return 'Full Paid';
+    return 'Partial Paid';
+  };
+
+  const getApprovalStatus = (freightData: any) => {
+    if (!freightData) return 'pending';
+    return freightData.status || 'pending';
+  };
+
+  const isClosed = (s: InvoiceSummary) => {
+    const freightData = transporterFreightMap[s.invoice_number];
+    return getApprovalStatus(freightData) === 'approved' && getPaymentStatus(freightData) === 'Full Paid';
+  };
+
+  // Apply sub-tab filter
+  const subTabFiltered = useMemo(() => {
+    if (subTab === 'closed') return data.filter(s => isClosed(s));
+    if (subTab === 'open') return data.filter(s => !isClosed(s));
+    return data;
+  }, [data, subTab, transporterFreightMap, paidAmountByFreightId]);
+
+  // Unique values for filters
+  const uniqueInvoices = useMemo(() => [...new Set(subTabFiltered.map(s => s.invoice_number))].sort(), [subTabFiltered]);
+  const uniqueDates = useMemo(() => [...new Set(subTabFiltered.filter(s => s.invoice_date).map(s => s.invoice_date!))].sort(), [subTabFiltered]);
+  const uniqueCustomers = useMemo(() => [...new Set(subTabFiltered.filter(s => s.customer_name).map(s => s.customer_name!))].sort(), [subTabFiltered]);
+  const uniqueTransporters = useMemo(() => {
+    const names = new Set<string>();
+    subTabFiltered.forEach(s => {
+      const f = transporterFreightMap[s.invoice_number];
+      if (f?.transporters?.name) names.add(f.transporters.name);
+    });
+    return [...names].sort();
+  }, [subTabFiltered, transporterFreightMap]);
+
+  // Apply column filters
+  const filtered = useMemo(() => {
+    return subTabFiltered.filter(s => {
+      if (filterInvoice && s.invoice_number !== filterInvoice) return false;
+      if (filterDate && s.invoice_date !== filterDate) return false;
+      if (filterCustomer && s.customer_name !== filterCustomer) return false;
+      const f = transporterFreightMap[s.invoice_number];
+      if (filterTransporter && f?.transporters?.name !== filterTransporter) return false;
+      if (filterApproval) {
+        const approval = getApprovalStatus(f);
+        if (filterApproval !== approval) return false;
+      }
+      if (filterPaymentStatus) {
+        const ps = getPaymentStatus(f);
+        if (filterPaymentStatus !== ps) return false;
+      }
+      return true;
+    });
+  }, [subTabFiltered, filterInvoice, filterDate, filterCustomer, filterTransporter, filterApproval, filterPaymentStatus, transporterFreightMap, paidAmountByFreightId]);
+
+  const totalFreight = filtered.reduce((s, r) => {
     const f = transporterFreightMap[r.invoice_number];
     return s + (f?.total_freight || 0) + (f?.gst || 0);
   }, 0);
 
+  const hasAnyFilter = filterInvoice || filterDate || filterCustomer || filterTransporter || filterApproval || filterPaymentStatus;
+
   return (
     <div className="space-y-3">
+      {/* Sub-tabs */}
+      <Tabs value={subTab} onValueChange={v => setSubTab(v as any)}>
+        <TabsList className="h-8">
+          <TabsTrigger value="all" className="text-xs h-7 px-3">All ({data.length})</TabsTrigger>
+          <TabsTrigger value="open" className="text-xs h-7 px-3">Open ({data.filter(s => !isClosed(s)).length})</TabsTrigger>
+          <TabsTrigger value="closed" className="text-xs h-7 px-3">Closed ({data.filter(s => isClosed(s)).length})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="flex items-center gap-4 text-sm flex-wrap">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Invoices:</span>{' '}
-          <span className="font-semibold">{data.length}</span>
+          <span className="font-semibold">{filtered.length}</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Qty:</span>{' '}
-          <span className="font-semibold font-mono-num">{data.reduce((s, r) => s + r.total_qty, 0).toFixed(2)} Kg</span>
+          <span className="font-semibold font-mono-num">{filtered.reduce((s, r) => s + r.total_qty, 0).toFixed(2)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Freight:</span>{' '}
           <span className="font-semibold font-mono-num">₹{totalFreight.toLocaleString('en-IN')}</span>
         </div>
+        {hasAnyFilter && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => {
+            setFilterInvoice(''); setFilterDate(''); setFilterCustomer(''); setFilterTransporter(''); setFilterApproval(''); setFilterPaymentStatus('');
+          }}>Clear Filters</Button>
+        )}
         <Button variant="outline" size="sm" onClick={onDownload} className="ml-auto gap-2 h-8">
           <Download className="h-3.5 w-3.5" /> Download Excel
         </Button>
@@ -439,22 +604,96 @@ function TransporterDispatchTable({
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold">Transporter Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
-              <TableHead className="text-xs font-semibold">Status</TableHead>
+              <TableHead className="text-xs font-semibold">Approval</TableHead>
+              <TableHead className="text-xs font-semibold">Paid Amount (₹)</TableHead>
+              <TableHead className="text-xs font-semibold">Payment Status</TableHead>
               <TableHead className="text-xs font-semibold">Action</TableHead>
+            </TableRow>
+            {/* Filter row */}
+            <TableRow>
+              <TableHead></TableHead>
+              <TableHead></TableHead>
+              <TableHead>
+                <Select value={filterInvoice} onValueChange={v => setFilterInvoice(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueInvoices.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead>
+                <Select value={filterDate} onValueChange={v => setFilterDate(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueDates.map(v => <SelectItem key={v} value={v}>{new Date(v).toLocaleDateString('en-IN')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead>
+                <Select value={filterCustomer} onValueChange={v => setFilterCustomer(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueCustomers.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead></TableHead>
+              <TableHead>
+                <Select value={filterTransporter} onValueChange={v => setFilterTransporter(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    {uniqueTransporters.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead></TableHead>
+              <TableHead>
+                <Select value={filterApproval} onValueChange={v => setFilterApproval(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-6 text-[10px] w-[90px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="hold">Hold</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead></TableHead>
+              <TableHead>
+                <Select value={filterPaymentStatus} onValueChange={v => setFilterPaymentStatus(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-6 text-[10px] w-[90px]"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    <SelectItem value="Unpaid">Unpaid</SelectItem>
+                    <SelectItem value="Partial Paid">Partial Paid</SelectItem>
+                    <SelectItem value="Full Paid">Full Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 && (
+            {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                   No transporter dispatches found.
                 </TableCell>
               </TableRow>
             )}
-            {data.map((s, idx) => {
+            {filtered.map((s, idx) => {
               const freightData = transporterFreightMap[s.invoice_number];
               const isExpanded = expandedRows.has(s.invoice_number);
               const comments = freightData ? (commentsByFreightId[freightData.id] || []) : [];
+              const payments = freightData ? (paymentsByFreightId[freightData.id] || []) : [];
+              const paidAmount = freightData ? (paidAmountByFreightId[freightData.id] || 0) : 0;
+              const totalAmount = freightData ? ((freightData.total_freight || 0) + (freightData.gst || 0)) : 0;
+              const paymentStatus = getPaymentStatus(freightData);
+              const approvalStatus = getApprovalStatus(freightData);
 
               return (
                 <>
@@ -469,15 +708,15 @@ function TransporterDispatchTable({
                     <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
                     <TableCell className="text-sm">{freightData?.transporters?.name || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-sm">
-                      {freightData && (freightData.total_freight > 0 || freightData.gst > 0) ? (
-                        <span className="font-mono-num">₹{((freightData.total_freight || 0) + (freightData.gst || 0)).toLocaleString('en-IN')}</span>
+                      {totalAmount > 0 ? (
+                        <span className="font-mono-num">₹{totalAmount.toLocaleString('en-IN')}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       {freightData ? (
-                        <Select value={freightData.status} onValueChange={v => onStatusChange(freightData.id, v)}>
+                        <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
                           <SelectTrigger className="h-7 text-xs w-[100px]">
                             <SelectValue />
                           </SelectTrigger>
@@ -493,6 +732,25 @@ function TransporterDispatchTable({
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
+                        <span className="font-mono-num">{paidAmount > 0 ? `₹${paidAmount.toLocaleString('en-IN')}` : '-'}</span>
+                        {freightData && (
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onAddPayment(freightData.id, s.invoice_number)}>
+                            <IndianRupee className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        paymentStatus === 'Full Paid' ? 'bg-green-100 text-green-700' :
+                        paymentStatus === 'Partial Paid' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {paymentStatus}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
                         <Button
                           variant={freightData ? 'outline' : 'default'}
                           size="sm"
@@ -503,17 +761,17 @@ function TransporterDispatchTable({
                           {freightData ? 'Edit' : 'Add Freight'}
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                          ← Move Back
+                          ← Back
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
-                      <TableCell colSpan={10} className="bg-muted/30 p-4">
+                      <TableCell colSpan={12} className="bg-muted/30 p-4">
                         <div className="space-y-3">
                           {/* Freight Details */}
-                          {freightData && (freightData.total_freight > 0 || freightData.gst > 0) && (
+                          {freightData && totalAmount > 0 && (
                             <div className="flex items-center gap-6 text-sm flex-wrap">
                               <div>
                                 <span className="text-muted-foreground font-medium">Basic Freight:</span>{' '}
@@ -525,16 +783,30 @@ function TransporterDispatchTable({
                               </div>
                               <div>
                                 <span className="text-muted-foreground font-medium">Total:</span>{' '}
-                                <span className="font-semibold font-mono-num">₹{((freightData.total_freight || 0) + (freightData.gst || 0)).toLocaleString('en-IN')}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground font-medium">Status:</span>{' '}
-                                <span className={`font-semibold ${freightData.status === 'approved' ? 'text-green-600' : freightData.status === 'hold' ? 'text-amber-600' : ''}`}>
-                                  {freightData.status.charAt(0).toUpperCase() + freightData.status.slice(1)}
-                                </span>
+                                <span className="font-semibold font-mono-num">₹{totalAmount.toLocaleString('en-IN')}</span>
                               </div>
                             </div>
                           )}
+
+                          {/* Payment Details */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm text-muted-foreground font-medium">Payment Details</span>
+                              <span className="text-xs text-muted-foreground">(Paid: ₹{paidAmount.toLocaleString('en-IN')} / ₹{totalAmount.toLocaleString('en-IN')})</span>
+                            </div>
+                            {payments.length === 0 ? (
+                              <p className="text-xs text-muted-foreground italic">No payments recorded.</p>
+                            ) : (
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {payments.map((p: any) => (
+                                  <div key={p.id} className="bg-background rounded-md border px-3 py-1.5 text-sm flex items-center justify-between">
+                                    <span className="font-mono-num font-medium">₹{(p.amount || 0).toLocaleString('en-IN')}</span>
+                                    <span className="text-xs text-muted-foreground">{p.user_email} — {new Date(p.created_at).toLocaleString('en-IN')}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
 
                           {/* User Comments */}
                           <div>
