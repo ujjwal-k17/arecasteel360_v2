@@ -346,9 +346,9 @@ function FreightPage() {
       <Tabs defaultValue="all-dispatches">
         <TabsList>
           <TabsTrigger value="all-dispatches">All Dispatches</TabsTrigger>
+          <TabsTrigger value="ex-sales">Ex-Sales</TabsTrigger>
           <TabsTrigger value="transporter">Transporter</TabsTrigger>
-          <TabsTrigger value="areca-0720">Areca 0720</TabsTrigger>
-          <TabsTrigger value="areca-2720">Areca 2720</TabsTrigger>
+          <TabsTrigger value="areca-trucks">Areca Trucks</TabsTrigger>
         </TabsList>
 
         <div className="flex items-center gap-3 flex-wrap my-4">
@@ -367,10 +367,18 @@ function FreightPage() {
 
         <TabsContent value="all-dispatches">
           <DispatchTable
-            data={filteredSummaries.filter(s => !s.dispatch_type || s.dispatch_type === 'Ex-Sales')}
+            data={filteredSummaries.filter(s => !s.dispatch_type)}
             showDispatchType
             onDispatchTypeChange={(inv, type) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: type })}
-            onDownload={() => handleDownload(filteredSummaries.filter(s => !s.dispatch_type || s.dispatch_type === 'Ex-Sales'), 'All Dispatches')}
+            onDownload={() => handleDownload(filteredSummaries.filter(s => !s.dispatch_type), 'All Dispatches')}
+          />
+        </TabsContent>
+        <TabsContent value="ex-sales">
+          <DispatchTable
+            data={filteredSummaries.filter(s => s.dispatch_type === 'Ex-Sales')}
+            showMoveBack
+            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+            onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Ex-Sales'), 'Ex-Sales')}
           />
         </TabsContent>
         <TabsContent value="transporter">
@@ -389,21 +397,29 @@ function FreightPage() {
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Transporter'), 'Transporter')}
           />
         </TabsContent>
-        <TabsContent value="areca-0720">
-          <DispatchTable
-            data={filteredSummaries.filter(s => s.dispatch_type === 'Areca 0720')}
-            showMoveBack
-            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
-            onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 0720'), 'Areca 0720')}
-          />
-        </TabsContent>
-        <TabsContent value="areca-2720">
-          <DispatchTable
-            data={filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720')}
-            showMoveBack
-            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
-            onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720'), 'Areca 2720')}
-          />
+        <TabsContent value="areca-trucks">
+          <Tabs defaultValue="areca-0720" className="mt-2">
+            <TabsList>
+              <TabsTrigger value="areca-0720">UP14KT0750</TabsTrigger>
+              <TabsTrigger value="areca-2720">UP14QT2750</TabsTrigger>
+            </TabsList>
+            <TabsContent value="areca-0720">
+              <DispatchTable
+                data={filteredSummaries.filter(s => s.dispatch_type === 'Areca 0720')}
+                showMoveBack
+                onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+                onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 0720'), 'UP14KT0750')}
+              />
+            </TabsContent>
+            <TabsContent value="areca-2720">
+              <DispatchTable
+                data={filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720')}
+                showMoveBack
+                onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+                onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720'), 'UP14QT2750')}
+              />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
 
