@@ -376,6 +376,7 @@ function FreightPage() {
         <TabsContent value="transporter">
           <TransporterDispatchTable
             data={filteredSummaries.filter(s => s.dispatch_type === 'Transporter')}
+            isAdmin={isAdmin}
             onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
             transporterFreightMap={transporterFreightMap || {}}
             commentsByFreightId={commentsByFreightId}
