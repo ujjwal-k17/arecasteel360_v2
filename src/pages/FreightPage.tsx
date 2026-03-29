@@ -28,7 +28,7 @@ interface InvoiceSummary {
 
 function FreightPage() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [freightDialog, setFreightDialog] = useState<{ open: boolean; invoice: string }>({ open: false, invoice: '' });
@@ -376,6 +376,7 @@ function FreightPage() {
         <TabsContent value="transporter">
           <TransporterDispatchTable
             data={filteredSummaries.filter(s => s.dispatch_type === 'Transporter')}
+            isAdmin={isAdmin}
             onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
             transporterFreightMap={transporterFreightMap || {}}
             commentsByFreightId={commentsByFreightId}
@@ -514,6 +515,7 @@ function FreightPage() {
 /* ── Transporter Dispatch Table with expandable rows, filters, sub-tabs ── */
 function TransporterDispatchTable({
   data,
+  isAdmin,
   onMoveBack,
   transporterFreightMap,
   commentsByFreightId,
@@ -526,6 +528,7 @@ function TransporterDispatchTable({
   onDownload,
 }: {
   data: InvoiceSummary[];
+  isAdmin: boolean;
   onMoveBack: (invoice: string) => void;
   transporterFreightMap: Record<string, any>;
   commentsByFreightId: Record<string, any[]>;
@@ -780,20 +783,30 @@ function TransporterDispatchTable({
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       {freightData ? (
-                        <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
-                          <SelectTrigger className={`h-7 text-xs w-[100px] ${
-                            approvalStatus === 'approved' ? 'border-green-500 text-green-700 bg-green-50' :
-                            approvalStatus === 'hold' ? 'border-amber-500 text-amber-700 bg-amber-50' :
-                            'border-orange-400 text-orange-600 bg-orange-50'
+                        isAdmin ? (
+                          <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
+                            <SelectTrigger className={`h-7 text-xs w-[100px] ${
+                              approvalStatus === 'approved' ? 'border-green-500 text-green-700 bg-green-50' :
+                              approvalStatus === 'hold' ? 'border-amber-500 text-amber-700 bg-amber-50' :
+                              'border-orange-400 text-orange-600 bg-orange-50'
+                            }`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="approved">Approved</SelectItem>
+                              <SelectItem value="hold">Hold</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            approvalStatus === 'approved' ? 'bg-green-100 text-green-700' :
+                            approvalStatus === 'hold' ? 'bg-amber-100 text-amber-700' :
+                            'bg-orange-100 text-orange-600'
                           }`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="hold">Hold</SelectItem>
-                          </SelectContent>
-                        </Select>
+                            {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
+                          </span>
+                        )
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
                       )}
