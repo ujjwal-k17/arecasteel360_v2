@@ -176,7 +176,14 @@ export default function PhysicalInventoryTab() {
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
 
   const isNewBatchValid = () => {
-    return Object.values(newBatch).every(v => v !== '');
+    const mat = newBatch.material;
+    const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
+    const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+    return Object.entries(newBatch).every(([key, v]) => {
+      if (key === 'coating' && coatingOptions.length === 0) return true;
+      if (key === 'grade' && gradeOptions.length === 0) return true;
+      return v !== '';
+    });
   };
 
   const handleAddNew = async () => {
