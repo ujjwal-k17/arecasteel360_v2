@@ -1091,6 +1091,41 @@ export type Database = {
           },
         ]
       }
+      transporter_freight_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          payment_date: string
+          transporter_freight_id: string
+          user_email: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_date?: string
+          transporter_freight_id: string
+          user_email: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_date?: string
+          transporter_freight_id?: string
+          user_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transporter_freight_payments_transporter_freight_id_fkey"
+            columns: ["transporter_freight_id"]
+            isOneToOne: false
+            referencedRelation: "transporter_freight"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transporters: {
         Row: {
           created_at: string
