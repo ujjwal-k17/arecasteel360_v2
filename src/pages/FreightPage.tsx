@@ -445,25 +445,53 @@ function FreightPage() {
       <Dialog open={paymentDialog.open} onOpenChange={o => setPaymentDialog(p => ({ ...p, open: o }))}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Record Payment — {paymentDialog.invoiceNumber}</DialogTitle></DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>Payment Amount (₹)</Label>
-            <Input
-              type="number"
-              placeholder="Enter payment amount"
-              value={paymentDialog.amount}
-              onChange={e => setPaymentDialog(p => ({ ...p, amount: e.target.value }))}
-            />
-            <p className="text-xs text-muted-foreground">Posting as: {user?.email}</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentDialog({ open: false, freightId: '', amount: '', invoiceNumber: '' })}>Cancel</Button>
-            <Button
-              onClick={() => addPayment.mutate({ transporter_freight_id: paymentDialog.freightId, amount: parseFloat(paymentDialog.amount) || 0 })}
-              disabled={!paymentDialog.amount || parseFloat(paymentDialog.amount) <= 0}
-            >
-              Record Payment
-            </Button>
-          </DialogFooter>
+          {(() => {
+            const freightRecord = (transporterFreightMap || {})[paymentDialog.invoiceNumber];
+            const totalAmount = freightRecord ? ((freightRecord.total_freight || 0) + (freightRecord.gst || 0)) : 0;
+            const alreadyPaid = freightRecord ? (paidAmountByFreightId[freightRecord.id] || 0) : 0;
+            const remaining = totalAmount - alreadyPaid;
+            const enteredAmount = parseFloat(paymentDialog.amount) || 0;
+            const exceedsBalance = enteredAmount > remaining;
+
+            return (
+              <>
+                <div className="space-y-2 py-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total Amount:</span>
+                    <span className="font-semibold font-mono-num">₹{totalAmount.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Already Paid:</span>
+                    <span className="font-mono-num">₹{alreadyPaid.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Remaining Balance:</span>
+                    <span className="font-semibold font-mono-num">₹{remaining.toLocaleString('en-IN')}</span>
+                  </div>
+                  <Label>Payment Amount (₹)</Label>
+                  <Input
+                    type="number"
+                    placeholder="Enter payment amount"
+                    value={paymentDialog.amount}
+                    onChange={e => setPaymentDialog(p => ({ ...p, amount: e.target.value }))}
+                  />
+                  {exceedsBalance && (
+                    <p className="text-xs text-destructive">Amount exceeds remaining balance of ₹{remaining.toLocaleString('en-IN')}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">Posting as: {user?.email}</p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPaymentDialog({ open: false, freightId: '', amount: '', invoiceNumber: '' })}>Cancel</Button>
+                  <Button
+                    onClick={() => addPayment.mutate({ transporter_freight_id: paymentDialog.freightId, amount: enteredAmount })}
+                    disabled={!paymentDialog.amount || enteredAmount <= 0 || exceedsBalance}
+                  >
+                    Record Payment
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
