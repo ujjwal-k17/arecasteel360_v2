@@ -782,14 +782,24 @@ function PurchasesTable({
                   <TableCell className="text-sm">{p.material || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{p.gross_weight.toFixed(2)}</TableCell>
                   <TableCell className="text-sm">
-                    {p.purchase_invoice_number ? (
-                      <span className="font-medium">{p.purchase_invoice_number}</span>
+                    {p.purchase_invoice_number && editingInvoice[p.batch_number] === undefined ? (
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">{p.purchase_invoice_number}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditingInvoice(prev => ({ ...prev, [p.batch_number]: p.purchase_invoice_number || '' }))}
+                        >
+                          ✎
+                        </Button>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-1">
                         <Input
                           className="h-7 text-xs w-[120px]"
                           placeholder="Invoice No."
-                          value={editingInvoice[p.batch_number] || ''}
+                          value={editingInvoice[p.batch_number] ?? ''}
                           onChange={e => setEditingInvoice(prev => ({ ...prev, [p.batch_number]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') handleSaveInvoice(p.batch_number); }}
                         />
@@ -802,6 +812,16 @@ function PurchasesTable({
                         >
                           Save
                         </Button>
+                        {p.purchase_invoice_number && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-1"
+                            onClick={() => setEditingInvoice(prev => { const n = { ...prev }; delete n[p.batch_number]; return n; })}
+                          >
+                            ✕
+                          </Button>
+                        )}
                       </div>
                     )}
                   </TableCell>
