@@ -1,0 +1,1 @@
+ALTER TABLE public.invoice_details ADD COLUMN source_type text DEFAULT 'sales';
