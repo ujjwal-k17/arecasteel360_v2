@@ -533,7 +533,14 @@ function FreightPage() {
             data={filteredMappedItems.filter(s => s.dispatch_type === 'Ex-Sales')}
             showMoveBack
             showSourceColumn
-            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+            onMoveBack={(inv, item) => {
+              if (item?.purchaseBatches) {
+                // Reset all batches under this purchase invoice
+                item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+              } else {
+                updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+              }
+            }}
             onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Ex-Sales'), 'Ex-Sales_FOR_Purchases')}
           />
         </TabsContent>
