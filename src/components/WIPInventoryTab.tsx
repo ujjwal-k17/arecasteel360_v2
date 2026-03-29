@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { ArrowRightCircle } from 'lucide-react';
 import WIPProcessingDialog from './WIPProcessingDialog';
 
 interface SKUGroup {
