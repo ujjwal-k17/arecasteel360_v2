@@ -46,6 +46,7 @@ interface PurchaseSummary {
   material: string | null;
   gross_weight: number;
   purchase_type: string | null;
+  purchase_invoice_number: string | null;
 }
 
 function FreightPage() {
@@ -252,6 +253,7 @@ function FreightPage() {
         material: b.material,
         gross_weight: b.gross_weight || 0,
         purchase_type: detail?.dispatch_type || null,
+        purchase_invoice_number: detail?.purchase_invoice_number || null,
       };
     });
   }, [batches, invoiceDetailMap]);
@@ -275,27 +277,35 @@ function FreightPage() {
   }, [purchaseSummaries, dateFrom, dateTo]);
 
   // Combined items for destination tabs (sales + purchases mapped to InvoiceSummary format)
-  const allMappedItems: InvoiceSummary[] = useMemo(() => {
+  const allMappedItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = useMemo(() => {
     // Sales items that have a dispatch_type
-    const salesItems = invoiceSummaries.filter(s => s.dispatch_type);
+    const salesItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = invoiceSummaries.filter(s => s.dispatch_type);
 
-    // Purchase items that have a purchase_type (dispatch_type in invoice_details)
-    const purchaseItems = purchaseSummaries
-      .filter(p => p.purchase_type)
-      .map(p => {
-        // Map purchase_type to dispatch_type for destination tabs
-        let mappedDispatchType = p.purchase_type;
-        if (p.purchase_type === 'FOR Purchase') mappedDispatchType = 'Ex-Sales';
-        return {
-          invoice_number: p.batch_number,
-          invoice_date: p.purchase_date,
-          order_id: null,
-          customer_name: p.purchase_from,
-          total_qty: p.gross_weight,
-          dispatch_type: mappedDispatchType,
-          source_type: 'purchase',
-        } as InvoiceSummary;
+    // Purchase items grouped by purchase_invoice_number
+    const purchasesByInvoice: Record<string, PurchaseSummary[]> = {};
+    purchaseSummaries
+      .filter(p => p.purchase_type && p.purchase_invoice_number)
+      .forEach(p => {
+        const key = p.purchase_invoice_number!;
+        if (!purchasesByInvoice[key]) purchasesByInvoice[key] = [];
+        purchasesByInvoice[key].push(p);
       });
+
+    const purchaseItems = Object.entries(purchasesByInvoice).map(([invNo, batches]) => {
+      const first = batches[0];
+      let mappedDispatchType = first.purchase_type;
+      if (first.purchase_type === 'FOR Purchase') mappedDispatchType = 'Ex-Sales';
+      return {
+        invoice_number: invNo,
+        invoice_date: first.purchase_date,
+        order_id: null,
+        customer_name: first.purchase_from,
+        total_qty: batches.reduce((s, b) => s + b.gross_weight, 0),
+        dispatch_type: mappedDispatchType,
+        source_type: 'purchase',
+        purchaseBatches: batches,
+      } as InvoiceSummary & { purchaseBatches?: PurchaseSummary[] };
+    });
 
     return [...salesItems, ...purchaseItems];
   }, [invoiceSummaries, purchaseSummaries]);
@@ -310,13 +320,20 @@ function FreightPage() {
   }, [allMappedItems, dateFrom, dateTo]);
 
   const updateDispatchType = useMutation({
-    mutationFn: async ({ invoice_number, dispatch_type, source_type }: { invoice_number: string; dispatch_type: string | null; source_type?: string }) => {
+    mutationFn: async ({ invoice_number, dispatch_type, source_type, purchase_invoice_number }: { invoice_number: string; dispatch_type: string | null; source_type?: string; purchase_invoice_number?: string }) => {
       const existing = invoiceDetailMap[invoice_number];
       if (existing) {
-        const { error } = await supabase.from('invoice_details').update({ dispatch_type, source_type: source_type || existing.source_type || 'sales' }).eq('invoice_number', invoice_number);
+        const updateData: any = { dispatch_type, source_type: source_type || existing.source_type || 'sales' };
+        if (purchase_invoice_number !== undefined) updateData.purchase_invoice_number = purchase_invoice_number;
+        const { error } = await supabase.from('invoice_details').update(updateData).eq('invoice_number', invoice_number);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('invoice_details').insert({ invoice_number, dispatch_type, source_type: source_type || 'sales' });
+        const { error } = await supabase.from('invoice_details').insert({
+          invoice_number,
+          dispatch_type,
+          source_type: source_type || 'sales',
+          purchase_invoice_number: purchase_invoice_number || null,
+        });
         if (error) throw error;
       }
 
@@ -336,6 +353,28 @@ function FreightPage() {
       toast.success('Type updated');
     },
     onError: () => toast.error('Failed to update type'),
+  });
+
+  const savePurchaseInvoiceNumber = useMutation({
+    mutationFn: async ({ batch_number, purchase_invoice_number }: { batch_number: string; purchase_invoice_number: string }) => {
+      const existing = invoiceDetailMap[batch_number];
+      if (existing) {
+        const { error } = await supabase.from('invoice_details').update({ purchase_invoice_number }).eq('invoice_number', batch_number);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('invoice_details').insert({
+          invoice_number: batch_number,
+          source_type: 'purchase',
+          purchase_invoice_number,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['freight_invoice_details'] });
+      toast.success('Purchase invoice number saved');
+    },
+    onError: () => toast.error('Failed to save purchase invoice number'),
   });
 
   const saveFreightDetails = useMutation({
@@ -481,6 +520,10 @@ function FreightPage() {
               dispatch_type: type,
               source_type: 'purchase',
             })}
+            onSavePurchaseInvoice={(batchNum, invNo) => savePurchaseInvoiceNumber.mutate({
+              batch_number: batchNum,
+              purchase_invoice_number: invNo,
+            })}
           />
         </TabsContent>
 
@@ -490,7 +533,14 @@ function FreightPage() {
             data={filteredMappedItems.filter(s => s.dispatch_type === 'Ex-Sales')}
             showMoveBack
             showSourceColumn
-            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+            onMoveBack={(inv, item) => {
+              if (item?.purchaseBatches) {
+                // Reset all batches under this purchase invoice
+                item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+              } else {
+                updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+              }
+            }}
             onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Ex-Sales'), 'Ex-Sales_FOR_Purchases')}
           />
         </TabsContent>
@@ -500,7 +550,14 @@ function FreightPage() {
           <TransporterDispatchTable
             data={filteredMappedItems.filter(s => s.dispatch_type === 'Transporter')}
             isAdmin={isAdmin}
-            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+            onMoveBack={(inv) => {
+              const item = filteredMappedItems.find(s => s.invoice_number === inv);
+              if (item?.purchaseBatches) {
+                item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+              } else {
+                updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+              }
+            }}
             transporterFreightMap={transporterFreightMap || {}}
             commentsByFreightId={commentsByFreightId}
             paymentsByFreightId={paymentsByFreightId}
@@ -525,7 +582,13 @@ function FreightPage() {
                 data={filteredMappedItems.filter(s => s.dispatch_type === 'Areca 0720')}
                 showMoveBack
                 showSourceColumn
-                onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+                onMoveBack={(inv, item) => {
+                  if (item?.purchaseBatches) {
+                    item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+                  } else {
+                    updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+                  }
+                }}
                 onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Areca 0720'), 'UP14KT0750')}
               />
             </TabsContent>
@@ -534,7 +597,13 @@ function FreightPage() {
                 data={filteredMappedItems.filter(s => s.dispatch_type === 'Areca 2720')}
                 showMoveBack
                 showSourceColumn
-                onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+                onMoveBack={(inv, item) => {
+                  if (item?.purchaseBatches) {
+                    item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+                  } else {
+                    updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+                  }
+                }}
                 onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Areca 2720'), 'UP14QT2750')}
               />
             </TabsContent>
@@ -651,10 +720,22 @@ function FreightPage() {
 function PurchasesTable({
   data,
   onPurchaseTypeChange,
+  onSavePurchaseInvoice,
 }: {
   data: PurchaseSummary[];
   onPurchaseTypeChange: (batchNumber: string, type: string) => void;
+  onSavePurchaseInvoice: (batchNumber: string, invoiceNumber: string) => void;
 }) {
+  const [editingInvoice, setEditingInvoice] = useState<Record<string, string>>({});
+
+  const handleSaveInvoice = (batchNumber: string) => {
+    const val = editingInvoice[batchNumber]?.trim();
+    if (val) {
+      onSavePurchaseInvoice(batchNumber, val);
+      setEditingInvoice(prev => { const n = { ...prev }; delete n[batchNumber]; return n; });
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-4 text-sm">
@@ -677,42 +758,76 @@ function PurchasesTable({
               <TableHead className="text-xs font-semibold">Supplier</TableHead>
               <TableHead className="text-xs font-semibold">Material</TableHead>
               <TableHead className="text-xs font-semibold">Gross Weight (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold">Purchase Invoice No.</TableHead>
               <TableHead className="text-xs font-semibold">Purchase Type</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No unassigned purchases found.
                 </TableCell>
               </TableRow>
             )}
-            {data.map((p, idx) => (
-              <TableRow key={p.batch_number}>
-                <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                <TableCell className="text-sm font-medium">{p.batch_number}</TableCell>
-                <TableCell className="text-sm">{p.purchase_date ? new Date(p.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                <TableCell className="text-sm">{p.purchase_from || '-'}</TableCell>
-                <TableCell className="text-sm">{p.material || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{p.gross_weight.toFixed(2)}</TableCell>
-                <TableCell className="text-sm">
-                  <Select
-                    value={p.purchase_type || ''}
-                    onValueChange={v => onPurchaseTypeChange(p.batch_number, v)}
-                  >
-                    <SelectTrigger className="h-7 text-xs w-[130px]">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PURCHASE_TYPES.map(t => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-              </TableRow>
-            ))}
+            {data.map((p, idx) => {
+              const hasPurchaseInvoice = !!(p.purchase_invoice_number || editingInvoice[p.batch_number]?.trim());
+
+              return (
+                <TableRow key={p.batch_number}>
+                  <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell className="text-sm font-medium">{p.batch_number}</TableCell>
+                  <TableCell className="text-sm">{p.purchase_date ? new Date(p.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                  <TableCell className="text-sm">{p.purchase_from || '-'}</TableCell>
+                  <TableCell className="text-sm">{p.material || '-'}</TableCell>
+                  <TableCell className="text-sm font-mono-num">{p.gross_weight.toFixed(2)}</TableCell>
+                  <TableCell className="text-sm">
+                    {p.purchase_invoice_number ? (
+                      <span className="font-medium">{p.purchase_invoice_number}</span>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          className="h-7 text-xs w-[120px]"
+                          placeholder="Invoice No."
+                          value={editingInvoice[p.batch_number] || ''}
+                          onChange={e => setEditingInvoice(prev => ({ ...prev, [p.batch_number]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') handleSaveInvoice(p.batch_number); }}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          disabled={!editingInvoice[p.batch_number]?.trim()}
+                          onClick={() => handleSaveInvoice(p.batch_number)}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {hasPurchaseInvoice || p.purchase_invoice_number ? (
+                      <Select
+                        value={p.purchase_type || ''}
+                        onValueChange={v => onPurchaseTypeChange(p.batch_number, v)}
+                        disabled={!p.purchase_invoice_number}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-[130px]">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PURCHASE_TYPES.map(t => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Enter invoice first</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -735,7 +850,7 @@ function TransporterDispatchTable({
   onAddPayment,
   onDownload,
 }: {
-  data: InvoiceSummary[];
+  data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   isAdmin: boolean;
   onMoveBack: (invoice: string) => void;
   transporterFreightMap: Record<string, any>;
@@ -1151,6 +1266,36 @@ function TransporterDispatchTable({
                               </div>
                             )}
                           </div>
+
+                          {s.purchaseBatches && s.purchaseBatches.length > 0 && (
+                            <div>
+                              <span className="text-sm text-muted-foreground font-medium mb-1 block">Batch Details ({s.purchaseBatches.length})</span>
+                              <div className="overflow-x-auto rounded border">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-muted/40">
+                                      <TableHead className="text-[10px] font-semibold">Batch No.</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Purchase Date</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Supplier</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Material</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Weight (Kg)</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {s.purchaseBatches.map(b => (
+                                      <TableRow key={b.batch_number}>
+                                        <TableCell className="text-xs">{b.batch_number}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_date ? new Date(b.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_from || '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.material || '-'}</TableCell>
+                                        <TableCell className="text-xs font-mono-num">{b.gross_weight.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1175,14 +1320,26 @@ function DispatchTable({
   onDownload,
   showSourceColumn,
 }: {
-  data: InvoiceSummary[];
+  data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   showDispatchType?: boolean;
   onDispatchTypeChange?: (invoice: string, type: string) => void;
   showMoveBack?: boolean;
-  onMoveBack?: (invoice: string) => void;
+  onMoveBack?: (invoice: string, item?: InvoiceSummary & { purchaseBatches?: PurchaseSummary[] }) => void;
   onDownload: () => void;
   showSourceColumn?: boolean;
 }) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const toggleRow = (inv: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(inv)) next.delete(inv); else next.add(inv);
+      return next;
+    });
+  };
+
+  // Check if any row has details to show
+  const hasExpandableData = data.some(s => s.purchaseBatches?.length || (s.source_type === 'sales' && s.order_id));
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-4 text-sm">
@@ -1202,10 +1359,11 @@ function DispatchTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              {hasExpandableData && <TableHead className="text-xs font-semibold w-8"></TableHead>}
               <TableHead className="text-xs font-semibold">#</TableHead>
               <TableHead className="text-xs font-semibold">Invoice Number</TableHead>
               <TableHead className="text-xs font-semibold">Invoice Date</TableHead>
-              <TableHead className="text-xs font-semibold">Order ID</TableHead>
+              {!showSourceColumn && <TableHead className="text-xs font-semibold">Order ID</TableHead>}
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               {showSourceColumn && <TableHead className="text-xs font-semibold">Purchase / Sales</TableHead>}
@@ -1217,53 +1375,114 @@ function DispatchTable({
           <TableBody>
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={showSourceColumn ? 8 : 7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={hasExpandableData ? 9 : 8} className="text-center text-muted-foreground py-8">
                   No dispatches found.
                 </TableCell>
               </TableRow>
             )}
-            {data.map((s, idx) => (
-              <TableRow key={s.invoice_number}>
-                <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
-                <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
-                <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
-                {showSourceColumn && (
-                  <TableCell className="text-sm">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      s.source_type === 'purchase' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      {s.source_type === 'purchase' ? 'Purchase' : 'Sales'}
-                    </span>
-                  </TableCell>
-                )}
-                <TableCell className="text-sm">
-                  {showDispatchType && onDispatchTypeChange ? (
-                    <Select
-                      value={s.dispatch_type || ''}
-                      onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-[130px]">
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DISPATCH_TYPES.map(t => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : showMoveBack && onMoveBack ? (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                      ← Move Back
-                    </Button>
-                  ) : (
-                    <span>{s.dispatch_type || '-'}</span>
+            {data.map((s, idx) => {
+              const isExpanded = expandedRows.has(s.invoice_number);
+              const hasDetails = s.purchaseBatches?.length || (s.source_type === 'sales' && s.order_id);
+
+              return (
+                <>
+                  <TableRow
+                    key={s.invoice_number}
+                    className={hasDetails ? 'cursor-pointer' : ''}
+                    onClick={() => hasDetails && toggleRow(s.invoice_number)}
+                  >
+                    {hasExpandableData && (
+                      <TableCell className="text-sm px-2">
+                        {hasDetails ? (
+                          isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : null}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
+                    <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                    {!showSourceColumn && <TableCell className="text-sm">{s.order_id || '-'}</TableCell>}
+                    <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
+                    {showSourceColumn && (
+                      <TableCell className="text-sm">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          s.source_type === 'purchase' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {s.source_type === 'purchase' ? 'Purchase' : 'Sales'}
+                        </span>
+                      </TableCell>
+                    )}
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      {showDispatchType && onDispatchTypeChange ? (
+                        <Select
+                          value={s.dispatch_type || ''}
+                          onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
+                        >
+                          <SelectTrigger className="h-7 text-xs w-[130px]">
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DISPATCH_TYPES.map(t => (
+                              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : showMoveBack && onMoveBack ? (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number, s)}>
+                          ← Move Back
+                        </Button>
+                      ) : (
+                        <span>{s.dispatch_type || '-'}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && hasDetails && (
+                    <TableRow key={`${s.invoice_number}-detail`}>
+                      <TableCell colSpan={hasExpandableData ? 9 : 8} className="bg-muted/30 p-4">
+                        <div className="space-y-2">
+                          {s.source_type === 'sales' && s.order_id && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground font-medium">Order ID:</span> {s.order_id}
+                              {s.customer_name && <> · <span className="text-muted-foreground font-medium">Customer:</span> {s.customer_name}</>}
+                            </div>
+                          )}
+                          {s.purchaseBatches && s.purchaseBatches.length > 0 && (
+                            <div>
+                              <span className="text-sm text-muted-foreground font-medium mb-1 block">Batch Details ({s.purchaseBatches.length})</span>
+                              <div className="overflow-x-auto rounded border">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-muted/40">
+                                      <TableHead className="text-[10px] font-semibold">Batch No.</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Purchase Date</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Supplier</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Material</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Weight (Kg)</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {s.purchaseBatches.map(b => (
+                                      <TableRow key={b.batch_number}>
+                                        <TableCell className="text-xs">{b.batch_number}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_date ? new Date(b.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_from || '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.material || '-'}</TableCell>
+                                        <TableCell className="text-xs font-mono-num">{b.gross_weight.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </TableCell>
-              </TableRow>
-            ))}
+                </>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

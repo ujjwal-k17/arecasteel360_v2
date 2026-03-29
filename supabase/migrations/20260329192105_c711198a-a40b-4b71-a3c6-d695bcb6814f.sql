@@ -1,0 +1,1 @@
+ALTER TABLE public.invoice_details ADD COLUMN purchase_invoice_number text;
