@@ -733,6 +733,8 @@ export default function CoilsInventoryTab() {
                 )}
               </>
             ))}
+              </>
+            ))}
           </TableBody>
         </Table>
       </div>
