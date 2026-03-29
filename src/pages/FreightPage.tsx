@@ -147,7 +147,7 @@ function FreightPage() {
 
   // Mutation to update dispatch_type
   const updateDispatchType = useMutation({
-    mutationFn: async ({ invoice_number, dispatch_type }: { invoice_number: string; dispatch_type: string }) => {
+    mutationFn: async ({ invoice_number, dispatch_type }: { invoice_number: string; dispatch_type: string | null }) => {
       const existing = invoiceDetailMap[invoice_number];
       if (existing) {
         const { error } = await supabase
@@ -224,27 +224,33 @@ function FreightPage() {
 
         <TabsContent value="all-dispatches">
           <DispatchTable
-            data={filteredSummaries}
+            data={filteredSummaries.filter(s => !s.dispatch_type || s.dispatch_type === 'Ex-Sales')}
             showDispatchType
             onDispatchTypeChange={(inv, type) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: type })}
-            onDownload={() => handleDownload(filteredSummaries, 'All Dispatches')}
+            onDownload={() => handleDownload(filteredSummaries.filter(s => !s.dispatch_type || s.dispatch_type === 'Ex-Sales'), 'All Dispatches')}
           />
         </TabsContent>
         <TabsContent value="transporter">
           <DispatchTable
             data={filteredSummaries.filter(s => s.dispatch_type === 'Transporter')}
+            showMoveBack
+            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Transporter'), 'Transporter')}
           />
         </TabsContent>
         <TabsContent value="areca-0720">
           <DispatchTable
             data={filteredSummaries.filter(s => s.dispatch_type === 'Areca 0720')}
+            showMoveBack
+            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 0720'), 'Areca 0720')}
           />
         </TabsContent>
         <TabsContent value="areca-2720">
           <DispatchTable
             data={filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720')}
+            showMoveBack
+            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720'), 'Areca 2720')}
           />
         </TabsContent>
@@ -257,11 +263,15 @@ function DispatchTable({
   data,
   showDispatchType,
   onDispatchTypeChange,
+  showMoveBack,
+  onMoveBack,
   onDownload,
 }: {
   data: InvoiceSummary[];
   showDispatchType?: boolean;
   onDispatchTypeChange?: (invoice: string, type: string) => void;
+  showMoveBack?: boolean;
+  onMoveBack?: (invoice: string) => void;
   onDownload: () => void;
 }) {
   return (
@@ -289,7 +299,9 @@ function DispatchTable({
               <TableHead className="text-xs font-semibold">Order ID</TableHead>
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold">Dispatch Type</TableHead>
+              <TableHead className="text-xs font-semibold">
+                {showDispatchType ? 'Dispatch Type' : showMoveBack ? 'Action' : 'Dispatch Type'}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -323,6 +335,15 @@ function DispatchTable({
                         ))}
                       </SelectContent>
                     </Select>
+                  ) : showMoveBack && onMoveBack ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => onMoveBack(s.invoice_number)}
+                    >
+                      ← Move Back
+                    </Button>
                   ) : (
                     <span>{s.dispatch_type || '-'}</span>
                   )}
