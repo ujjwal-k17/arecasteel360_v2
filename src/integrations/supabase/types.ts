@@ -1056,6 +1056,38 @@ export type Database = {
           },
         ]
       }
+      transporter_freight_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          transporter_freight_id: string
+          user_email: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          transporter_freight_id: string
+          user_email: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          transporter_freight_id?: string
+          user_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transporter_freight_comments_transporter_freight_id_fkey"
+            columns: ["transporter_freight_id"]
+            isOneToOne: false
+            referencedRelation: "transporter_freight"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transporters: {
         Row: {
           created_at: string
