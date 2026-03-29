@@ -23,7 +23,8 @@ const modules = [
   { title: 'Consumables', url: '/consumables', icon: Wrench, page: 'consumables' },
   { title: 'Order Book', url: '/order-book', icon: ClipboardList, page: 'order-book' },
   { title: 'Working Capital', url: '/working-capital', icon: Wallet, page: 'working-capital' },
-  { title: 'Freight & Job Work', url: '/freight-jobwork', icon: Truck, page: 'freight-jobwork' },
+  { title: 'Petty Cash Ledger', url: '/petty-cash', icon: Wallet, page: 'petty-cash' },
+  { title: 'Areca Truck Fleet', url: '/truck-fleet', icon: Truck, page: 'truck-fleet' },
 ];
 
 export function AppSidebar() {
