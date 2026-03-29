@@ -469,12 +469,25 @@ function FreightPage() {
                     <span className="font-semibold font-mono-num">₹{remaining.toLocaleString('en-IN')}</span>
                   </div>
                   <Label>Payment Amount (₹)</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter payment amount"
-                    value={paymentDialog.amount}
-                    onChange={e => setPaymentDialog(p => ({ ...p, amount: e.target.value }))}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Enter payment amount"
+                      value={paymentDialog.amount}
+                      onChange={e => setPaymentDialog(p => ({ ...p, amount: e.target.value }))}
+                      className="flex-1"
+                    />
+                    {remaining > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="text-xs whitespace-nowrap"
+                        onClick={() => setPaymentDialog(p => ({ ...p, amount: remaining.toString() }))}
+                      >
+                        Full Balance
+                      </Button>
+                    )}
+                  </div>
                   {exceedsBalance && (
                     <p className="text-xs text-destructive">Amount exceeds remaining balance of ₹{remaining.toLocaleString('en-IN')}</p>
                   )}
@@ -656,6 +669,7 @@ function TransporterDispatchTable({
               <TableHead className="text-xs font-semibold">Approval</TableHead>
               <TableHead className="text-xs font-semibold">Paid Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Payment Status</TableHead>
+              <TableHead className="text-xs font-semibold">Comments</TableHead>
               <TableHead className="text-xs font-semibold">Action</TableHead>
             </TableRow>
             {/* Filter row */}
@@ -724,12 +738,13 @@ function TransporterDispatchTable({
                 </Select>
               </TableHead>
               <TableHead></TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                   No transporter dispatches found.
                 </TableCell>
               </TableRow>
@@ -803,6 +818,18 @@ function TransporterDispatchTable({
                       </span>
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      {freightData ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">{comments.length}</span>
+                          <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => onAddComment(freightData.id)}>
+                            <Plus className="h-3 w-3" /> Add
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <Button
                           variant={freightData ? 'outline' : 'default'}
@@ -821,7 +848,7 @@ function TransporterDispatchTable({
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
-                      <TableCell colSpan={12} className="bg-muted/30 p-4">
+                      <TableCell colSpan={13} className="bg-muted/30 p-4">
                         <div className="space-y-3">
                           {/* Freight Details */}
                           {freightData && totalAmount > 0 && (
