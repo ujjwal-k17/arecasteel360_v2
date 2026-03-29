@@ -805,6 +805,18 @@ function TransporterDispatchTable({
                       </span>
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      {freightData ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">{comments.length}</span>
+                          <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => onAddComment(freightData.id)}>
+                            <Plus className="h-3 w-3" /> Add
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <Button
                           variant={freightData ? 'outline' : 'default'}
@@ -823,7 +835,7 @@ function TransporterDispatchTable({
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
-                      <TableCell colSpan={12} className="bg-muted/30 p-4">
+                      <TableCell colSpan={13} className="bg-muted/30 p-4">
                         <div className="space-y-3">
                           {/* Freight Details */}
                           {freightData && totalAmount > 0 && (
