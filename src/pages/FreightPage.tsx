@@ -320,13 +320,20 @@ function FreightPage() {
   }, [allMappedItems, dateFrom, dateTo]);
 
   const updateDispatchType = useMutation({
-    mutationFn: async ({ invoice_number, dispatch_type, source_type }: { invoice_number: string; dispatch_type: string | null; source_type?: string }) => {
+    mutationFn: async ({ invoice_number, dispatch_type, source_type, purchase_invoice_number }: { invoice_number: string; dispatch_type: string | null; source_type?: string; purchase_invoice_number?: string }) => {
       const existing = invoiceDetailMap[invoice_number];
       if (existing) {
-        const { error } = await supabase.from('invoice_details').update({ dispatch_type, source_type: source_type || existing.source_type || 'sales' }).eq('invoice_number', invoice_number);
+        const updateData: any = { dispatch_type, source_type: source_type || existing.source_type || 'sales' };
+        if (purchase_invoice_number !== undefined) updateData.purchase_invoice_number = purchase_invoice_number;
+        const { error } = await supabase.from('invoice_details').update(updateData).eq('invoice_number', invoice_number);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('invoice_details').insert({ invoice_number, dispatch_type, source_type: source_type || 'sales' });
+        const { error } = await supabase.from('invoice_details').insert({
+          invoice_number,
+          dispatch_type,
+          source_type: source_type || 'sales',
+          purchase_invoice_number: purchase_invoice_number || null,
+        });
         if (error) throw error;
       }
 
@@ -346,6 +353,28 @@ function FreightPage() {
       toast.success('Type updated');
     },
     onError: () => toast.error('Failed to update type'),
+  });
+
+  const savePurchaseInvoiceNumber = useMutation({
+    mutationFn: async ({ batch_number, purchase_invoice_number }: { batch_number: string; purchase_invoice_number: string }) => {
+      const existing = invoiceDetailMap[batch_number];
+      if (existing) {
+        const { error } = await supabase.from('invoice_details').update({ purchase_invoice_number }).eq('invoice_number', batch_number);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('invoice_details').insert({
+          invoice_number: batch_number,
+          source_type: 'purchase',
+          purchase_invoice_number,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['freight_invoice_details'] });
+      toast.success('Purchase invoice number saved');
+    },
+    onError: () => toast.error('Failed to save purchase invoice number'),
   });
 
   const saveFreightDetails = useMutation({
