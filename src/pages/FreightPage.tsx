@@ -469,12 +469,25 @@ function FreightPage() {
                     <span className="font-semibold font-mono-num">₹{remaining.toLocaleString('en-IN')}</span>
                   </div>
                   <Label>Payment Amount (₹)</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter payment amount"
-                    value={paymentDialog.amount}
-                    onChange={e => setPaymentDialog(p => ({ ...p, amount: e.target.value }))}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Enter payment amount"
+                      value={paymentDialog.amount}
+                      onChange={e => setPaymentDialog(p => ({ ...p, amount: e.target.value }))}
+                      className="flex-1"
+                    />
+                    {remaining > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="text-xs whitespace-nowrap"
+                        onClick={() => setPaymentDialog(p => ({ ...p, amount: remaining.toString() }))}
+                      >
+                        Full Balance
+                      </Button>
+                    )}
+                  </div>
                   {exceedsBalance && (
                     <p className="text-xs text-destructive">Amount exceeds remaining balance of ₹{remaining.toLocaleString('en-IN')}</p>
                   )}
