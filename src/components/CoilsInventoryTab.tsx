@@ -75,6 +75,7 @@ export default function CoilsInventoryTab() {
   const updateBatch = useUpdateBatch();
   
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
+  const [expandedMaterials, setExpandedMaterials] = useState<Set<string>>(new Set());
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addMode, setAddMode] = useState<'new' | 'import' | null>(null);
@@ -158,6 +159,27 @@ export default function CoilsInventoryTab() {
     });
     return groups;
   }, [filteredBatches, allActions, allProcRecords]);
+
+  const materialGroups = useMemo(() => {
+    const map = new Map<string, { material: string; groups: SKUGroup[]; totalBalance: number; totalUsable: number }>();
+    skuGroups.forEach(g => {
+      const mat = g.material || 'Unknown';
+      if (!map.has(mat)) map.set(mat, { material: mat, groups: [], totalBalance: 0, totalUsable: 0 });
+      const entry = map.get(mat)!;
+      entry.groups.push(g);
+      entry.totalBalance += g.totalBalanceQty;
+      entry.totalUsable += g.totalUsableQty;
+    });
+    return Array.from(map.values()).sort((a, b) => a.material.localeCompare(b.material));
+  }, [skuGroups]);
+
+  const toggleMaterial = (mat: string) => {
+    setExpandedMaterials(prev => {
+      const next = new Set(prev);
+      if (next.has(mat)) next.delete(mat); else next.add(mat);
+      return next;
+    });
+  };
 
   const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
   const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
@@ -386,7 +408,7 @@ export default function CoilsInventoryTab() {
         )}
       </div>
 
-      {/* SKU Summary */}
+      {/* Material > SKU Summary */}
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
@@ -395,13 +417,21 @@ export default function CoilsInventoryTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {skuGroups.length === 0 && (
+            {materialGroups.length === 0 && (
               <TableRow><TableCell colSpan={skuCols.length} className="text-center text-muted-foreground py-8">No inventory items. Add batches to get started.</TableCell></TableRow>
             )}
-            {skuGroups.map(g => (
+            {materialGroups.map(mg => (
+              <>
+                <TableRow key={`mat-${mg.material}`} className="cursor-pointer bg-primary/10 hover:bg-primary/15 font-semibold border-b-2 border-primary/20" onClick={() => toggleMaterial(mg.material)}>
+                  <TableCell>{expandedMaterials.has(mg.material) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                  <TableCell className="text-sm font-bold" colSpan={6}>{mg.material} ({mg.groups.reduce((s, g) => s + g.batches.length, 0)} coils)</TableCell>
+                  <TableCell className="text-sm font-mono-num font-bold">{mg.totalUsable.toFixed(2)}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-bold">{mg.totalBalance.toFixed(2)}</TableCell>
+                </TableRow>
+                {expandedMaterials.has(mg.material) && mg.groups.map(g => (
               <>
                 <TableRow key={g.key} className="cursor-pointer bg-[hsl(var(--sku-row))] hover:bg-[hsl(var(--sku-row))/0.7] font-medium" onClick={() => setExpandedSKU(expandedSKU === g.key ? null : g.key)}>
-                  <TableCell>{expandedSKU === g.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                  <TableCell className="pl-8">{expandedSKU === g.key ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                   <TableCell className="text-sm">{g.material || '-'}</TableCell>
                   <TableCell className="text-sm">{g.make || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.thickness ?? '-'}</TableCell>
@@ -701,6 +731,8 @@ export default function CoilsInventoryTab() {
                     </TableCell>
                   </TableRow>
                 )}
+              </>
+            ))}
               </>
             ))}
           </TableBody>
