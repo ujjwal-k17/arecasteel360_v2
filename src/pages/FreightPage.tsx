@@ -403,7 +403,10 @@ function TransporterDispatchTable({
     });
   };
 
-  const totalFreight = data.reduce((s, r) => s + (transporterFreightMap[r.invoice_number]?.total_freight || 0), 0);
+  const totalFreight = data.reduce((s, r) => {
+    const f = transporterFreightMap[r.invoice_number];
+    return s + (f?.total_freight || 0) + (f?.gst || 0);
+  }, 0);
 
   return (
     <div className="space-y-3">
