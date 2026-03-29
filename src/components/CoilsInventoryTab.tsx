@@ -170,8 +170,8 @@ export default function CoilsInventoryTab() {
     return skuGroups.filter(g => (g.material || 'Unknown') === materialTab);
   }, [skuGroups, materialTab]);
 
-  const grandTotalBalanceQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
-  const grandTotalUsableQty = useMemo(() => filteredBatches.reduce((s, b) => s + calcUsableBalanceQty(b, allActions, allProcRecords), 0), [filteredBatches, allActions, allProcRecords]);
+  const grandTotalBalanceQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalBalanceQty, 0), [displayedSkuGroups]);
+  const grandTotalUsableQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalUsableQty, 0), [displayedSkuGroups]);
 
   const toggleBatchSelect = (id: string) => {
     setSelectedBatchIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
