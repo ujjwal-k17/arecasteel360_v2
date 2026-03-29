@@ -293,6 +293,15 @@ function FreightPage() {
 
   const addPayment = useMutation({
     mutationFn: async ({ transporter_freight_id, amount }: { transporter_freight_id: string; amount: number }) => {
+      // Get freight record to check total amount
+      const freightRecord = Object.values(transporterFreightMap || {}).find((r: any) => r.id === transporter_freight_id) as any;
+      if (freightRecord) {
+        const totalAmount = (freightRecord.total_freight || 0) + (freightRecord.gst || 0);
+        const alreadyPaid = paidAmountByFreightId[transporter_freight_id] || 0;
+        if (alreadyPaid + amount > totalAmount) {
+          throw new Error(`Payment exceeds total amount. Remaining balance: ₹${(totalAmount - alreadyPaid).toLocaleString('en-IN')}`);
+        }
+      }
       const { error } = await supabase.from('transporter_freight_payments').insert({
         transporter_freight_id,
         amount,
@@ -305,7 +314,7 @@ function FreightPage() {
       toast.success('Payment recorded');
       setPaymentDialog({ open: false, freightId: '', amount: '', invoiceNumber: '' });
     },
-    onError: () => toast.error('Failed to record payment'),
+    onError: (e: any) => toast.error(e.message || 'Failed to record payment'),
   });
 
   const refreshAll = () => {
