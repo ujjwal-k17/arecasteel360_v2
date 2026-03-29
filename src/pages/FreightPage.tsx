@@ -764,9 +764,6 @@ function PurchasesTable({
               </TableRow>
             )}
             {data.map((p, idx) => {
-              const currentInvoice = editingInvoice[p.batch_number] !== undefined
-                ? editingInvoice[p.batch_number]
-                : (p.purchase_invoice_number || '');
               const hasPurchaseInvoice = !!(p.purchase_invoice_number || editingInvoice[p.batch_number]?.trim());
 
               return (
