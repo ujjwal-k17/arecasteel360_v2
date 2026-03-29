@@ -575,7 +575,13 @@ function FreightPage() {
                 data={filteredMappedItems.filter(s => s.dispatch_type === 'Areca 0720')}
                 showMoveBack
                 showSourceColumn
-                onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+                onMoveBack={(inv, item) => {
+                  if (item?.purchaseBatches) {
+                    item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+                  } else {
+                    updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+                  }
+                }}
                 onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Areca 0720'), 'UP14KT0750')}
               />
             </TabsContent>
@@ -584,7 +590,13 @@ function FreightPage() {
                 data={filteredMappedItems.filter(s => s.dispatch_type === 'Areca 2720')}
                 showMoveBack
                 showSourceColumn
-                onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+                onMoveBack={(inv, item) => {
+                  if (item?.purchaseBatches) {
+                    item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+                  } else {
+                    updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+                  }
+                }}
                 onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Areca 2720'), 'UP14QT2750')}
               />
             </TabsContent>
