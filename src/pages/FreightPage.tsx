@@ -253,6 +253,7 @@ function FreightPage() {
         material: b.material,
         gross_weight: b.gross_weight || 0,
         purchase_type: detail?.dispatch_type || null,
+        purchase_invoice_number: detail?.purchase_invoice_number || null,
       };
     });
   }, [batches, invoiceDetailMap]);
