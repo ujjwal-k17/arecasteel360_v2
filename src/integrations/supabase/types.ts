@@ -1015,6 +1015,65 @@ export type Database = {
         }
         Relationships: []
       }
+      transporter_freight: {
+        Row: {
+          comments: string | null
+          created_at: string
+          id: string
+          invoice_number: string
+          status: string
+          total_freight: number | null
+          transporter_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          invoice_number: string
+          status?: string
+          total_freight?: number | null
+          transporter_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          invoice_number?: string
+          status?: string
+          total_freight?: number | null
+          transporter_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transporter_freight_transporter_id_fkey"
+            columns: ["transporter_id"]
+            isOneToOne: false
+            referencedRelation: "transporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transporters: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           can_edit: boolean | null

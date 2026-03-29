@@ -6,9 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, Download } from 'lucide-react';
+import { RefreshCw, Download, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { FreightDetailsDialog } from '@/components/freight/FreightDetailsDialog';
+import { TransporterFreightTab } from '@/components/freight/TransporterFreightTab';
 
 const DISPATCH_TYPES = ['Ex-Sales', 'Transporter', 'Areca 0720', 'Areca 2720'] as const;
 
@@ -25,8 +27,8 @@ function FreightPage() {
   const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [freightDialog, setFreightDialog] = useState<{ open: boolean; invoice: string }>({ open: false, invoice: '' });
 
-  // Fetch orders with customers
   const { data: orders } = useQuery({
     queryKey: ['freight_orders'],
     queryFn: async () => {
@@ -48,7 +50,6 @@ function FreightPage() {
     return map;
   }, [orders]);
 
-  // Fetch invoice_details for dispatch_type
   const { data: invoiceDetails } = useQuery({
     queryKey: ['freight_invoice_details'],
     queryFn: async () => {
@@ -60,13 +61,10 @@ function FreightPage() {
 
   const invoiceDetailMap = useMemo(() => {
     const map: Record<string, any> = {};
-    (invoiceDetails || []).forEach((d: any) => {
-      map[d.invoice_number] = d;
-    });
+    (invoiceDetails || []).forEach((d: any) => { map[d.invoice_number] = d; });
     return map;
   }, [invoiceDetails]);
 
-  // Fetch all sales sources
   const { data: inventoryActions } = useQuery({
     queryKey: ['freight_inv_actions'],
     queryFn: async () => {
@@ -82,9 +80,7 @@ function FreightPage() {
   const { data: fgSales } = useQuery({
     queryKey: ['freight_fg_sales'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fg_sales')
-        .select('invoice_number, sales_date, order_id, quantity');
+      const { data, error } = await supabase.from('fg_sales').select('invoice_number, sales_date, order_id, quantity');
       if (error) throw error;
       return data;
     },
@@ -93,18 +89,34 @@ function FreightPage() {
   const { data: defectiveSales } = useQuery({
     queryKey: ['freight_defective_sales'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('defective_sales')
-        .select('invoice_number, sales_date, order_id, quantity');
+      const { data, error } = await supabase.from('defective_sales').select('invoice_number, sales_date, order_id, quantity');
       if (error) throw error;
       return data;
     },
   });
 
-  // Aggregate at invoice level
+  const { data: transporters } = useQuery({
+    queryKey: ['transporters_list'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('transporters').select('*').order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: transporterFreightMap } = useQuery({
+    queryKey: ['transporter_freight_map'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('transporter_freight').select('*');
+      if (error) throw error;
+      const map: Record<string, any> = {};
+      (data || []).forEach((r: any) => { map[r.invoice_number] = r; });
+      return map;
+    },
+  });
+
   const invoiceSummaries: InvoiceSummary[] = useMemo(() => {
     const map: Record<string, { invoice_date: string | null; order_ids: Set<string>; total_qty: number }> = {};
-
     const addRecord = (inv: string | null, date: string | null, orderId: string | null, qty: number) => {
       if (!inv) return;
       if (!map[inv]) map[inv] = { invoice_date: null, order_ids: new Set(), total_qty: 0 };
@@ -112,7 +124,6 @@ function FreightPage() {
       if (orderId) map[inv].order_ids.add(orderId);
       map[inv].total_qty += qty;
     };
-
     (inventoryActions || []).forEach((a: any) => addRecord(a.invoice_number, a.sales_date, a.order_id, a.net_weight || 0));
     (fgSales || []).forEach((s: any) => addRecord(s.invoice_number, s.sales_date, s.order_id, s.quantity || 0));
     (defectiveSales || []).forEach((s: any) => addRecord(s.invoice_number, s.sales_date, s.order_id, s.quantity || 0));
@@ -135,7 +146,6 @@ function FreightPage() {
     });
   }, [inventoryActions, fgSales, defectiveSales, orderMap, invoiceDetailMap]);
 
-  // Filter by date
   const filteredSummaries = useMemo(() => {
     return invoiceSummaries.filter(s => {
       if (!s.invoice_date) return !dateFrom && !dateTo;
@@ -145,20 +155,14 @@ function FreightPage() {
     });
   }, [invoiceSummaries, dateFrom, dateTo]);
 
-  // Mutation to update dispatch_type
   const updateDispatchType = useMutation({
     mutationFn: async ({ invoice_number, dispatch_type }: { invoice_number: string; dispatch_type: string | null }) => {
       const existing = invoiceDetailMap[invoice_number];
       if (existing) {
-        const { error } = await supabase
-          .from('invoice_details')
-          .update({ dispatch_type })
-          .eq('invoice_number', invoice_number);
+        const { error } = await supabase.from('invoice_details').update({ dispatch_type }).eq('invoice_number', invoice_number);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('invoice_details')
-          .insert({ invoice_number, dispatch_type });
+        const { error } = await supabase.from('invoice_details').insert({ invoice_number, dispatch_type });
         if (error) throw error;
       }
     },
@@ -169,12 +173,32 @@ function FreightPage() {
     onError: () => toast.error('Failed to update dispatch type'),
   });
 
+  const saveFreightDetails = useMutation({
+    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number }) => {
+      const existing = (transporterFreightMap || {})[data.invoice_number];
+      if (existing) {
+        const { error } = await supabase.from('transporter_freight')
+          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('transporter_freight')
+          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_map'] });
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_records'] });
+      toast.success('Freight details saved');
+    },
+    onError: () => toast.error('Failed to save freight details'),
+  });
+
   const refreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['freight_inv_actions'] });
-    queryClient.invalidateQueries({ queryKey: ['freight_fg_sales'] });
-    queryClient.invalidateQueries({ queryKey: ['freight_defective_sales'] });
-    queryClient.invalidateQueries({ queryKey: ['freight_orders'] });
-    queryClient.invalidateQueries({ queryKey: ['freight_invoice_details'] });
+    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list'].forEach(k =>
+      queryClient.invalidateQueries({ queryKey: [k] })
+    );
     toast.success('Refreshed');
   };
 
@@ -192,7 +216,6 @@ function FreightPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, label);
     XLSX.writeFile(wb, `${label.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast.success('Downloaded');
   };
 
   return (
@@ -204,6 +227,7 @@ function FreightPage() {
           <TabsTrigger value="transporter">Transporter</TabsTrigger>
           <TabsTrigger value="areca-0720">Areca 0720</TabsTrigger>
           <TabsTrigger value="areca-2720">Areca 2720</TabsTrigger>
+          <TabsTrigger value="tpt-freight">TPT Freight</TabsTrigger>
         </TabsList>
 
         <div className="flex items-center gap-3 flex-wrap my-4">
@@ -215,9 +239,7 @@ function FreightPage() {
             <span className="text-xs text-muted-foreground">to</span>
             <Input type="date" className="h-8 w-36 text-xs" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             {(dateFrom || dateTo) && (
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setDateFrom(''); setDateTo(''); }}>
-                Clear
-              </Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>
             )}
           </div>
         </div>
@@ -235,6 +257,9 @@ function FreightPage() {
             data={filteredSummaries.filter(s => s.dispatch_type === 'Transporter')}
             showMoveBack
             onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+            showFreightAction
+            transporterFreightMap={transporterFreightMap || {}}
+            onOpenFreightDialog={(inv) => setFreightDialog({ open: true, invoice: inv })}
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Transporter'), 'Transporter')}
           />
         </TabsContent>
@@ -254,7 +279,19 @@ function FreightPage() {
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720'), 'Areca 2720')}
           />
         </TabsContent>
+        <TabsContent value="tpt-freight">
+          <TransporterFreightTab />
+        </TabsContent>
       </Tabs>
+
+      <FreightDetailsDialog
+        open={freightDialog.open}
+        onOpenChange={(o) => setFreightDialog(p => ({ ...p, open: o }))}
+        invoiceNumber={freightDialog.invoice}
+        transporters={(transporters || []).map((t: any) => ({ id: t.id, name: t.name }))}
+        existingData={(transporterFreightMap || {})[freightDialog.invoice] || null}
+        onSave={(data) => saveFreightDetails.mutate(data)}
+      />
     </div>
   );
 }
@@ -265,6 +302,9 @@ function DispatchTable({
   onDispatchTypeChange,
   showMoveBack,
   onMoveBack,
+  showFreightAction,
+  transporterFreightMap,
+  onOpenFreightDialog,
   onDownload,
 }: {
   data: InvoiceSummary[];
@@ -272,6 +312,9 @@ function DispatchTable({
   onDispatchTypeChange?: (invoice: string, type: string) => void;
   showMoveBack?: boolean;
   onMoveBack?: (invoice: string) => void;
+  showFreightAction?: boolean;
+  transporterFreightMap?: Record<string, any>;
+  onOpenFreightDialog?: (invoice: string) => void;
   onDownload: () => void;
 }) {
   return (
@@ -302,54 +345,66 @@ function DispatchTable({
               <TableHead className="text-xs font-semibold">
                 {showDispatchType ? 'Dispatch Type' : showMoveBack ? 'Action' : 'Dispatch Type'}
               </TableHead>
+              {showFreightAction && <TableHead className="text-xs font-semibold">Freight</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={showFreightAction ? 8 : 7} className="text-center text-muted-foreground py-8">
                   No dispatches found.
                 </TableCell>
               </TableRow>
             )}
-            {data.map((s, idx) => (
-              <TableRow key={s.invoice_number}>
-                <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
-                <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
-                <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
-                <TableCell className="text-sm">
-                  {showDispatchType && onDispatchTypeChange ? (
-                    <Select
-                      value={s.dispatch_type || ''}
-                      onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-[130px]">
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DISPATCH_TYPES.map(t => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : showMoveBack && onMoveBack ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => onMoveBack(s.invoice_number)}
-                    >
-                      ← Move Back
-                    </Button>
-                  ) : (
-                    <span>{s.dispatch_type || '-'}</span>
+            {data.map((s, idx) => {
+              const freightData = transporterFreightMap?.[s.invoice_number];
+              return (
+                <TableRow key={s.invoice_number}>
+                  <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
+                  <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                  <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
+                  <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
+                  <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
+                  <TableCell className="text-sm">
+                    {showDispatchType && onDispatchTypeChange ? (
+                      <Select
+                        value={s.dispatch_type || ''}
+                        onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-[130px]">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DISPATCH_TYPES.map(t => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : showMoveBack && onMoveBack ? (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
+                        ← Move Back
+                      </Button>
+                    ) : (
+                      <span>{s.dispatch_type || '-'}</span>
+                    )}
+                  </TableCell>
+                  {showFreightAction && (
+                    <TableCell className="text-sm">
+                      <Button
+                        variant={freightData ? 'outline' : 'default'}
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => onOpenFreightDialog?.(s.invoice_number)}
+                      >
+                        <Truck className="h-3.5 w-3.5" />
+                        {freightData ? `₹${(freightData.total_freight || 0).toLocaleString('en-IN')}` : 'Add'}
+                      </Button>
+                    </TableCell>
                   )}
-                </TableCell>
-              </TableRow>
-            ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
