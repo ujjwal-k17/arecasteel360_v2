@@ -1,0 +1,1 @@
+ALTER TABLE public.invoice_details ADD COLUMN dispatch_type text DEFAULT NULL;

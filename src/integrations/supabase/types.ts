@@ -419,6 +419,7 @@ export type Database = {
         Row: {
           created_at: string
           credit_period: number | null
+          dispatch_type: string | null
           id: string
           invoice_amount: number | null
           invoice_number: string
@@ -427,6 +428,7 @@ export type Database = {
         Insert: {
           created_at?: string
           credit_period?: number | null
+          dispatch_type?: string | null
           id?: string
           invoice_amount?: number | null
           invoice_number: string
@@ -435,6 +437,7 @@ export type Database = {
         Update: {
           created_at?: string
           credit_period?: number | null
+          dispatch_type?: string | null
           id?: string
           invoice_amount?: number | null
           invoice_number?: string
