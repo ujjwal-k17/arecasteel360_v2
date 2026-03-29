@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { ArrowRightCircle } from 'lucide-react';
 import WIPProcessingDialog from './WIPProcessingDialog';
 
 interface SKUGroup {
@@ -167,22 +168,56 @@ export default function WIPInventoryTab() {
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {
                     const canProcess = item.process === 'Slit Coil';
-                    const batchNum = batchMap.get(item.source_batch_id) || '-';
-                    return (
+                     const batchNum = batchMap.get(item.source_batch_id) || '-';
+                     const handleMoveToFG = async () => {
+                       if (!confirm(`Move this WIP item (${item.qty?.toFixed(2)} Kg) to Finished Goods?`)) return;
+                       try {
+                         const { error: fgError } = await supabase.from('fg_items').insert({
+                           source_id: item.source_batch_id,
+                           source_type: 'wip',
+                           processing_record_id: item.processing_record_id,
+                           material: item.material,
+                           make: item.make,
+                           process: item.process,
+                           thickness: item.thickness,
+                           width: item.width,
+                           length: item.length,
+                           coating: item.coating,
+                           grade: item.grade,
+                           qty: item.qty,
+                           num_pcs: item.num_pcs,
+                           order_id: item.order_id,
+                         });
+                         if (fgError) throw fgError;
+                         const { error: delError } = await supabase.from('wip_items').delete().eq('id', item.id);
+                         if (delError) throw delError;
+                         queryClient.invalidateQueries({ queryKey: ['wip_items'] });
+                         queryClient.invalidateQueries({ queryKey: ['fg_items'] });
+                         toast.success('Moved to Finished Goods');
+                       } catch (err: any) {
+                         toast.error(err.message || 'Failed to move to FG');
+                       }
+                     };
+                     return (
                       <TableRow key={item.id} className="bg-background">
-                        <TableCell />
-                        <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{batchNum}</span></TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
-                        <TableCell className="text-xs font-mono-num">{item.qty ?? '-'}</TableCell>
-                        <TableCell>
-                          {canProcess ? (
-                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
-                          ) : <span className="text-xs text-muted-foreground">—</span>}
-                        </TableCell>
-                      </TableRow>
+                         <TableCell />
+                         <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{batchNum}</span></TableCell>
+                         <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
+                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item)}</TableCell>
+                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
+                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
+                         <TableCell className="text-xs font-mono-num">{item.qty ?? '-'}</TableCell>
+                         <TableCell>
+                           <div className="flex gap-1">
+                             {canProcess && (
+                               <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
+                             )}
+                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
+                               <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
+                             </Button>
+                           </div>
+                         </TableCell>
+                       </TableRow>
                     );
                   })}
                 </>
