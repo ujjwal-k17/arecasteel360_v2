@@ -1,16 +1,19 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, Download, Truck } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { RefreshCw, Download, Truck, ChevronDown, ChevronUp, MessageSquare, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { FreightDetailsDialog } from '@/components/freight/FreightDetailsDialog';
-import { TransporterFreightTab } from '@/components/freight/TransporterFreightTab';
 
 const DISPATCH_TYPES = ['Ex-Sales', 'Transporter', 'Areca 0720', 'Areca 2720'] as const;
 
@@ -25,9 +28,11 @@ interface InvoiceSummary {
 
 function FreightPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [freightDialog, setFreightDialog] = useState<{ open: boolean; invoice: string }>({ open: false, invoice: '' });
+  const [commentDialog, setCommentDialog] = useState<{ open: boolean; freightId: string; comment: string }>({ open: false, freightId: '', comment: '' });
 
   const { data: orders } = useQuery({
     queryKey: ['freight_orders'],
@@ -107,13 +112,34 @@ function FreightPage() {
   const { data: transporterFreightMap } = useQuery({
     queryKey: ['transporter_freight_map'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('transporter_freight').select('*');
+      const { data, error } = await supabase.from('transporter_freight').select('*, transporters(name)');
       if (error) throw error;
       const map: Record<string, any> = {};
       (data || []).forEach((r: any) => { map[r.invoice_number] = r; });
       return map;
     },
   });
+
+  const { data: freightComments } = useQuery({
+    queryKey: ['transporter_freight_comments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transporter_freight_comments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const commentsByFreightId = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    (freightComments || []).forEach((c: any) => {
+      if (!map[c.transporter_freight_id]) map[c.transporter_freight_id] = [];
+      map[c.transporter_freight_id].push(c);
+    });
+    return map;
+  }, [freightComments]);
 
   const invoiceSummaries: InvoiceSummary[] = useMemo(() => {
     const map: Record<string, { invoice_date: string | null; order_ids: Set<string>; total_qty: number }> = {};
@@ -189,14 +215,42 @@ function FreightPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transporter_freight_map'] });
-      queryClient.invalidateQueries({ queryKey: ['transporter_freight_records'] });
       toast.success('Freight details saved');
     },
     onError: () => toast.error('Failed to save freight details'),
   });
 
+  const updateFreightStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from('transporter_freight').update({ status }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_map'] });
+      toast.success('Status updated');
+    },
+    onError: () => toast.error('Failed to update status'),
+  });
+
+  const addComment = useMutation({
+    mutationFn: async ({ transporter_freight_id, comment }: { transporter_freight_id: string; comment: string }) => {
+      const { error } = await supabase.from('transporter_freight_comments').insert({
+        transporter_freight_id,
+        user_email: user?.email || 'unknown',
+        comment,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_comments'] });
+      toast.success('Comment added');
+      setCommentDialog({ open: false, freightId: '', comment: '' });
+    },
+    onError: () => toast.error('Failed to add comment'),
+  });
+
   const refreshAll = () => {
-    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list'].forEach(k =>
+    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments'].forEach(k =>
       queryClient.invalidateQueries({ queryKey: [k] })
     );
     toast.success('Refreshed');
@@ -227,7 +281,6 @@ function FreightPage() {
           <TabsTrigger value="transporter">Transporter</TabsTrigger>
           <TabsTrigger value="areca-0720">Areca 0720</TabsTrigger>
           <TabsTrigger value="areca-2720">Areca 2720</TabsTrigger>
-          <TabsTrigger value="tpt-freight">TPT Freight</TabsTrigger>
         </TabsList>
 
         <div className="flex items-center gap-3 flex-wrap my-4">
@@ -253,13 +306,14 @@ function FreightPage() {
           />
         </TabsContent>
         <TabsContent value="transporter">
-          <DispatchTable
+          <TransporterDispatchTable
             data={filteredSummaries.filter(s => s.dispatch_type === 'Transporter')}
-            showMoveBack
             onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
-            showFreightAction
             transporterFreightMap={transporterFreightMap || {}}
+            commentsByFreightId={commentsByFreightId}
             onOpenFreightDialog={(inv) => setFreightDialog({ open: true, invoice: inv })}
+            onStatusChange={(id, status) => updateFreightStatus.mutate({ id, status })}
+            onAddComment={(freightId) => setCommentDialog({ open: true, freightId, comment: '' })}
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Transporter'), 'Transporter')}
           />
         </TabsContent>
@@ -279,9 +333,6 @@ function FreightPage() {
             onDownload={() => handleDownload(filteredSummaries.filter(s => s.dispatch_type === 'Areca 2720'), 'Areca 2720')}
           />
         </TabsContent>
-        <TabsContent value="tpt-freight">
-          <TransporterFreightTab />
-        </TabsContent>
       </Tabs>
 
       <FreightDetailsDialog
@@ -292,19 +343,246 @@ function FreightPage() {
         existingData={(transporterFreightMap || {})[freightDialog.invoice] || null}
         onSave={(data) => saveFreightDetails.mutate(data)}
       />
+
+      {/* Add Comment Dialog */}
+      <Dialog open={commentDialog.open} onOpenChange={o => setCommentDialog(p => ({ ...p, open: o }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Add Comment</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Your Comment</Label>
+            <Textarea
+              value={commentDialog.comment}
+              onChange={e => setCommentDialog(p => ({ ...p, comment: e.target.value }))}
+              placeholder="Type your comment..."
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">Posting as: {user?.email}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCommentDialog({ open: false, freightId: '', comment: '' })}>Cancel</Button>
+            <Button
+              onClick={() => addComment.mutate({ transporter_freight_id: commentDialog.freightId, comment: commentDialog.comment })}
+              disabled={!commentDialog.comment.trim()}
+            >
+              Add Comment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
+/* ── Transporter Dispatch Table with expandable rows ── */
+function TransporterDispatchTable({
+  data,
+  onMoveBack,
+  transporterFreightMap,
+  commentsByFreightId,
+  onOpenFreightDialog,
+  onStatusChange,
+  onAddComment,
+  onDownload,
+}: {
+  data: InvoiceSummary[];
+  onMoveBack: (invoice: string) => void;
+  transporterFreightMap: Record<string, any>;
+  commentsByFreightId: Record<string, any[]>;
+  onOpenFreightDialog: (invoice: string) => void;
+  onStatusChange: (id: string, status: string) => void;
+  onAddComment: (freightId: string) => void;
+  onDownload: () => void;
+}) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (inv: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(inv)) next.delete(inv); else next.add(inv);
+      return next;
+    });
+  };
+
+  const totalFreight = data.reduce((s, r) => s + (transporterFreightMap[r.invoice_number]?.total_freight || 0), 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-4 text-sm flex-wrap">
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">Invoices:</span>{' '}
+          <span className="font-semibold">{data.length}</span>
+        </div>
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">Total Qty:</span>{' '}
+          <span className="font-semibold font-mono-num">{data.reduce((s, r) => s + r.total_qty, 0).toFixed(2)} Kg</span>
+        </div>
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">Total Freight:</span>{' '}
+          <span className="font-semibold font-mono-num">₹{totalFreight.toLocaleString('en-IN')}</span>
+        </div>
+        <Button variant="outline" size="sm" onClick={onDownload} className="ml-auto gap-2 h-8">
+          <Download className="h-3.5 w-3.5" /> Download Excel
+        </Button>
+      </div>
+      <div className="overflow-x-auto rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="text-xs font-semibold w-8"></TableHead>
+              <TableHead className="text-xs font-semibold">#</TableHead>
+              <TableHead className="text-xs font-semibold">Invoice Number</TableHead>
+              <TableHead className="text-xs font-semibold">Invoice Date</TableHead>
+              <TableHead className="text-xs font-semibold">Customer Name</TableHead>
+              <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold">Freight (₹)</TableHead>
+              <TableHead className="text-xs font-semibold">Status</TableHead>
+              <TableHead className="text-xs font-semibold">Comments</TableHead>
+              <TableHead className="text-xs font-semibold">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                  No transporter dispatches found.
+                </TableCell>
+              </TableRow>
+            )}
+            {data.map((s, idx) => {
+              const freightData = transporterFreightMap[s.invoice_number];
+              const isExpanded = expandedRows.has(s.invoice_number);
+              const comments = freightData ? (commentsByFreightId[freightData.id] || []) : [];
+
+              return (
+                <>
+                  <TableRow key={s.invoice_number} className="cursor-pointer" onClick={() => toggleRow(s.invoice_number)}>
+                    <TableCell className="text-sm px-2">
+                      {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
+                    <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                    <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm">
+                      <Button
+                        variant={freightData ? 'outline' : 'default'}
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={(e) => { e.stopPropagation(); onOpenFreightDialog(s.invoice_number); }}
+                      >
+                        <Truck className="h-3.5 w-3.5" />
+                        {freightData ? `₹${(freightData.total_freight || 0).toLocaleString('en-IN')}` : 'Add'}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      {freightData ? (
+                        <Select value={freightData.status} onValueChange={v => onStatusChange(freightData.id, v)}>
+                          <SelectTrigger className="h-7 text-xs w-[100px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
+                            <SelectItem value="hold">Hold</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      {freightData ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => onAddComment(freightData.id)}
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          {comments.length > 0 ? `(${comments.length})` : 'Add'}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
+                        ← Move Back
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && (
+                    <TableRow key={`${s.invoice_number}-detail`}>
+                      <TableCell colSpan={10} className="bg-muted/30 p-4">
+                        <div className="space-y-3">
+                          {/* Transporter Details */}
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-muted-foreground font-medium">Transporter:</span>
+                            <span className="font-semibold">{freightData?.transporters?.name || 'Not assigned'}</span>
+                            {freightData?.total_freight > 0 && (
+                              <>
+                                <span className="text-muted-foreground font-medium ml-4">Total Freight:</span>
+                                <span className="font-semibold font-mono-num">₹{(freightData.total_freight || 0).toLocaleString('en-IN')}</span>
+                              </>
+                            )}
+                            {freightData?.status && (
+                              <>
+                                <span className="text-muted-foreground font-medium ml-4">Status:</span>
+                                <span className={`font-semibold ${freightData.status === 'approved' ? 'text-green-600' : freightData.status === 'hold' ? 'text-amber-600' : ''}`}>
+                                  {freightData.status.charAt(0).toUpperCase() + freightData.status.slice(1)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* User Comments */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm text-muted-foreground font-medium">User Comments</span>
+                              {freightData && (
+                                <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => onAddComment(freightData.id)}>
+                                  <Plus className="h-3 w-3" /> Add
+                                </Button>
+                              )}
+                            </div>
+                            {comments.length === 0 ? (
+                              <p className="text-xs text-muted-foreground italic">No comments yet.</p>
+                            ) : (
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {comments.map((c: any) => (
+                                  <div key={c.id} className="bg-background rounded-md border px-3 py-2 text-sm">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="font-medium text-xs">{c.user_email}</span>
+                                      <span className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString('en-IN')}</span>
+                                    </div>
+                                    <p className="text-sm">{c.comment}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Generic Dispatch Table (for All Dispatches, Areca tabs) ── */
 function DispatchTable({
   data,
   showDispatchType,
   onDispatchTypeChange,
   showMoveBack,
   onMoveBack,
-  showFreightAction,
-  transporterFreightMap,
-  onOpenFreightDialog,
   onDownload,
 }: {
   data: InvoiceSummary[];
@@ -312,9 +590,6 @@ function DispatchTable({
   onDispatchTypeChange?: (invoice: string, type: string) => void;
   showMoveBack?: boolean;
   onMoveBack?: (invoice: string) => void;
-  showFreightAction?: boolean;
-  transporterFreightMap?: Record<string, any>;
-  onOpenFreightDialog?: (invoice: string) => void;
   onDownload: () => void;
 }) {
   return (
@@ -343,68 +618,51 @@ function DispatchTable({
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold">
-                {showDispatchType ? 'Dispatch Type' : showMoveBack ? 'Action' : 'Dispatch Type'}
+                {showDispatchType ? 'Dispatch Type' : 'Action'}
               </TableHead>
-              {showFreightAction && <TableHead className="text-xs font-semibold">Freight</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={showFreightAction ? 8 : 7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No dispatches found.
                 </TableCell>
               </TableRow>
             )}
-            {data.map((s, idx) => {
-              const freightData = transporterFreightMap?.[s.invoice_number];
-              return (
-                <TableRow key={s.invoice_number}>
-                  <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
-                  <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                  <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
-                  <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
-                  <TableCell className="text-sm">
-                    {showDispatchType && onDispatchTypeChange ? (
-                      <Select
-                        value={s.dispatch_type || ''}
-                        onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
-                      >
-                        <SelectTrigger className="h-7 text-xs w-[130px]">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DISPATCH_TYPES.map(t => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : showMoveBack && onMoveBack ? (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                        ← Move Back
-                      </Button>
-                    ) : (
-                      <span>{s.dispatch_type || '-'}</span>
-                    )}
-                  </TableCell>
-                  {showFreightAction && (
-                    <TableCell className="text-sm">
-                      <Button
-                        variant={freightData ? 'outline' : 'default'}
-                        size="sm"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => onOpenFreightDialog?.(s.invoice_number)}
-                      >
-                        <Truck className="h-3.5 w-3.5" />
-                        {freightData ? `₹${(freightData.total_freight || 0).toLocaleString('en-IN')}` : 'Add'}
-                      </Button>
-                    </TableCell>
+            {data.map((s, idx) => (
+              <TableRow key={s.invoice_number}>
+                <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
+                <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
+                <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
+                <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
+                <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
+                <TableCell className="text-sm">
+                  {showDispatchType && onDispatchTypeChange ? (
+                    <Select
+                      value={s.dispatch_type || ''}
+                      onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-[130px]">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DISPATCH_TYPES.map(t => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : showMoveBack && onMoveBack ? (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
+                      ← Move Back
+                    </Button>
+                  ) : (
+                    <span>{s.dispatch_type || '-'}</span>
                   )}
-                </TableRow>
-              );
-            })}
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
