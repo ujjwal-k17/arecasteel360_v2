@@ -56,10 +56,14 @@ export default function SalesDataTab() {
   const orderMap = useMemo(() => {
     const map: Record<string, { order_number: string; customer_name: string }> = {};
     (orders || []).forEach((o: any) => {
-      map[o.id] = {
+      const entry = {
         order_number: o.order_number,
         customer_name: o.customers?.customer_name || '-',
       };
+      map[o.id] = entry;
+      if (o.order_number) {
+        map[o.order_number] = entry;
+      }
     });
     return map;
   }, [orders]);
