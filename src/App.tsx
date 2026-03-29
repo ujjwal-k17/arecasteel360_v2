@@ -12,7 +12,7 @@ import ConsumablesPage from "./pages/ConsumablesPage";
 import OrderBookPage from "./pages/OrderBookPage";
 import WorkingCapitalPage from "./pages/WorkingCapitalPage";
 import PettyCashPage from "./pages/PettyCashPage";
-import TruckFleetPage from "./pages/TruckFleetPage";
+import FreightPage from "./pages/FreightPage";
 import AdminPage from "./pages/AdminPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
@@ -38,7 +38,7 @@ const App = () => (
               <Route path="/order-book" element={<ProtectedRoute page="order-book"><OrderBookPage /></ProtectedRoute>} />
               <Route path="/working-capital" element={<ProtectedRoute page="working-capital"><WorkingCapitalPage /></ProtectedRoute>} />
               <Route path="/petty-cash" element={<ProtectedRoute page="petty-cash"><PettyCashPage /></ProtectedRoute>} />
-              <Route path="/truck-fleet" element={<ProtectedRoute page="truck-fleet"><TruckFleetPage /></ProtectedRoute>} />
+              <Route path="/freight" element={<ProtectedRoute page="freight"><FreightPage /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
