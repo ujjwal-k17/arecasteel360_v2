@@ -520,6 +520,10 @@ function FreightPage() {
               dispatch_type: type,
               source_type: 'purchase',
             })}
+            onSavePurchaseInvoice={(batchNum, invNo) => savePurchaseInvoiceNumber.mutate({
+              batch_number: batchNum,
+              purchase_invoice_number: invNo,
+            })}
           />
         </TabsContent>
 
