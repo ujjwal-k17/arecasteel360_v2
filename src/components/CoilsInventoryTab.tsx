@@ -49,14 +49,26 @@ const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
 ];
 
 function isBatchComplete(b: Batch): boolean {
+  const mat = b.material || '';
+  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
+  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS.every(f => {
+    if (f === 'coating' && coatingOptions.length === 0) return true;
+    if (f === 'grade' && gradeOptions.length === 0) return true;
     const v = b[f]; return v !== null && v !== undefined && v !== '' && v !== 0;
   });
 }
 
 function getMissingFields(b: Batch): string[] {
+  const mat = b.material || '';
+  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
+  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS
-    .filter(f => { const v = b[f]; return v === null || v === undefined || v === '' || v === 0; })
+    .filter(f => {
+      if (f === 'coating' && coatingOptions.length === 0) return false;
+      if (f === 'grade' && gradeOptions.length === 0) return false;
+      const v = b[f]; return v === null || v === undefined || v === '' || v === 0;
+    })
     .map(f => String(f).replace(/_/g, ' '));
 }
 
