@@ -843,7 +843,7 @@ function TransporterDispatchTable({
   onAddPayment,
   onDownload,
 }: {
-  data: InvoiceSummary[];
+  data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   isAdmin: boolean;
   onMoveBack: (invoice: string) => void;
   transporterFreightMap: Record<string, any>;
