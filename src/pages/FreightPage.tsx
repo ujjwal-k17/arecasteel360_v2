@@ -200,16 +200,16 @@ function FreightPage() {
   });
 
   const saveFreightDetails = useMutation({
-    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; comments: string }) => {
+    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number }) => {
       const existing = (transporterFreightMap || {})[data.invoice_number];
       if (existing) {
         const { error } = await supabase.from('transporter_freight')
-          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, comments: data.comments })
+          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('transporter_freight')
-          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, comments: data.comments });
+          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst });
         if (error) throw error;
       }
     },
@@ -403,7 +403,10 @@ function TransporterDispatchTable({
     });
   };
 
-  const totalFreight = data.reduce((s, r) => s + (transporterFreightMap[r.invoice_number]?.total_freight || 0), 0);
+  const totalFreight = data.reduce((s, r) => {
+    const f = transporterFreightMap[r.invoice_number];
+    return s + (f?.total_freight || 0) + (f?.gst || 0);
+  }, 0);
 
   return (
     <div className="space-y-3">
@@ -434,9 +437,9 @@ function TransporterDispatchTable({
               <TableHead className="text-xs font-semibold">Invoice Date</TableHead>
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold">Freight (₹)</TableHead>
+              <TableHead className="text-xs font-semibold">Transporter Name</TableHead>
+              <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Status</TableHead>
-              <TableHead className="text-xs font-semibold">Comments</TableHead>
               <TableHead className="text-xs font-semibold">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -464,16 +467,13 @@ function TransporterDispatchTable({
                     <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
                     <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
                     <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm">{freightData?.transporters?.name || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-sm">
-                      <Button
-                        variant={freightData ? 'outline' : 'default'}
-                        size="sm"
-                        className="h-7 text-xs gap-1"
-                        onClick={(e) => { e.stopPropagation(); onOpenFreightDialog(s.invoice_number); }}
-                      >
-                        <Truck className="h-3.5 w-3.5" />
-                        {freightData ? `₹${(freightData.total_freight || 0).toLocaleString('en-IN')}` : 'Add'}
-                      </Button>
+                      {freightData && (freightData.total_freight > 0 || freightData.gst > 0) ? (
+                        <span className="font-mono-num">₹{((freightData.total_freight || 0) + (freightData.gst || 0)).toLocaleString('en-IN')}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       {freightData ? (
@@ -492,49 +492,49 @@ function TransporterDispatchTable({
                       )}
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      {freightData ? (
+                      <div className="flex items-center gap-1">
                         <Button
-                          variant="ghost"
+                          variant={freightData ? 'outline' : 'default'}
                           size="sm"
                           className="h-7 text-xs gap-1"
-                          onClick={() => onAddComment(freightData.id)}
+                          onClick={() => onOpenFreightDialog(s.invoice_number)}
                         >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          {comments.length > 0 ? `(${comments.length})` : 'Add'}
+                          <Truck className="h-3.5 w-3.5" />
+                          {freightData ? 'Edit' : 'Add Freight'}
                         </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                        ← Move Back
-                      </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
+                          ← Move Back
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
                       <TableCell colSpan={10} className="bg-muted/30 p-4">
                         <div className="space-y-3">
-                          {/* Transporter Details */}
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground font-medium">Transporter:</span>
-                            <span className="font-semibold">{freightData?.transporters?.name || 'Not assigned'}</span>
-                            {freightData?.total_freight > 0 && (
-                              <>
-                                <span className="text-muted-foreground font-medium ml-4">Total Freight:</span>
+                          {/* Freight Details */}
+                          {freightData && (freightData.total_freight > 0 || freightData.gst > 0) && (
+                            <div className="flex items-center gap-6 text-sm flex-wrap">
+                              <div>
+                                <span className="text-muted-foreground font-medium">Basic Freight:</span>{' '}
                                 <span className="font-semibold font-mono-num">₹{(freightData.total_freight || 0).toLocaleString('en-IN')}</span>
-                              </>
-                            )}
-                            {freightData?.status && (
-                              <>
-                                <span className="text-muted-foreground font-medium ml-4">Status:</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">GST:</span>{' '}
+                                <span className="font-semibold font-mono-num">₹{(freightData.gst || 0).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">Total:</span>{' '}
+                                <span className="font-semibold font-mono-num">₹{((freightData.total_freight || 0) + (freightData.gst || 0)).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">Status:</span>{' '}
                                 <span className={`font-semibold ${freightData.status === 'approved' ? 'text-green-600' : freightData.status === 'hold' ? 'text-amber-600' : ''}`}>
                                   {freightData.status.charAt(0).toUpperCase() + freightData.status.slice(1)}
                                 </span>
-                              </>
-                            )}
-                          </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* User Comments */}
                           <div>

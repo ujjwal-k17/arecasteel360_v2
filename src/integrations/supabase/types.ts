@@ -1019,6 +1019,7 @@ export type Database = {
         Row: {
           comments: string | null
           created_at: string
+          gst: number | null
           id: string
           invoice_number: string
           status: string
@@ -1029,6 +1030,7 @@ export type Database = {
         Insert: {
           comments?: string | null
           created_at?: string
+          gst?: number | null
           id?: string
           invoice_number: string
           status?: string
@@ -1039,6 +1041,7 @@ export type Database = {
         Update: {
           comments?: string | null
           created_at?: string
+          gst?: number | null
           id?: string
           invoice_number?: string
           status?: string

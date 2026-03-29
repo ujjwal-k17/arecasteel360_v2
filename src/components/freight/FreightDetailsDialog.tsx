@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,8 +14,8 @@ interface FreightDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   invoiceNumber: string;
   transporters: { id: string; name: string }[];
-  existingData?: { transporter_id: string | null; total_freight: number | null; comments: string | null } | null;
-  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; comments: string }) => void;
+  existingData?: { transporter_id: string | null; total_freight: number | null; gst: number | null } | null;
+  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number }) => void;
 }
 
 export function FreightDetailsDialog({
@@ -30,7 +29,7 @@ export function FreightDetailsDialog({
   const queryClient = useQueryClient();
   const [transporterId, setTransporterId] = useState('');
   const [totalFreight, setTotalFreight] = useState('');
-  const [comments, setComments] = useState('');
+  const [gst, setGst] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -38,7 +37,7 @@ export function FreightDetailsDialog({
     if (open) {
       setTransporterId(existingData?.transporter_id || '');
       setTotalFreight(existingData?.total_freight?.toString() || '');
-      setComments(existingData?.comments || '');
+      setGst(existingData?.gst?.toString() || '');
       setShowAddNew(false);
       setNewName('');
     }
@@ -66,7 +65,7 @@ export function FreightDetailsDialog({
       invoice_number: invoiceNumber,
       transporter_id: transporterId,
       total_freight: parseFloat(totalFreight),
-      comments,
+      gst: parseFloat(gst) || 0,
     });
     onOpenChange(false);
   };
@@ -110,23 +109,29 @@ export function FreightDetailsDialog({
             )}
           </div>
           <div className="space-y-2">
-            <Label>Total Freight (₹)</Label>
+            <Label>Freight Amount (₹)</Label>
             <Input
               type="number"
-              placeholder="Enter total freight amount"
+              placeholder="Enter freight amount"
               value={totalFreight}
               onChange={e => setTotalFreight(e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label>Comments</Label>
-            <Textarea
-              placeholder="Add comments..."
-              value={comments}
-              onChange={e => setComments(e.target.value)}
-              rows={3}
+            <Label>GST (₹)</Label>
+            <Input
+              type="number"
+              placeholder="Enter GST amount"
+              value={gst}
+              onChange={e => setGst(e.target.value)}
             />
           </div>
+          {(totalFreight || gst) && (
+            <div className="bg-muted/50 rounded-md px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Total (Freight + GST):</span>{' '}
+              <span className="font-semibold">₹{((parseFloat(totalFreight) || 0) + (parseFloat(gst) || 0)).toLocaleString('en-IN')}</span>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
