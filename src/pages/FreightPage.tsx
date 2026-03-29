@@ -277,27 +277,35 @@ function FreightPage() {
   }, [purchaseSummaries, dateFrom, dateTo]);
 
   // Combined items for destination tabs (sales + purchases mapped to InvoiceSummary format)
-  const allMappedItems: InvoiceSummary[] = useMemo(() => {
+  const allMappedItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = useMemo(() => {
     // Sales items that have a dispatch_type
-    const salesItems = invoiceSummaries.filter(s => s.dispatch_type);
+    const salesItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = invoiceSummaries.filter(s => s.dispatch_type);
 
-    // Purchase items that have a purchase_type (dispatch_type in invoice_details)
-    const purchaseItems = purchaseSummaries
-      .filter(p => p.purchase_type)
-      .map(p => {
-        // Map purchase_type to dispatch_type for destination tabs
-        let mappedDispatchType = p.purchase_type;
-        if (p.purchase_type === 'FOR Purchase') mappedDispatchType = 'Ex-Sales';
-        return {
-          invoice_number: p.batch_number,
-          invoice_date: p.purchase_date,
-          order_id: null,
-          customer_name: p.purchase_from,
-          total_qty: p.gross_weight,
-          dispatch_type: mappedDispatchType,
-          source_type: 'purchase',
-        } as InvoiceSummary;
+    // Purchase items grouped by purchase_invoice_number
+    const purchasesByInvoice: Record<string, PurchaseSummary[]> = {};
+    purchaseSummaries
+      .filter(p => p.purchase_type && p.purchase_invoice_number)
+      .forEach(p => {
+        const key = p.purchase_invoice_number!;
+        if (!purchasesByInvoice[key]) purchasesByInvoice[key] = [];
+        purchasesByInvoice[key].push(p);
       });
+
+    const purchaseItems = Object.entries(purchasesByInvoice).map(([invNo, batches]) => {
+      const first = batches[0];
+      let mappedDispatchType = first.purchase_type;
+      if (first.purchase_type === 'FOR Purchase') mappedDispatchType = 'Ex-Sales';
+      return {
+        invoice_number: invNo,
+        invoice_date: first.purchase_date,
+        order_id: null,
+        customer_name: first.purchase_from,
+        total_qty: batches.reduce((s, b) => s + b.gross_weight, 0),
+        dispatch_type: mappedDispatchType,
+        source_type: 'purchase',
+        purchaseBatches: batches,
+      } as InvoiceSummary & { purchaseBatches?: PurchaseSummary[] };
+    });
 
     return [...salesItems, ...purchaseItems];
   }, [invoiceSummaries, purchaseSummaries]);
