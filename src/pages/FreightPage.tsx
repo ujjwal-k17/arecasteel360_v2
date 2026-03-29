@@ -694,10 +694,22 @@ function FreightPage() {
 function PurchasesTable({
   data,
   onPurchaseTypeChange,
+  onSavePurchaseInvoice,
 }: {
   data: PurchaseSummary[];
   onPurchaseTypeChange: (batchNumber: string, type: string) => void;
+  onSavePurchaseInvoice: (batchNumber: string, invoiceNumber: string) => void;
 }) {
+  const [editingInvoice, setEditingInvoice] = useState<Record<string, string>>({});
+
+  const handleSaveInvoice = (batchNumber: string) => {
+    const val = editingInvoice[batchNumber]?.trim();
+    if (val) {
+      onSavePurchaseInvoice(batchNumber, val);
+      setEditingInvoice(prev => { const n = { ...prev }; delete n[batchNumber]; return n; });
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-4 text-sm">
@@ -720,42 +732,79 @@ function PurchasesTable({
               <TableHead className="text-xs font-semibold">Supplier</TableHead>
               <TableHead className="text-xs font-semibold">Material</TableHead>
               <TableHead className="text-xs font-semibold">Gross Weight (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold">Purchase Invoice No.</TableHead>
               <TableHead className="text-xs font-semibold">Purchase Type</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No unassigned purchases found.
                 </TableCell>
               </TableRow>
             )}
-            {data.map((p, idx) => (
-              <TableRow key={p.batch_number}>
-                <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                <TableCell className="text-sm font-medium">{p.batch_number}</TableCell>
-                <TableCell className="text-sm">{p.purchase_date ? new Date(p.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                <TableCell className="text-sm">{p.purchase_from || '-'}</TableCell>
-                <TableCell className="text-sm">{p.material || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{p.gross_weight.toFixed(2)}</TableCell>
-                <TableCell className="text-sm">
-                  <Select
-                    value={p.purchase_type || ''}
-                    onValueChange={v => onPurchaseTypeChange(p.batch_number, v)}
-                  >
-                    <SelectTrigger className="h-7 text-xs w-[130px]">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PURCHASE_TYPES.map(t => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-              </TableRow>
-            ))}
+            {data.map((p, idx) => {
+              const currentInvoice = editingInvoice[p.batch_number] !== undefined
+                ? editingInvoice[p.batch_number]
+                : (p.purchase_invoice_number || '');
+              const hasPurchaseInvoice = !!(p.purchase_invoice_number || editingInvoice[p.batch_number]?.trim());
+
+              return (
+                <TableRow key={p.batch_number}>
+                  <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell className="text-sm font-medium">{p.batch_number}</TableCell>
+                  <TableCell className="text-sm">{p.purchase_date ? new Date(p.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                  <TableCell className="text-sm">{p.purchase_from || '-'}</TableCell>
+                  <TableCell className="text-sm">{p.material || '-'}</TableCell>
+                  <TableCell className="text-sm font-mono-num">{p.gross_weight.toFixed(2)}</TableCell>
+                  <TableCell className="text-sm">
+                    {p.purchase_invoice_number ? (
+                      <span className="font-medium">{p.purchase_invoice_number}</span>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          className="h-7 text-xs w-[120px]"
+                          placeholder="Invoice No."
+                          value={editingInvoice[p.batch_number] || ''}
+                          onChange={e => setEditingInvoice(prev => ({ ...prev, [p.batch_number]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') handleSaveInvoice(p.batch_number); }}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          disabled={!editingInvoice[p.batch_number]?.trim()}
+                          onClick={() => handleSaveInvoice(p.batch_number)}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {hasPurchaseInvoice || p.purchase_invoice_number ? (
+                      <Select
+                        value={p.purchase_type || ''}
+                        onValueChange={v => onPurchaseTypeChange(p.batch_number, v)}
+                        disabled={!p.purchase_invoice_number}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-[130px]">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PURCHASE_TYPES.map(t => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Enter invoice first</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
