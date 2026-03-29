@@ -550,7 +550,14 @@ function FreightPage() {
           <TransporterDispatchTable
             data={filteredMappedItems.filter(s => s.dispatch_type === 'Transporter')}
             isAdmin={isAdmin}
-            onMoveBack={(inv) => updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null })}
+            onMoveBack={(inv) => {
+              const item = filteredMappedItems.find(s => s.invoice_number === inv);
+              if (item?.purchaseBatches) {
+                item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+              } else {
+                updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
+              }
+            }}
             transporterFreightMap={transporterFreightMap || {}}
             commentsByFreightId={commentsByFreightId}
             paymentsByFreightId={paymentsByFreightId}
