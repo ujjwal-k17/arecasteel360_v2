@@ -736,9 +736,6 @@ function TransporterDispatchTable({
                 </TableCell>
               </TableRow>
             )}
-                </TableCell>
-              </TableRow>
-            )}
             {filtered.map((s, idx) => {
               const freightData = transporterFreightMap[s.invoice_number];
               const isExpanded = expandedRows.has(s.invoice_number);
