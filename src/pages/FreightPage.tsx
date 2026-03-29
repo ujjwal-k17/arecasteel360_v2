@@ -174,16 +174,16 @@ function FreightPage() {
   });
 
   const saveFreightDetails = useMutation({
-    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number }) => {
+    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; comments: string }) => {
       const existing = (transporterFreightMap || {})[data.invoice_number];
       if (existing) {
         const { error } = await supabase.from('transporter_freight')
-          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight })
+          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, comments: data.comments })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('transporter_freight')
-          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight });
+          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, comments: data.comments });
         if (error) throw error;
       }
     },
