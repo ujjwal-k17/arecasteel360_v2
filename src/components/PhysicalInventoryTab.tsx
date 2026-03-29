@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, Eye, Plus, RefreshCw, Undo2, Download } from
 import { toast } from 'sonner';
 import BatchActionDialog from './BatchActionDialog';
 import InventoryFieldSelect from './InventoryFieldSelect';
+import { COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
 import { isFieldValueValid } from '@/lib/field-validation';
 import * as XLSX from 'xlsx';
 
@@ -41,14 +42,26 @@ const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
 ];
 
 function isBatchComplete(b: Batch): boolean {
+  const mat = b.material || '';
+  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
+  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS.every(f => {
+    if (f === 'coating' && coatingOptions.length === 0) return true;
+    if (f === 'grade' && gradeOptions.length === 0) return true;
     const v = b[f]; return v !== null && v !== undefined && v !== '' && v !== 0;
   });
 }
 
 function getMissingFields(b: Batch): string[] {
+  const mat = b.material || '';
+  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
+  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS
-    .filter(f => { const v = b[f]; return v === null || v === undefined || v === '' || v === 0; })
+    .filter(f => {
+      if (f === 'coating' && coatingOptions.length === 0) return false;
+      if (f === 'grade' && gradeOptions.length === 0) return false;
+      const v = b[f]; return v === null || v === undefined || v === '' || v === 0;
+    })
     .map(f => String(f).replace(/_/g, ' '));
 }
 
@@ -176,7 +189,14 @@ export default function PhysicalInventoryTab() {
   const existingBatchNumbers = new Set((batches || []).filter(b => b.status === 'received').map(b => b.batch_number));
 
   const isNewBatchValid = () => {
-    return Object.values(newBatch).every(v => v !== '');
+    const mat = newBatch.material;
+    const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
+    const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+    return Object.entries(newBatch).every(([key, v]) => {
+      if (key === 'coating' && coatingOptions.length === 0) return true;
+      if (key === 'grade' && gradeOptions.length === 0) return true;
+      return v !== '';
+    });
   };
 
   const handleAddNew = async () => {
