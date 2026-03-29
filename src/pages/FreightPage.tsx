@@ -1286,14 +1286,26 @@ function DispatchTable({
   onDownload,
   showSourceColumn,
 }: {
-  data: InvoiceSummary[];
+  data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   showDispatchType?: boolean;
   onDispatchTypeChange?: (invoice: string, type: string) => void;
   showMoveBack?: boolean;
-  onMoveBack?: (invoice: string) => void;
+  onMoveBack?: (invoice: string, item?: InvoiceSummary & { purchaseBatches?: PurchaseSummary[] }) => void;
   onDownload: () => void;
   showSourceColumn?: boolean;
 }) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const toggleRow = (inv: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(inv)) next.delete(inv); else next.add(inv);
+      return next;
+    });
+  };
+
+  // Check if any row has details to show
+  const hasExpandableData = data.some(s => s.purchaseBatches?.length || (s.source_type === 'sales' && s.order_id));
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-4 text-sm">
@@ -1313,10 +1325,11 @@ function DispatchTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              {hasExpandableData && <TableHead className="text-xs font-semibold w-8"></TableHead>}
               <TableHead className="text-xs font-semibold">#</TableHead>
               <TableHead className="text-xs font-semibold">Invoice Number</TableHead>
               <TableHead className="text-xs font-semibold">Invoice Date</TableHead>
-              <TableHead className="text-xs font-semibold">Order ID</TableHead>
+              {!showSourceColumn && <TableHead className="text-xs font-semibold">Order ID</TableHead>}
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               {showSourceColumn && <TableHead className="text-xs font-semibold">Purchase / Sales</TableHead>}
@@ -1328,53 +1341,114 @@ function DispatchTable({
           <TableBody>
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={showSourceColumn ? 8 : 7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={hasExpandableData ? 9 : 8} className="text-center text-muted-foreground py-8">
                   No dispatches found.
                 </TableCell>
               </TableRow>
             )}
-            {data.map((s, idx) => (
-              <TableRow key={s.invoice_number}>
-                <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
-                <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
-                <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
-                <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
-                {showSourceColumn && (
-                  <TableCell className="text-sm">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      s.source_type === 'purchase' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      {s.source_type === 'purchase' ? 'Purchase' : 'Sales'}
-                    </span>
-                  </TableCell>
-                )}
-                <TableCell className="text-sm">
-                  {showDispatchType && onDispatchTypeChange ? (
-                    <Select
-                      value={s.dispatch_type || ''}
-                      onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-[130px]">
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DISPATCH_TYPES.map(t => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : showMoveBack && onMoveBack ? (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                      ← Move Back
-                    </Button>
-                  ) : (
-                    <span>{s.dispatch_type || '-'}</span>
+            {data.map((s, idx) => {
+              const isExpanded = expandedRows.has(s.invoice_number);
+              const hasDetails = s.purchaseBatches?.length || (s.source_type === 'sales' && s.order_id);
+
+              return (
+                <>
+                  <TableRow
+                    key={s.invoice_number}
+                    className={hasDetails ? 'cursor-pointer' : ''}
+                    onClick={() => hasDetails && toggleRow(s.invoice_number)}
+                  >
+                    {hasExpandableData && (
+                      <TableCell className="text-sm px-2">
+                        {hasDetails ? (
+                          isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : null}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
+                    <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                    {!showSourceColumn && <TableCell className="text-sm">{s.order_id || '-'}</TableCell>}
+                    <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
+                    {showSourceColumn && (
+                      <TableCell className="text-sm">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          s.source_type === 'purchase' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {s.source_type === 'purchase' ? 'Purchase' : 'Sales'}
+                        </span>
+                      </TableCell>
+                    )}
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      {showDispatchType && onDispatchTypeChange ? (
+                        <Select
+                          value={s.dispatch_type || ''}
+                          onValueChange={v => onDispatchTypeChange(s.invoice_number, v)}
+                        >
+                          <SelectTrigger className="h-7 text-xs w-[130px]">
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DISPATCH_TYPES.map(t => (
+                              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : showMoveBack && onMoveBack ? (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number, s)}>
+                          ← Move Back
+                        </Button>
+                      ) : (
+                        <span>{s.dispatch_type || '-'}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && hasDetails && (
+                    <TableRow key={`${s.invoice_number}-detail`}>
+                      <TableCell colSpan={hasExpandableData ? 9 : 8} className="bg-muted/30 p-4">
+                        <div className="space-y-2">
+                          {s.source_type === 'sales' && s.order_id && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground font-medium">Order ID:</span> {s.order_id}
+                              {s.customer_name && <> · <span className="text-muted-foreground font-medium">Customer:</span> {s.customer_name}</>}
+                            </div>
+                          )}
+                          {s.purchaseBatches && s.purchaseBatches.length > 0 && (
+                            <div>
+                              <span className="text-sm text-muted-foreground font-medium mb-1 block">Batch Details ({s.purchaseBatches.length})</span>
+                              <div className="overflow-x-auto rounded border">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-muted/40">
+                                      <TableHead className="text-[10px] font-semibold">Batch No.</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Purchase Date</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Supplier</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Material</TableHead>
+                                      <TableHead className="text-[10px] font-semibold">Weight (Kg)</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {s.purchaseBatches.map(b => (
+                                      <TableRow key={b.batch_number}>
+                                        <TableCell className="text-xs">{b.batch_number}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_date ? new Date(b.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.purchase_from || '-'}</TableCell>
+                                        <TableCell className="text-xs">{b.material || '-'}</TableCell>
+                                        <TableCell className="text-xs font-mono-num">{b.gross_weight.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </TableCell>
-              </TableRow>
-            ))}
+                </>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
