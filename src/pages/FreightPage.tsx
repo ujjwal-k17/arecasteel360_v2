@@ -147,7 +147,7 @@ function FreightPage() {
 
   // Mutation to update dispatch_type
   const updateDispatchType = useMutation({
-    mutationFn: async ({ invoice_number, dispatch_type }: { invoice_number: string; dispatch_type: string }) => {
+    mutationFn: async ({ invoice_number, dispatch_type }: { invoice_number: string; dispatch_type: string | null }) => {
       const existing = invoiceDetailMap[invoice_number];
       if (existing) {
         const { error } = await supabase
