@@ -28,7 +28,7 @@ interface InvoiceSummary {
 
 function FreightPage() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [freightDialog, setFreightDialog] = useState<{ open: boolean; invoice: string }>({ open: false, invoice: '' });
@@ -515,6 +515,7 @@ function FreightPage() {
 /* ── Transporter Dispatch Table with expandable rows, filters, sub-tabs ── */
 function TransporterDispatchTable({
   data,
+  isAdmin,
   onMoveBack,
   transporterFreightMap,
   commentsByFreightId,
@@ -527,6 +528,7 @@ function TransporterDispatchTable({
   onDownload,
 }: {
   data: InvoiceSummary[];
+  isAdmin: boolean;
   onMoveBack: (invoice: string) => void;
   transporterFreightMap: Record<string, any>;
   commentsByFreightId: Record<string, any[]>;
