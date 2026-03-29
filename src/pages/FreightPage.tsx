@@ -766,7 +766,11 @@ function TransporterDispatchTable({
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       {freightData ? (
                         <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
-                          <SelectTrigger className="h-7 text-xs w-[100px]">
+                          <SelectTrigger className={`h-7 text-xs w-[100px] ${
+                            approvalStatus === 'approved' ? 'border-green-500 text-green-700 bg-green-50' :
+                            approvalStatus === 'hold' ? 'border-amber-500 text-amber-700 bg-amber-50' :
+                            'border-orange-400 text-orange-600 bg-orange-50'
+                          }`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
