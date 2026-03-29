@@ -1288,7 +1288,8 @@ function TransporterDispatchTable({
                                 </Table>
                               </div>
                             </div>
-                          )
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
