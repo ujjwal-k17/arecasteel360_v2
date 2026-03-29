@@ -75,7 +75,7 @@ export default function CoilsInventoryTab() {
   const updateBatch = useUpdateBatch();
   
   const [expandedSKU, setExpandedSKU] = useState<string | null>(null);
-  const [expandedMaterials, setExpandedMaterials] = useState<Set<string>>(new Set());
+  const [materialTab, setMaterialTab] = useState<string>('all');
   const [expandedBatchActions, setExpandedBatchActions] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addMode, setAddMode] = useState<'new' | 'import' | null>(null);
