@@ -221,9 +221,21 @@ function FreightPage() {
         const { error } = await supabase.from('invoice_details').insert({ invoice_number, dispatch_type });
         if (error) throw error;
       }
+
+      // If moving back from Transporter (dispatch_type is null), reset transporter freight data
+      if (!dispatch_type) {
+        const freightRecord = (transporterFreightMap || {})[invoice_number];
+        if (freightRecord) {
+          // Delete cascades to comments and payments via FK
+          await supabase.from('transporter_freight').delete().eq('id', freightRecord.id);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['freight_invoice_details'] });
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_map'] });
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_comments'] });
+      queryClient.invalidateQueries({ queryKey: ['transporter_freight_payments'] });
       toast.success('Dispatch type updated');
     },
     onError: () => toast.error('Failed to update dispatch type'),
