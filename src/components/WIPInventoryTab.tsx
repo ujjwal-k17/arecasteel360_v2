@@ -6,10 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ArrowRightCircle } from 'lucide-react';
 import WIPProcessingDialog from './WIPProcessingDialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SKUGroup {
   key: string;
@@ -27,6 +28,7 @@ interface SKUGroup {
 export default function WIPInventoryTab() {
   const { data: wipItems } = useWIPItems();
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const [processingItem, setProcessingItem] = useState<any | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -207,16 +209,32 @@ export default function WIPInventoryTab() {
                          <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                          <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                          <TableCell className="text-xs font-mono-num">{item.qty ?? '-'}</TableCell>
-                         <TableCell>
-                           <div className="flex gap-1">
-                             {canProcess && (
-                               <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
-                             )}
-                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
-                               <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
-                             </Button>
-                           </div>
-                         </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {canProcess && (
+                                <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
+                              )}
+                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
+                                <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
+                              </Button>
+                              {isAdmin && (
+                                <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)?`)) return;
+                                  try {
+                                    const { error } = await supabase.from('wip_items').delete().eq('id', item.id);
+                                    if (error) throw error;
+                                    queryClient.invalidateQueries({ queryKey: ['wip_items'] });
+                                    toast.success('WIP item deleted');
+                                  } catch (err: any) {
+                                    toast.error(err.message || 'Failed to delete');
+                                  }
+                                }} title="Delete WIP item">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                        </TableRow>
                     );
                   })}

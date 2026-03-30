@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
@@ -32,6 +33,7 @@ interface SKUGroup {
 export default function FGInventoryTab() {
   const { data: fgItems } = useFGItems();
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [fgView, setFgView] = useState<'open' | 'closed'>('open');
 
@@ -382,6 +384,22 @@ export default function FGInventoryTab() {
                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }}>
                               <AlertTriangle className="h-3 w-3" /> Defective
                             </Button>
+                            {isAdmin && (
+                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm(`Delete this FG item (${availQty.toFixed(2)} Kg)?`)) return;
+                                try {
+                                  const { error } = await supabase.from('fg_items').delete().eq('id', item.id);
+                                  if (error) throw error;
+                                  queryClient.invalidateQueries({ queryKey: ['fg_items'] });
+                                  toast.success('FG item deleted');
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Failed to delete');
+                                }
+                              }} title="Delete FG item">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
