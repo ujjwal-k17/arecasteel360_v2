@@ -253,6 +253,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       onClose();
     } catch {
       toast.error('Failed to record processing');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
