@@ -66,6 +66,7 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
     // Collect valid defect entries
     const validDefects = defectEntries.filter(d => d.type && Number(d.weight) > 0);
 
+    setIsSubmitting(true);
     try {
       await wipProcessing.mutateAsync({
         wipItemId: wipItem.id,
