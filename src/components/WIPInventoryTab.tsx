@@ -6,10 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ArrowRightCircle } from 'lucide-react';
 import WIPProcessingDialog from './WIPProcessingDialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SKUGroup {
   key: string;
