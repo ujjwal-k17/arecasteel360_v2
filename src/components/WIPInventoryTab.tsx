@@ -28,6 +28,7 @@ interface SKUGroup {
 export default function WIPInventoryTab() {
   const { data: wipItems } = useWIPItems();
   const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const [processingItem, setProcessingItem] = useState<any | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
