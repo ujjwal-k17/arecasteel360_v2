@@ -384,6 +384,22 @@ export default function FGInventoryTab() {
                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }}>
                               <AlertTriangle className="h-3 w-3" /> Defective
                             </Button>
+                            {isAdmin && (
+                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm(`Delete this FG item (${availQty.toFixed(2)} Kg)?`)) return;
+                                try {
+                                  const { error } = await supabase.from('fg_items').delete().eq('id', item.id);
+                                  if (error) throw error;
+                                  queryClient.invalidateQueries({ queryKey: ['fg_items'] });
+                                  toast.success('FG item deleted');
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Failed to delete');
+                                }
+                              }} title="Delete FG item">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

@@ -209,16 +209,32 @@ export default function WIPInventoryTab() {
                          <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                          <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                          <TableCell className="text-xs font-mono-num">{item.qty ?? '-'}</TableCell>
-                         <TableCell>
-                           <div className="flex gap-1">
-                             {canProcess && (
-                               <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
-                             )}
-                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
-                               <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
-                             </Button>
-                           </div>
-                         </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {canProcess && (
+                                <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
+                              )}
+                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
+                                <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
+                              </Button>
+                              {isAdmin && (
+                                <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)?`)) return;
+                                  try {
+                                    const { error } = await supabase.from('wip_items').delete().eq('id', item.id);
+                                    if (error) throw error;
+                                    queryClient.invalidateQueries({ queryKey: ['wip_items'] });
+                                    toast.success('WIP item deleted');
+                                  } catch (err: any) {
+                                    toast.error(err.message || 'Failed to delete');
+                                  }
+                                }} title="Delete WIP item">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                        </TableRow>
                     );
                   })}
