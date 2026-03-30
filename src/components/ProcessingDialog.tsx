@@ -176,6 +176,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // 1. Save inline scrap entries
       for (const [type, wt] of Object.entries(scrapEntries)) {
