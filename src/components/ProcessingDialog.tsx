@@ -500,8 +500,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={insertProcessing.isPending || exceedsUsable}>
-            {insertProcessing.isPending ? 'Saving...' : 'Save'}
+          <Button onClick={handleSubmit} disabled={isSubmitting || insertProcessing.isPending || exceedsUsable}>
+            {isSubmitting || insertProcessing.isPending ? 'Saving...' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

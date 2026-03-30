@@ -202,8 +202,8 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={wipProcessing.isPending || exceedsAvailable}>
-            {wipProcessing.isPending ? 'Saving...' : 'Process to FG'}
+          <Button onClick={handleSubmit} disabled={isSubmitting || wipProcessing.isPending || exceedsAvailable}>
+            {isSubmitting || wipProcessing.isPending ? 'Saving...' : 'Process to FG'}
           </Button>
         </DialogFooter>
       </DialogContent>
