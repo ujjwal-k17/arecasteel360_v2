@@ -122,7 +122,10 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     const hasProcess = !!processType;
     const effectiveOutputType = processType === 'Slit' ? outputType : 'FG';
 
@@ -173,6 +176,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // 1. Save inline scrap entries
       for (const [type, wt] of Object.entries(scrapEntries)) {
@@ -250,6 +254,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       onClose();
     } catch {
       toast.error('Failed to record processing');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -495,8 +501,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={insertProcessing.isPending || exceedsUsable}>
-            {insertProcessing.isPending ? 'Saving...' : 'Save'}
+          <Button onClick={handleSubmit} disabled={isSubmitting || insertProcessing.isPending || exceedsUsable}>
+            {isSubmitting || insertProcessing.isPending ? 'Saving...' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

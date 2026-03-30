@@ -50,7 +50,10 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
   const totalCommitted = totalOutputQty + defectiveTotal;
   const exceedsAvailable = totalCommitted > (wipItem.qty || 0) + 0.01;
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
       toast.error('Please fill all CTL length entries');
       return;
@@ -63,6 +66,7 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
     // Collect valid defect entries
     const validDefects = defectEntries.filter(d => d.type && Number(d.weight) > 0);
 
+    setIsSubmitting(true);
     try {
       await wipProcessing.mutateAsync({
         wipItemId: wipItem.id,
@@ -75,6 +79,8 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
       onClose();
     } catch {
       toast.error('Failed to process WIP item');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -196,8 +202,8 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={wipProcessing.isPending || exceedsAvailable}>
-            {wipProcessing.isPending ? 'Saving...' : 'Process to FG'}
+          <Button onClick={handleSubmit} disabled={isSubmitting || wipProcessing.isPending || exceedsAvailable}>
+            {isSubmitting || wipProcessing.isPending ? 'Saving...' : 'Process to FG'}
           </Button>
         </DialogFooter>
       </DialogContent>
