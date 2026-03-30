@@ -79,6 +79,8 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
       onClose();
     } catch {
       toast.error('Failed to process WIP item');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
