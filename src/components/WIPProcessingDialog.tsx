@@ -50,7 +50,10 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
   const totalCommitted = totalOutputQty + defectiveTotal;
   const exceedsAvailable = totalCommitted > (wipItem.qty || 0) + 0.01;
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
       toast.error('Please fill all CTL length entries');
       return;
