@@ -29,6 +29,7 @@ export async function upsertSku(params: {
  */
 export function getSkuLabel(item: {
   material?: string | null;
+  form?: string | null;
   thickness?: number | null;
   width?: number | null;
   length?: number | null;
@@ -37,6 +38,7 @@ export function getSkuLabel(item: {
 }): string {
   const parts = [
     item.material,
+    item.form,
     item.thickness ? `${item.thickness}mm` : null,
     item.width ? `${item.width}W` : null,
     item.length ? `${item.length}L` : null,
