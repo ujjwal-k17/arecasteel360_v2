@@ -122,7 +122,10 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     const hasProcess = !!processType;
     const effectiveOutputType = processType === 'Slit' ? outputType : 'FG';
 
