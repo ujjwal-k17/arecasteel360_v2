@@ -387,12 +387,33 @@ export default function FGInventoryTab() {
                             {isAdmin && (
                               <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive hover:bg-destructive/10" onClick={async (e) => {
                                 e.stopPropagation();
-                                if (!confirm(`Delete this FG item (${availQty.toFixed(2)} Kg)?`)) return;
+                                const restoreTo = item.source_type === 'wip' ? 'WIP' : 'Coil';
+                                if (!confirm(`Delete this FG item (${availQty.toFixed(2)} Kg)? Quantity will be restored to ${restoreTo}.`)) return;
                                 try {
+                                  if (item.source_type === 'wip' && item.source_id) {
+                                    // Restore qty to WIP item
+                                    const { data: wipItem } = await supabase.from('wip_items').select('qty, status').eq('id', item.source_id).single();
+                                    if (wipItem) {
+                                      const newQty = (wipItem.qty || 0) + (item.qty || 0);
+                                      await supabase.from('wip_items').update({ qty: newQty, status: 'active' } as any).eq('id', item.source_id);
+                                    }
+                                  }
+                                  // Delete associated processing output items & record
+                                  if (item.processing_record_id) {
+                                    await supabase.from('processing_output_items').delete().eq('processing_record_id', item.processing_record_id);
+                                    // Only delete processing record if no other FG items reference it
+                                    const { data: otherFGs } = await supabase.from('fg_items').select('id').eq('processing_record_id', item.processing_record_id).neq('id', item.id);
+                                    if (!otherFGs || otherFGs.length === 0) {
+                                      await supabase.from('processing_records').delete().eq('id', item.processing_record_id);
+                                    }
+                                  }
                                   const { error } = await supabase.from('fg_items').delete().eq('id', item.id);
                                   if (error) throw error;
                                   queryClient.invalidateQueries({ queryKey: ['fg_items'] });
-                                  toast.success('FG item deleted');
+                                  queryClient.invalidateQueries({ queryKey: ['wip_items'] });
+                                  queryClient.invalidateQueries({ queryKey: ['batches'] });
+                                  queryClient.invalidateQueries({ queryKey: ['processing_records'] });
+                                  toast.success(`FG item deleted & quantity restored to ${restoreTo}`);
                                 } catch (err: any) {
                                   toast.error(err.message || 'Failed to delete');
                                 }
