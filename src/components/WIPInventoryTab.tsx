@@ -220,12 +220,19 @@ export default function WIPInventoryTab() {
                               {isAdmin && (
                                 <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-destructive hover:bg-destructive/10" onClick={async (e) => {
                                   e.stopPropagation();
-                                  if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)?`)) return;
+                                  if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)? Quantity will be restored to the source coil.`)) return;
                                   try {
+                                    // Delete associated processing output items & record to restore coil balance
+                                    if (item.processing_record_id) {
+                                      await supabase.from('processing_output_items').delete().eq('processing_record_id', item.processing_record_id);
+                                      await supabase.from('processing_records').delete().eq('id', item.processing_record_id);
+                                    }
                                     const { error } = await supabase.from('wip_items').delete().eq('id', item.id);
                                     if (error) throw error;
                                     queryClient.invalidateQueries({ queryKey: ['wip_items'] });
-                                    toast.success('WIP item deleted');
+                                    queryClient.invalidateQueries({ queryKey: ['batches'] });
+                                    queryClient.invalidateQueries({ queryKey: ['processing_records'] });
+                                    toast.success('WIP item deleted & quantity restored to coil');
                                   } catch (err: any) {
                                     toast.error(err.message || 'Failed to delete');
                                   }
@@ -235,19 +242,19 @@ export default function WIPInventoryTab() {
                               )}
                             </div>
                           </TableCell>
-                       </TableRow>
-                    );
-                  })}
-                </>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+                        </TableRow>
+                     );
+                   })}
+                 </>
+               );
+             })}
+           </TableBody>
+         </Table>
+       </div>
 
-      {processingItem && (
-        <WIPProcessingDialog wipItem={processingItem} open={!!processingItem} onClose={() => setProcessingItem(null)} />
-      )}
-    </div>
-  );
-}
+       {processingItem && (
+         <WIPProcessingDialog wipItem={processingItem} open={!!processingItem} onClose={() => setProcessingItem(null)} />
+       )}
+     </div>
+   );
+ }
