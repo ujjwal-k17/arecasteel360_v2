@@ -301,6 +301,11 @@ export default function OrderBookPage() {
       <TableRow key={`${o.id}-sub`}>
         <TableCell colSpan={9} className="p-0 bg-muted/20">
           <div className="px-8 py-2">
+            {o.comments && (
+              <div className="mb-2 text-xs text-muted-foreground bg-muted/30 rounded px-3 py-1.5">
+                <span className="font-semibold">Order Comments:</span> {o.comments}
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -309,6 +314,7 @@ export default function OrderBookPage() {
                   <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
+                  <TableHead className="text-xs">Comments</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -319,12 +325,13 @@ export default function OrderBookPage() {
                     <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{row.comments || '-'}</TableCell>
                   </TableRow>
                 ))}
                 {subRows.some(r => r.isExtra) && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={5} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
+                      <TableCell colSpan={6} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
                         Additional dispatches (not in order)
                       </TableCell>
                     </TableRow>
@@ -338,6 +345,7 @@ export default function OrderBookPage() {
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
                         <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">-</TableCell>
                       </TableRow>
                     ))}
                   </>
