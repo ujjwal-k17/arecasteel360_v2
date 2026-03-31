@@ -20,7 +20,7 @@ export function useBatches(statusFilter?: string) {
       if (statusFilter) q = q.eq('status', statusFilter);
       const { data, error } = await q;
       if (error) throw error;
-      return data;
+      return normalizeBatchCoating(data);
     },
   });
 }
