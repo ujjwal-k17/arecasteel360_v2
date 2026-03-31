@@ -305,6 +305,7 @@ export default function OrderBookPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">SKU</TableHead>
+                  <TableHead className="text-xs">Form</TableHead>
                   <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
@@ -314,6 +315,7 @@ export default function OrderBookPage() {
                 {subRows.filter(r => !r.isExtra).map(row => (
                   <TableRow key={row.key}>
                     <TableCell className="text-xs">{row.label}</TableCell>
+                    <TableCell className="text-xs">{row.form}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
