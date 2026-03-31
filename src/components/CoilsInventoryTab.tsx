@@ -144,7 +144,7 @@ export default function CoilsInventoryTab() {
         if (balance > 0) return false;
       }
       for (const [field, val] of Object.entries(filters)) {
-        if (String((b as any)[field] ?? '') !== val) return false;
+        if (!eqCI(String((b as any)[field] ?? ''), val)) return false;
       }
       return true;
     });

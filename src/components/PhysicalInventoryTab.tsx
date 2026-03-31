@@ -117,7 +117,7 @@ export default function PhysicalInventoryTab() {
   const filteredBatches = useMemo(() => {
     return receivedBatches.filter(b => {
       for (const [field, val] of Object.entries(filters)) {
-        if (String((b as any)[field] ?? '') !== val) return false;
+        if (!eqCI(String((b as any)[field] ?? ''), val)) return false;
       }
       return true;
     });

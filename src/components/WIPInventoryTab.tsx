@@ -67,11 +67,11 @@ export default function WIPInventoryTab() {
 
   const filteredItems = useMemo(() => {
     return items.filter(i =>
-      (filterMaterial === 'all' || (i.material || '-') === filterMaterial) &&
-      (filterMake === 'all' || (i.make || '-') === filterMake) &&
-      (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
-      (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
-      (filterGrade === 'all' || (i.grade || '-') === filterGrade)
+      (filterMaterial === 'all' || eqCI(i.material || '-', filterMaterial)) &&
+      (filterMake === 'all' || eqCI(i.make || '-', filterMake)) &&
+      (filterProcess === 'all' || eqCI(i.process || '-', filterProcess)) &&
+      (filterCoating === 'all' || eqCI(i.coating || '-', filterCoating)) &&
+      (filterGrade === 'all' || eqCI(i.grade || '-', filterGrade))
     );
   }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade]);
 
