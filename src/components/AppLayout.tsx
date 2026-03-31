@@ -1,8 +1,11 @@
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Outlet } from 'react-router-dom';
+import { useDeviceTracking } from '@/hooks/useDeviceTracking';
 
 export default function AppLayout() {
+  useDeviceTracking();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">

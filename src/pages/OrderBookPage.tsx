@@ -163,17 +163,17 @@ export default function OrderBookPage() {
     const orderItems = order.order_items || [];
     const orderSales = salesByOrder[order.order_number] || {};
     const matchedKeys = new Set<string>();
-    const rows: { key: string; label: string; form: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
+    const rows: { key: string; label: string; form: string; comments: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
     for (const item of orderItems) {
       const key = skuKey(item);
       const salesEntry = orderSales[key];
       const dq = salesEntry ? salesEntry.qty : 0;
       if (salesEntry) matchedKeys.add(key);
-      rows.push({ key: item.id, label: getSkuLabel(item), form: item.form || '-', orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
+      rows.push({ key: item.id, label: getSkuLabel(item), form: item.form || '-', comments: item.comments || '', orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
     }
     for (const [key, entry] of Object.entries(orderSales)) {
       if (!matchedKeys.has(key)) {
-        rows.push({ key: `extra-${key}`, label: entry.label, form: '-', orderQty: 0, dispatchQty: entry.qty, isExtra: true });
+        rows.push({ key: `extra-${key}`, label: entry.label, form: '-', comments: '', orderQty: 0, dispatchQty: entry.qty, isExtra: true });
       }
     }
     return rows;
@@ -301,6 +301,11 @@ export default function OrderBookPage() {
       <TableRow key={`${o.id}-sub`}>
         <TableCell colSpan={9} className="p-0 bg-muted/20">
           <div className="px-8 py-2">
+            {o.comments && (
+              <div className="mb-2 text-xs text-muted-foreground bg-muted/30 rounded px-3 py-1.5">
+                <span className="font-semibold">Order Comments:</span> {o.comments}
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -309,6 +314,7 @@ export default function OrderBookPage() {
                   <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
+                  <TableHead className="text-xs">Comments</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -319,12 +325,13 @@ export default function OrderBookPage() {
                     <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{row.comments || '-'}</TableCell>
                   </TableRow>
                 ))}
                 {subRows.some(r => r.isExtra) && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={5} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
+                      <TableCell colSpan={6} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
                         Additional dispatches (not in order)
                       </TableCell>
                     </TableRow>
@@ -338,6 +345,7 @@ export default function OrderBookPage() {
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
                         <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">-</TableCell>
                       </TableRow>
                     ))}
                   </>
@@ -484,7 +492,7 @@ export default function OrderBookPage() {
         </Card>
       </div>
 
-      {/* Tabs for Open / Closed Orders */}
+      {/* Tabs for Open / Closed / Customer View */}
       <Tabs defaultValue="open">
         <TabsList>
           <TabsTrigger value="open" className="gap-1.5">
@@ -495,6 +503,7 @@ export default function OrderBookPage() {
             Closed Orders
             <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{filteredClosedOrders.length}</Badge>
           </TabsTrigger>
+          <TabsTrigger value="customer">Customer View</TabsTrigger>
         </TabsList>
 
         <TabsContent value="open">
@@ -529,6 +538,75 @@ export default function OrderBookPage() {
               </TableBody>
             </Table>
           </div>
+        </TabsContent>
+
+        <TabsContent value="customer">
+          {(() => {
+            // Group open orders by customer
+            const customerGroups: Record<string, { name: string; orders: any[]; totalOrder: number; totalDispatched: number }> = {};
+            for (const o of filteredOpenOrders) {
+              const custName = (o.customers as any)?.customer_name || 'Unknown';
+              if (!customerGroups[custName]) customerGroups[custName] = { name: custName, orders: [], totalOrder: 0, totalDispatched: 0 };
+              const t = getOrderTotals(o);
+              customerGroups[custName].orders.push(o);
+              customerGroups[custName].totalOrder += t.total;
+              customerGroups[custName].totalDispatched += t.dispatched;
+            }
+            const groups = Object.values(customerGroups).sort((a, b) => a.name.localeCompare(b.name));
+            return (
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="text-right">Orders</TableHead>
+                      <TableHead className="text-right">Total Order Qty (Kg)</TableHead>
+                      <TableHead className="text-right">Dispatch Qty (Kg)</TableHead>
+                      <TableHead className="text-right">Balance Qty (Kg)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groups.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No orders</TableCell></TableRow>
+                    ) : groups.map(g => {
+                      const isExp = expanded.has(`cust-${g.name}`);
+                      const balance = g.totalOrder - g.totalDispatched;
+                      return (
+                        <>
+                          <TableRow key={`cust-${g.name}`} className="cursor-pointer hover:bg-muted/30 bg-muted/10 font-medium" onClick={() => toggleExpand(`cust-${g.name}`)}>
+                            <TableCell className="w-8 px-2">{isExp ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                            <TableCell className="font-semibold">{g.name}</TableCell>
+                            <TableCell className="text-right">{g.orders.length}</TableCell>
+                            <TableCell className="text-right font-mono">{g.totalOrder.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-mono">{g.totalDispatched.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-mono">{balance.toFixed(2)}</TableCell>
+                          </TableRow>
+                          {isExp && g.orders.map((o: any) => {
+                            const t = getOrderTotals(o);
+                            const isOrderExp = expanded.has(o.id);
+                            return (
+                              <>
+                                <TableRow key={o.id} className="cursor-pointer bg-background" onClick={() => toggleExpand(o.id)}>
+                                  <TableCell className="pl-8">{isOrderExp ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</TableCell>
+                                  <TableCell className="text-xs">{o.order_number} {o.po_number ? `(PO: ${o.po_number})` : ''}</TableCell>
+                                  <TableCell className="text-xs text-right">{o.order_date || '-'}</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">{t.total.toFixed(2)}</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">{t.dispatched.toFixed(2)}</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">{t.balance.toFixed(2)}</TableCell>
+                                </TableRow>
+                                {isOrderExp && renderSubRows(o)}
+                              </>
+                            );
+                          })}
+                        </>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 

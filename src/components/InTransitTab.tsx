@@ -69,7 +69,7 @@ export default function InTransitTab() {
     return batches.filter(b => {
       for (const [field, val] of Object.entries(filters)) {
         const bVal = String((b as any)[field] ?? '');
-        if (bVal !== val) return false;
+        if (bVal.toLowerCase() !== val.toLowerCase()) return false;
       }
       if (dateFrom && b.purchase_date && b.purchase_date < dateFrom) return false;
       if (dateTo && b.purchase_date && b.purchase_date > dateTo) return false;
@@ -111,10 +111,14 @@ export default function InTransitTab() {
 
   const uniqueValues = useMemo(() => {
     if (!batches) return {} as Record<string, string[]>;
-    const fields = ['batch_number', 'material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
+    const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'coating', 'grade', 'purchase_from'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
-      const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
+      const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort((a, b) => {
+        const na = Number(a), nb = Number(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return a.localeCompare(b);
+      });
       result[f] = vals;
     });
     return result;
@@ -218,7 +222,7 @@ export default function InTransitTab() {
   };
 
   const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
-  const filterableFields = ['batch_number', 'material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
+  const filterableFields = ['batch_number', 'material', 'make', 'form', 'thickness', 'coating', 'grade', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
     const val = String((editValues as any)[field] ?? '');

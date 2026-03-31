@@ -129,7 +129,6 @@ export default function WIPInventoryTab() {
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Make</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Dimensions</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
@@ -140,7 +139,6 @@ export default function WIPInventoryTab() {
             <TableRow className="bg-muted/20">
               <TableHead />
               <TableHead><FilterSelect value={filterMaterial} onChange={setFilterMaterial} options={uniqueVals.material} placeholder="Material" /></TableHead>
-              <TableHead><FilterSelect value={filterMake} onChange={setFilterMake} options={uniqueVals.make} placeholder="Make" /></TableHead>
               <TableHead><FilterSelect value={filterProcess} onChange={setFilterProcess} options={uniqueVals.process} placeholder="Process" /></TableHead>
               <TableHead />
               <TableHead><FilterSelect value={filterCoating} onChange={setFilterCoating} options={uniqueVals.coating} placeholder="Coating" /></TableHead>
@@ -151,7 +149,7 @@ export default function WIPInventoryTab() {
           </TableHeader>
           <TableBody>
             {skuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No WIP items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No WIP items found.</TableCell></TableRow>
             )}
             {skuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -160,7 +158,6 @@ export default function WIPInventoryTab() {
                   <TableRow key={g.key} className="cursor-pointer hover:bg-muted/30 bg-muted/10 font-medium" onClick={() => toggleExpand(g.key)}>
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell className="text-sm">{g.material}</TableCell>
-                    <TableCell className="text-sm">{g.make}</TableCell>
                     <TableCell className="text-sm">{g.process}</TableCell>
                     <TableCell className="text-sm font-mono-num whitespace-nowrap">{g.thickness ?? '-'} x {g.width ?? '-'} x Coil</TableCell>
                     <TableCell className="text-sm">{g.coating}</TableCell>
@@ -203,7 +200,7 @@ export default function WIPInventoryTab() {
                      return (
                       <TableRow key={item.id} className="bg-background">
                          <TableCell />
-                         <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{batchNum}</span></TableCell>
+                         <TableCell className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{batchNum}</span> <span className="text-muted-foreground ml-2">Make: </span><span className="font-medium">{item.make || '-'}</span></TableCell>
                          <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
                          <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item)}</TableCell>
                          <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
