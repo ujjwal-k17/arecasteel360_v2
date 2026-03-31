@@ -38,7 +38,6 @@ export function getSkuLabel(item: {
 }): string {
   const parts = [
     item.material,
-    item.form,
     item.thickness ? `${item.thickness}mm` : null,
     item.width ? `${item.width}W` : null,
     item.length ? `${item.length}L` : null,

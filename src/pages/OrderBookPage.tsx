@@ -163,17 +163,17 @@ export default function OrderBookPage() {
     const orderItems = order.order_items || [];
     const orderSales = salesByOrder[order.order_number] || {};
     const matchedKeys = new Set<string>();
-    const rows: { key: string; label: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
+    const rows: { key: string; label: string; form: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
     for (const item of orderItems) {
       const key = skuKey(item);
       const salesEntry = orderSales[key];
       const dq = salesEntry ? salesEntry.qty : 0;
       if (salesEntry) matchedKeys.add(key);
-      rows.push({ key: item.id, label: getSkuLabel(item), orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
+      rows.push({ key: item.id, label: getSkuLabel(item), form: item.form || '-', orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
     }
     for (const [key, entry] of Object.entries(orderSales)) {
       if (!matchedKeys.has(key)) {
-        rows.push({ key: `extra-${key}`, label: entry.label, orderQty: 0, dispatchQty: entry.qty, isExtra: true });
+        rows.push({ key: `extra-${key}`, label: entry.label, form: '-', orderQty: 0, dispatchQty: entry.qty, isExtra: true });
       }
     }
     return rows;
@@ -305,6 +305,7 @@ export default function OrderBookPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">SKU</TableHead>
+                  <TableHead className="text-xs">Form</TableHead>
                   <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
@@ -314,6 +315,7 @@ export default function OrderBookPage() {
                 {subRows.filter(r => !r.isExtra).map(row => (
                   <TableRow key={row.key}>
                     <TableCell className="text-xs">{row.label}</TableCell>
+                    <TableCell className="text-xs">{row.form}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
@@ -322,7 +324,7 @@ export default function OrderBookPage() {
                 {subRows.some(r => r.isExtra) && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
+                      <TableCell colSpan={5} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
                         Additional dispatches (not in order)
                       </TableCell>
                     </TableRow>
@@ -332,6 +334,7 @@ export default function OrderBookPage() {
                           {row.label}
                           <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">New</Badge>
                         </TableCell>
+                        <TableCell className="text-xs">{row.form}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
                         <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
