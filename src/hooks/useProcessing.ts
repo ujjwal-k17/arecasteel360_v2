@@ -31,7 +31,7 @@ export function useWIPItems() {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as any[];
+      return normalizeItemCoating(data as any[]);
     },
   });
 }
