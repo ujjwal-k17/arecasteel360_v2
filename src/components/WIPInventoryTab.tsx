@@ -129,7 +129,6 @@ export default function WIPInventoryTab() {
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Make</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Dimensions</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
@@ -140,7 +139,6 @@ export default function WIPInventoryTab() {
             <TableRow className="bg-muted/20">
               <TableHead />
               <TableHead><FilterSelect value={filterMaterial} onChange={setFilterMaterial} options={uniqueVals.material} placeholder="Material" /></TableHead>
-              <TableHead><FilterSelect value={filterMake} onChange={setFilterMake} options={uniqueVals.make} placeholder="Make" /></TableHead>
               <TableHead><FilterSelect value={filterProcess} onChange={setFilterProcess} options={uniqueVals.process} placeholder="Process" /></TableHead>
               <TableHead />
               <TableHead><FilterSelect value={filterCoating} onChange={setFilterCoating} options={uniqueVals.coating} placeholder="Coating" /></TableHead>
