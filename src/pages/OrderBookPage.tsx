@@ -173,7 +173,7 @@ export default function OrderBookPage() {
     }
     for (const [key, entry] of Object.entries(orderSales)) {
       if (!matchedKeys.has(key)) {
-        rows.push({ key: `extra-${key}`, label: entry.label, orderQty: 0, dispatchQty: entry.qty, isExtra: true });
+        rows.push({ key: `extra-${key}`, label: entry.label, form: '-', orderQty: 0, dispatchQty: entry.qty, isExtra: true });
       }
     }
     return rows;
