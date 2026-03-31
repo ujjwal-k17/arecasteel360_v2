@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeCoating } from '@/lib/utils';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+
+function normalizeBatchCoating<T extends { coating?: string | null }>(items: T[]): T[] {
+  return items.map(i => ({ ...i, coating: normalizeCoating(i.coating) || i.coating }));
+}
 
 export type Batch = Tables<'batches'>;
 export type BatchInsert = TablesInsert<'batches'>;
@@ -15,7 +20,7 @@ export function useBatches(statusFilter?: string) {
       if (statusFilter) q = q.eq('status', statusFilter);
       const { data, error } = await q;
       if (error) throw error;
-      return data;
+      return normalizeBatchCoating(data);
     },
   });
 }
@@ -26,7 +31,7 @@ export function useAllBatches() {
     queryFn: async () => {
       const { data, error } = await supabase.from('batches').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return normalizeBatchCoating(data);
     },
   });
 }
