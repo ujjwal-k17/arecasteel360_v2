@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
 import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useQueryClient } from '@tanstack/react-query';

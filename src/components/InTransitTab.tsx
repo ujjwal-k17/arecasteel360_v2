@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
+import { uniqueCaseInsensitive } from '@/lib/utils';
 import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
