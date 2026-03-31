@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { uniqueCaseInsensitive, eqCI, normalizeCoating } from '@/lib/utils';
+import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
 import { useWIPItems } from '@/hooks/useProcessing';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
