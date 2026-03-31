@@ -200,7 +200,7 @@ export default function WIPInventoryTab() {
                      return (
                       <TableRow key={item.id} className="bg-background">
                          <TableCell />
-                         <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{batchNum}</span></TableCell>
+                         <TableCell className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{batchNum}</span> <span className="text-muted-foreground ml-2">Make: </span><span className="font-medium">{item.make || '-'}</span></TableCell>
                          <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
                          <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item)}</TableCell>
                          <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
