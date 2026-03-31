@@ -81,7 +81,7 @@ export default function WIPInventoryTab() {
   const skuGroups = useMemo(() => {
     const map = new Map<string, SKUGroup>();
     for (const item of filteredItems) {
-      const key = [item.material || '', item.make || '', item.process || '', item.thickness ?? '', item.width ?? '', item.coating || '', item.grade || ''].join('|');
+      const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.coating || '', item.grade || ''].join('|');
       if (!map.has(key)) {
         map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, items: [] });
       }
