@@ -222,7 +222,7 @@ export default function InTransitTab() {
   };
 
   const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'width', 'length', 'coating', 'grade', 'gross_weight', 'net_weight', 'coil_number', 'purchase_date', 'purchase_from'];
-  const filterableFields = ['batch_number', 'material', 'make', 'form', 'coating', 'grade', 'purchase_from'];
+  const filterableFields = ['batch_number', 'material', 'make', 'form', 'thickness', 'coating', 'grade', 'purchase_from'];
 
   const renderEditCell = (field: string) => {
     const val = String((editValues as any)[field] ?? '');
