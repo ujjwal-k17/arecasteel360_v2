@@ -45,7 +45,7 @@ export function useFGItems() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as any[];
+      return normalizeItemCoating(data as any[]);
     },
   });
 }

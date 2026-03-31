@@ -31,7 +31,7 @@ export function useAllBatches() {
     queryFn: async () => {
       const { data, error } = await supabase.from('batches').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return normalizeBatchCoating(data);
     },
   });
 }
