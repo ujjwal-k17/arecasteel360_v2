@@ -324,7 +324,7 @@ export default function OrderBookPage() {
                 {subRows.some(r => r.isExtra) && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
+                      <TableCell colSpan={5} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
                         Additional dispatches (not in order)
                       </TableCell>
                     </TableRow>
@@ -334,6 +334,7 @@ export default function OrderBookPage() {
                           {row.label}
                           <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">New</Badge>
                         </TableCell>
+                        <TableCell className="text-xs">{row.form}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
                         <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
