@@ -492,7 +492,7 @@ export default function OrderBookPage() {
         </Card>
       </div>
 
-      {/* Tabs for Open / Closed Orders */}
+      {/* Tabs for Open / Closed / Customer View */}
       <Tabs defaultValue="open">
         <TabsList>
           <TabsTrigger value="open" className="gap-1.5">
@@ -503,6 +503,7 @@ export default function OrderBookPage() {
             Closed Orders
             <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{filteredClosedOrders.length}</Badge>
           </TabsTrigger>
+          <TabsTrigger value="customer">Customer View</TabsTrigger>
         </TabsList>
 
         <TabsContent value="open">
@@ -537,6 +538,75 @@ export default function OrderBookPage() {
               </TableBody>
             </Table>
           </div>
+        </TabsContent>
+
+        <TabsContent value="customer">
+          {(() => {
+            // Group open orders by customer
+            const customerGroups: Record<string, { name: string; orders: any[]; totalOrder: number; totalDispatched: number }> = {};
+            for (const o of filteredOpenOrders) {
+              const custName = (o.customers as any)?.customer_name || 'Unknown';
+              if (!customerGroups[custName]) customerGroups[custName] = { name: custName, orders: [], totalOrder: 0, totalDispatched: 0 };
+              const t = getOrderTotals(o);
+              customerGroups[custName].orders.push(o);
+              customerGroups[custName].totalOrder += t.total;
+              customerGroups[custName].totalDispatched += t.dispatched;
+            }
+            const groups = Object.values(customerGroups).sort((a, b) => a.name.localeCompare(b.name));
+            return (
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="text-right">Orders</TableHead>
+                      <TableHead className="text-right">Total Order Qty (Kg)</TableHead>
+                      <TableHead className="text-right">Dispatch Qty (Kg)</TableHead>
+                      <TableHead className="text-right">Balance Qty (Kg)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groups.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No orders</TableCell></TableRow>
+                    ) : groups.map(g => {
+                      const isExp = expanded.has(`cust-${g.name}`);
+                      const balance = g.totalOrder - g.totalDispatched;
+                      return (
+                        <>
+                          <TableRow key={`cust-${g.name}`} className="cursor-pointer hover:bg-muted/30 bg-muted/10 font-medium" onClick={() => toggleExpand(`cust-${g.name}`)}>
+                            <TableCell className="w-8 px-2">{isExp ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                            <TableCell className="font-semibold">{g.name}</TableCell>
+                            <TableCell className="text-right">{g.orders.length}</TableCell>
+                            <TableCell className="text-right font-mono">{g.totalOrder.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-mono">{g.totalDispatched.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-mono">{balance.toFixed(2)}</TableCell>
+                          </TableRow>
+                          {isExp && g.orders.map((o: any) => {
+                            const t = getOrderTotals(o);
+                            const isOrderExp = expanded.has(o.id);
+                            return (
+                              <>
+                                <TableRow key={o.id} className="cursor-pointer bg-background" onClick={() => toggleExpand(o.id)}>
+                                  <TableCell className="pl-8">{isOrderExp ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</TableCell>
+                                  <TableCell className="text-xs">{o.order_number} {o.po_number ? `(PO: ${o.po_number})` : ''}</TableCell>
+                                  <TableCell className="text-xs text-right">{o.order_date || '-'}</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">{t.total.toFixed(2)}</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">{t.dispatched.toFixed(2)}</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">{t.balance.toFixed(2)}</TableCell>
+                                </TableRow>
+                                {isOrderExp && renderSubRows(o)}
+                              </>
+                            );
+                          })}
+                        </>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
