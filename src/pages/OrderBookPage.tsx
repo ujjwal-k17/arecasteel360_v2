@@ -163,13 +163,13 @@ export default function OrderBookPage() {
     const orderItems = order.order_items || [];
     const orderSales = salesByOrder[order.order_number] || {};
     const matchedKeys = new Set<string>();
-    const rows: { key: string; label: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
+    const rows: { key: string; label: string; form: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
     for (const item of orderItems) {
       const key = skuKey(item);
       const salesEntry = orderSales[key];
       const dq = salesEntry ? salesEntry.qty : 0;
       if (salesEntry) matchedKeys.add(key);
-      rows.push({ key: item.id, label: getSkuLabel(item), orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
+      rows.push({ key: item.id, label: getSkuLabel(item), form: item.form || '-', orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
     }
     for (const [key, entry] of Object.entries(orderSales)) {
       if (!matchedKeys.has(key)) {
