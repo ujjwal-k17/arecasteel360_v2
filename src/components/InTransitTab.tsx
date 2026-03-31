@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
+import { uniqueCaseInsensitive } from '@/lib/utils';
 import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
@@ -114,11 +115,7 @@ export default function InTransitTab() {
     const fields = ['batch_number', 'material', 'make', 'form', 'thickness', 'coating', 'grade', 'purchase_from'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
-      const vals = [...new Set(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort((a, b) => {
-        const na = Number(a), nb = Number(b);
-        if (!isNaN(na) && !isNaN(nb)) return na - nb;
-        return a.localeCompare(b);
-      });
+      const vals = uniqueCaseInsensitive(batches.map(b => String((b as any)[f] ?? '')).filter(Boolean));
       result[f] = vals;
     });
     return result;

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
 import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useQueryClient } from '@tanstack/react-query';
@@ -127,7 +128,7 @@ export default function CoilsInventoryTab() {
     const fields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
-      const vals = [...new Set(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
+      const vals = uniqueCaseInsensitive(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean));
       result[f] = vals;
     });
     return result;
@@ -144,7 +145,7 @@ export default function CoilsInventoryTab() {
         if (balance > 0) return false;
       }
       for (const [field, val] of Object.entries(filters)) {
-        if (String((b as any)[field] ?? '') !== val) return false;
+        if (!eqCI(String((b as any)[field] ?? ''), val)) return false;
       }
       return true;
     });

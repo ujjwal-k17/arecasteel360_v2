@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
 import { useAllBatches, useAllActions, useUpdateBatch, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useQueryClient } from '@tanstack/react-query';
@@ -108,7 +109,7 @@ export default function PhysicalInventoryTab() {
     const fields = ['material', 'make', 'form', 'thickness', 'width', 'coating', 'grade'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
-      const vals = [...new Set(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
+      const vals = uniqueCaseInsensitive(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean));
       result[f] = vals;
     });
     return result;
@@ -117,7 +118,7 @@ export default function PhysicalInventoryTab() {
   const filteredBatches = useMemo(() => {
     return receivedBatches.filter(b => {
       for (const [field, val] of Object.entries(filters)) {
-        if (String((b as any)[field] ?? '') !== val) return false;
+        if (!eqCI(String((b as any)[field] ?? ''), val)) return false;
       }
       return true;
     });

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
 import { useWIPItems } from '@/hooks/useProcessing';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,20 +59,20 @@ export default function WIPInventoryTab() {
 
   // Unique values for filters
   const uniqueVals = useMemo(() => ({
-    material: [...new Set(items.map(i => i.material || '-'))].sort(),
-    make: [...new Set(items.map(i => i.make || '-'))].sort(),
-    process: [...new Set(items.map(i => i.process || '-'))].sort(),
-    coating: [...new Set(items.map(i => i.coating || '-'))].sort(),
-    grade: [...new Set(items.map(i => i.grade || '-'))].sort(),
+    material: uniqueCaseInsensitive(items.map(i => i.material || '-')),
+    make: uniqueCaseInsensitive(items.map(i => i.make || '-')),
+    process: uniqueCaseInsensitive(items.map(i => i.process || '-')),
+    coating: uniqueCaseInsensitive(items.map(i => i.coating || '-')),
+    grade: uniqueCaseInsensitive(items.map(i => i.grade || '-')),
   }), [items]);
 
   const filteredItems = useMemo(() => {
     return items.filter(i =>
-      (filterMaterial === 'all' || (i.material || '-') === filterMaterial) &&
-      (filterMake === 'all' || (i.make || '-') === filterMake) &&
-      (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
-      (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
-      (filterGrade === 'all' || (i.grade || '-') === filterGrade)
+      (filterMaterial === 'all' || eqCI(i.material || '-', filterMaterial)) &&
+      (filterMake === 'all' || eqCI(i.make || '-', filterMake)) &&
+      (filterProcess === 'all' || eqCI(i.process || '-', filterProcess)) &&
+      (filterCoating === 'all' || eqCI(i.coating || '-', filterCoating)) &&
+      (filterGrade === 'all' || eqCI(i.grade || '-', filterGrade))
     );
   }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade]);
 
