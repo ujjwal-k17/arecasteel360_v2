@@ -55,7 +55,7 @@ export default function WIPInventoryTab() {
     return map;
   }, [batches]);
 
-  const items = useMemo(() => (wipItems || []).map(i => ({ ...i, coating: normalizeCoating(i.coating) || i.coating })), [wipItems]);
+  const items = wipItems || [];
 
   // Unique values for filters
   const uniqueVals = useMemo(() => ({
