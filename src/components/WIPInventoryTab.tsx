@@ -58,11 +58,11 @@ export default function WIPInventoryTab() {
 
   // Unique values for filters
   const uniqueVals = useMemo(() => ({
-    material: [...new Set(items.map(i => i.material || '-'))].sort(),
-    make: [...new Set(items.map(i => i.make || '-'))].sort(),
-    process: [...new Set(items.map(i => i.process || '-'))].sort(),
-    coating: [...new Set(items.map(i => i.coating || '-'))].sort(),
-    grade: [...new Set(items.map(i => i.grade || '-'))].sort(),
+    material: uniqueCaseInsensitive(items.map(i => i.material || '-')),
+    make: uniqueCaseInsensitive(items.map(i => i.make || '-')),
+    process: uniqueCaseInsensitive(items.map(i => i.process || '-')),
+    coating: uniqueCaseInsensitive(items.map(i => i.coating || '-')),
+    grade: uniqueCaseInsensitive(items.map(i => i.grade || '-')),
   }), [items]);
 
   const filteredItems = useMemo(() => {
