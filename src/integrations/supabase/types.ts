@@ -220,6 +220,36 @@ export type Database = {
           },
         ]
       }
+      dropdown_options: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          parent_value: string | null
+          sort_order: number | null
+          value: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          parent_value?: string | null
+          sort_order?: number | null
+          value: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          parent_value?: string | null
+          sort_order?: number | null
+          value?: string
+        }
+        Relationships: []
+      }
       fg_defectives: {
         Row: {
           created_at: string
@@ -1147,6 +1177,45 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      user_devices: {
+        Row: {
+          browser: string | null
+          created_at: string | null
+          device_fingerprint: string
+          device_name: string | null
+          id: string
+          ip_address: string | null
+          is_approved: boolean | null
+          last_seen_at: string | null
+          os: string | null
+          user_id: string
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string | null
+          device_fingerprint: string
+          device_name?: string | null
+          id?: string
+          ip_address?: string | null
+          is_approved?: boolean | null
+          last_seen_at?: string | null
+          os?: string | null
+          user_id: string
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string | null
+          device_fingerprint?: string
+          device_name?: string | null
+          id?: string
+          ip_address?: string | null
+          is_approved?: boolean | null
+          last_seen_at?: string | null
+          os?: string | null
+          user_id?: string
         }
         Relationships: []
       }
