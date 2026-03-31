@@ -69,7 +69,7 @@ export default function InTransitTab() {
     return batches.filter(b => {
       for (const [field, val] of Object.entries(filters)) {
         const bVal = String((b as any)[field] ?? '');
-        if (bVal !== val) return false;
+        if (bVal.toLowerCase() !== val.toLowerCase()) return false;
       }
       if (dateFrom && b.purchase_date && b.purchase_date < dateFrom) return false;
       if (dateTo && b.purchase_date && b.purchase_date > dateTo) return false;
