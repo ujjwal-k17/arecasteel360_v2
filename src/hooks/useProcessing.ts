@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeCoating } from '@/lib/utils';
 import { upsertSku } from '@/lib/sku-utils';
+
+function normalizeItemCoating<T extends { coating?: string | null }>(items: T[]): T[] {
+  return items.map(i => ({ ...i, coating: normalizeCoating(i.coating) || i.coating }));
+}
 
 export function useAllProcessingRecords() {
   return useQuery({
