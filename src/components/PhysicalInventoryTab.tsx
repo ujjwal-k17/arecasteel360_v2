@@ -108,7 +108,7 @@ export default function PhysicalInventoryTab() {
     const fields = ['material', 'make', 'form', 'thickness', 'width', 'coating', 'grade'];
     const result: Record<string, string[]> = {};
     fields.forEach(f => {
-      const vals = [...new Set(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean))].sort();
+      const vals = uniqueCaseInsensitive(receivedBatches.map(b => String((b as any)[f] ?? '')).filter(Boolean));
       result[f] = vals;
     });
     return result;
