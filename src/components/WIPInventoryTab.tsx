@@ -158,7 +158,6 @@ export default function WIPInventoryTab() {
                   <TableRow key={g.key} className="cursor-pointer hover:bg-muted/30 bg-muted/10 font-medium" onClick={() => toggleExpand(g.key)}>
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell className="text-sm">{g.material}</TableCell>
-                    <TableCell className="text-sm">{g.make}</TableCell>
                     <TableCell className="text-sm">{g.process}</TableCell>
                     <TableCell className="text-sm font-mono-num whitespace-nowrap">{g.thickness ?? '-'} x {g.width ?? '-'} x Coil</TableCell>
                     <TableCell className="text-sm">{g.coating}</TableCell>
