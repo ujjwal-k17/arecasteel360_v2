@@ -161,9 +161,18 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
             <Select value={orderId} onValueChange={setOrderId} disabled={!customerId}>
               <SelectTrigger><SelectValue placeholder={customerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
               <SelectContent>
-                {filteredOrders.map((o: any) => (
-                  <SelectItem key={o.id} value={o.order_number}>{o.order_number}{o.po_number ? ` (PO: ${o.po_number})` : ''}</SelectItem>
-                ))}
+              {filteredOrders.map((o: any) => {
+                  const oItems = o.order_items || [];
+                  const totalOrd = oItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
+                  const totalDisp = oItems.reduce((s: number, i: any) => s + ((allDispatches || []).filter((d: any) => d.order_item_id === i.id).reduce((a: number, d: any) => a + (d.dispatch_qty || 0), 0)), 0);
+                  const bal = totalOrd - totalDisp;
+                  const dateStr = o.order_date ? new Date(o.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '';
+                  return (
+                    <SelectItem key={o.id} value={o.order_number}>
+                      {o.order_number} — Bal: {bal.toFixed(0)} Kg{dateStr ? ` | ${dateStr}` : ''}{o.po_number ? ` (PO: ${o.po_number})` : ''}
+                    </SelectItem>
+                  );
+                })}
                 {filteredOrders.length === 0 && customerId && (
                   <div className="px-2 py-1.5 text-xs text-muted-foreground">No open orders</div>
                 )}
