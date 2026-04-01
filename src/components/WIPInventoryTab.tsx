@@ -214,9 +214,25 @@ export default function WIPInventoryTab() {
                               {canProcess && (
                                 <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
                               )}
-                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
-                                <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
-                              </Button>
+                               <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
+                                 <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
+                               </Button>
+                               <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                                 e.stopPropagation();
+                                 if (!confirm(`Request to move this WIP item (${item.qty?.toFixed(2)} Kg) back to Coil Inventory?`)) return;
+                                 try {
+                                   await submitApproval.mutateAsync({
+                                     action_type: 'move_back',
+                                     entity_type: 'wip_item',
+                                     entity_id: item.id,
+                                     description: `Move WIP item (${item.qty?.toFixed(2)} Kg, ${item.material || '-'} ${item.thickness ?? ''}x${item.width ?? ''}) back to Coil Inventory`,
+                                     metadata: { source_batch_id: item.source_batch_id, qty: item.qty, processing_record_id: item.processing_record_id },
+                                   });
+                                   toast.success('Move-back request submitted for approval');
+                                 } catch { toast.error('Failed to submit request'); }
+                               }} title="Move back to Coil Inventory" disabled={submitApproval.isPending}>
+                                 <Undo2 className="h-3.5 w-3.5" /> Move Back
+                               </Button>
                               {isAdmin && (
                                 <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-destructive hover:bg-destructive/10" onClick={async (e) => {
                                   e.stopPropagation();
