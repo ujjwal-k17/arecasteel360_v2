@@ -515,7 +515,35 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm">{b.grade || '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.gross_weight ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.net_weight ?? '-'}</TableCell>
-                                    <TableCell className="text-sm">{b.coil_number || '-'}</TableCell>
+                                    <TableCell className="text-sm">
+                                      {editingCoilNumber === b.id ? (
+                                        <Input
+                                          autoFocus
+                                          value={editCoilNumberValue}
+                                          onChange={(e) => setEditCoilNumberValue(e.target.value)}
+                                          onBlur={async () => {
+                                            if (editCoilNumberValue !== (b.coil_number || '')) {
+                                              try {
+                                                await updateBatch.mutateAsync({ id: b.id, coil_number: editCoilNumberValue || null });
+                                                toast.success('Coil number updated');
+                                              } catch { toast.error('Failed to update'); }
+                                            }
+                                            setEditingCoilNumber(null);
+                                          }}
+                                          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditingCoilNumber(null); }}
+                                          className="h-7 text-sm w-28"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      ) : (
+                                        <span
+                                          className="cursor-pointer hover:underline hover:text-primary"
+                                          onClick={(e) => { e.stopPropagation(); setEditingCoilNumber(b.id); setEditCoilNumberValue(b.coil_number || ''); }}
+                                          title="Click to edit"
+                                        >
+                                          {b.coil_number || '-'}
+                                        </span>
+                                      )}
+                                    </TableCell>
                                     <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
                                     <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
