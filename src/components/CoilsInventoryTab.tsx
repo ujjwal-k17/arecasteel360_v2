@@ -96,6 +96,8 @@ export default function CoilsInventoryTab() {
   const [selectedImportIds, setSelectedImportIds] = useState<Set<string>>(new Set());
   const [importSearch, setImportSearch] = useState('');
   const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
+  const [editingCoilNumber, setEditingCoilNumber] = useState<string | null>(null);
+  const [editCoilNumberValue, setEditCoilNumberValue] = useState('');
 
   // Action dialogs
   const [processingBatch, setProcessingBatch] = useState<Batch | null>(null);
