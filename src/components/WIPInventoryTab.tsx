@@ -137,6 +137,29 @@ export default function WIPInventoryTab() {
         </div>
       </div>
 
+      {/* Material Tabs */}
+      <div className="flex items-center gap-1 flex-wrap bg-muted/50 rounded-lg p-1">
+        <Button
+          size="sm"
+          variant={materialTab === 'all' ? 'default' : 'ghost'}
+          className="text-xs h-7 px-3"
+          onClick={() => setMaterialTab('all')}
+        >
+          All
+        </Button>
+        {uniqueMaterials.map(mat => (
+          <Button
+            key={mat}
+            size="sm"
+            variant={materialTab === mat ? 'default' : 'ghost'}
+            className="text-xs h-7 px-3"
+            onClick={() => setMaterialTab(mat)}
+          >
+            {mat}
+          </Button>
+        ))}
+      </div>
+
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
