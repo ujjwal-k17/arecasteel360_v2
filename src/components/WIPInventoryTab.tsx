@@ -185,10 +185,10 @@ export default function WIPInventoryTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {skuGroups.length === 0 && (
+            {displayedSkuGroups.length === 0 && (
               <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No WIP items found.</TableCell></TableRow>
             )}
-            {skuGroups.map(g => {
+            {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
               return (
                 <>

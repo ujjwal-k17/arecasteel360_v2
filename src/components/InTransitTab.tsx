@@ -371,10 +371,10 @@ export default function InTransitTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {skuGroups.length === 0 && (
+              {displayedSkuGroups.length === 0 && (
                 <TableRow><TableCell colSpan={skuCols.length} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
               )}
-              {skuGroups.map(group => (
+              {displayedSkuGroups.map(group => (
                 <>
                   {/* SKU Summary Row */}
                   <TableRow
