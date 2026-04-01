@@ -114,8 +114,39 @@ export function useReviewApproval() {
         const meta = (approval as any).metadata || {};
         const entityType = (approval as any).entity_type;
         const entityId = (approval as any).entity_id;
+        const actionType = (approval as any).action_type;
 
-        if (entityType === 'order') {
+        if (actionType === 'move_back' && entityType === 'fg_item') {
+          // Move FG item back to WIP or Coil
+          const { data: fgItem } = await supabase.from('fg_items').select('*').eq('id', entityId).single();
+          if (fgItem) {
+            if (meta.source_type === 'wip' && meta.source_id) {
+              const { data: wipItem } = await supabase.from('wip_items').select('qty, status').eq('id', meta.source_id).single();
+              if (wipItem) {
+                const newQty = ((wipItem as any).qty || 0) + ((fgItem as any).qty || 0);
+                await supabase.from('wip_items').update({ qty: newQty, status: 'active' } as any).eq('id', meta.source_id);
+              }
+            }
+            if ((fgItem as any).processing_record_id) {
+              await supabase.from('processing_output_items').delete().eq('processing_record_id', (fgItem as any).processing_record_id);
+              const { data: otherFGs } = await supabase.from('fg_items').select('id').eq('processing_record_id', (fgItem as any).processing_record_id).neq('id', entityId);
+              if (!otherFGs || otherFGs.length === 0) {
+                await supabase.from('processing_records').delete().eq('id', (fgItem as any).processing_record_id);
+              }
+            }
+            await supabase.from('fg_items').delete().eq('id', entityId);
+          }
+        } else if (actionType === 'move_back' && entityType === 'wip_item') {
+          // Move WIP item back to Coil Inventory
+          const { data: wipItem } = await supabase.from('wip_items').select('*').eq('id', entityId).single();
+          if (wipItem) {
+            if ((wipItem as any).processing_record_id) {
+              await supabase.from('processing_output_items').delete().eq('processing_record_id', (wipItem as any).processing_record_id);
+              await supabase.from('processing_records').delete().eq('id', (wipItem as any).processing_record_id);
+            }
+            await supabase.from('wip_items').delete().eq('id', entityId);
+          }
+        } else if (entityType === 'order') {
           // Delete order items first, then the order
           const { data: items } = await supabase.from('order_items').select('id').eq('order_id', entityId);
           if (items && items.length > 0) {
