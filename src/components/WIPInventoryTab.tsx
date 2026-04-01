@@ -100,6 +100,11 @@ export default function WIPInventoryTab() {
     return Array.from(map.values());
   }, [filteredItems]);
 
+  const displayedSkuGroups = useMemo(() => {
+    if (materialTab === 'all') return skuGroups;
+    return skuGroups.filter(g => eqCI(g.material || '', materialTab));
+  }, [skuGroups, materialTab]);
+
   const toggleExpand = (key: string) => {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   };
