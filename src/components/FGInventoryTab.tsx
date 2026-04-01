@@ -386,6 +386,23 @@ export default function FGInventoryTab() {
                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }}>
                               <AlertTriangle className="h-3 w-3" /> Defective
                             </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                              e.stopPropagation();
+                              const restoreTo = item.source_type === 'wip' ? 'WIP' : 'Coil Inventory';
+                              if (!confirm(`Request to move this FG item (${availQty.toFixed(2)} Kg) back to ${restoreTo}?`)) return;
+                              try {
+                                await submitApproval.mutateAsync({
+                                  action_type: 'move_back',
+                                  entity_type: 'fg_item',
+                                  entity_id: item.id,
+                                  description: `Move FG item (${availQty.toFixed(2)} Kg, ${item.material || '-'} ${item.thickness ?? ''}x${item.width ?? ''}) back to ${restoreTo}`,
+                                  metadata: { source_type: item.source_type, source_id: item.source_id, qty: item.qty, processing_record_id: item.processing_record_id },
+                                });
+                                toast.success('Move-back request submitted for approval');
+                              } catch { toast.error('Failed to submit request'); }
+                            }} title={`Move back to ${item.source_type === 'wip' ? 'WIP' : 'Coil Inventory'}`} disabled={submitApproval.isPending}>
+                              <Undo2 className="h-3 w-3" /> Move Back
+                            </Button>
                             {isAdmin && (
                               <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive hover:bg-destructive/10" onClick={async (e) => {
                                 e.stopPropagation();
