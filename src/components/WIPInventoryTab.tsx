@@ -78,6 +78,12 @@ export default function WIPInventoryTab() {
     );
   }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade]);
 
+  const [materialTab, setMaterialTab] = useState('all');
+
+  const uniqueMaterials = useMemo(() => {
+    return uniqueCaseInsensitive(items.map(i => i.material || '').filter(Boolean)).sort();
+  }, [items]);
+
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + (i.qty || 0), 0), [filteredItems]);
 
   const skuGroups = useMemo(() => {
