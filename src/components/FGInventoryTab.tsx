@@ -206,6 +206,12 @@ export default function FGInventoryTab() {
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
 
+  const [materialTab, setMaterialTab] = useState('all');
+
+  const uniqueMaterials = useMemo(() => {
+    return [...new Set(items.map(i => i.material || '').filter(Boolean))].sort();
+  }, [items]);
+
   const skuGroups = useMemo(() => {
     const map = new Map<string, SKUGroup>();
     for (const item of filteredItems) {
