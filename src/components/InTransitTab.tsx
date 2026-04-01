@@ -108,6 +108,18 @@ export default function InTransitTab() {
     return groups;
   }, [filteredBatches]);
 
+  const [materialTab, setMaterialTab] = useState<string>('all');
+
+  const uniqueMaterials = useMemo(() => {
+    if (!batches) return [];
+    return uniqueCaseInsensitive(batches.filter(b => b.status === statusFilter).map(b => b.material || '').filter(Boolean)).sort();
+  }, [batches, statusFilter]);
+
+  const displayedSkuGroups = useMemo(() => {
+    if (materialTab === 'all') return skuGroups;
+    return skuGroups.filter(g => eqCI(g.material || '', materialTab));
+  }, [skuGroups, materialTab]);
+
   const totalNetWeight = useMemo(() => filteredBatches.reduce((s, b) => s + (b.net_weight || 0), 0), [filteredBatches]);
 
   const uniqueValues = useMemo(() => {
