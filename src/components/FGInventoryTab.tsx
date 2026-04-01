@@ -227,6 +227,11 @@ export default function FGInventoryTab() {
     return Array.from(map.values());
   }, [filteredItems, soldByItem, defectiveByItem]);
 
+  const displayedSkuGroups = useMemo(() => {
+    if (materialTab === 'all') return skuGroups;
+    return skuGroups.filter(g => (g.material || '') === materialTab);
+  }, [skuGroups, materialTab]);
+
   const toggleExpand = (key: string) => {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   };
