@@ -178,6 +178,9 @@ export function useReviewApproval() {
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['batches'] });
       qc.invalidateQueries({ queryKey: ['inventory_actions'] });
+      qc.invalidateQueries({ queryKey: ['wip_items'] });
+      qc.invalidateQueries({ queryKey: ['fg_items'] });
+      qc.invalidateQueries({ queryKey: ['processing_records'] });
     },
   });
 }
