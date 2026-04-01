@@ -35,6 +35,7 @@ export default function FGInventoryTab() {
   const { data: fgItems } = useFGItems();
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
+  const submitApproval = useSubmitApproval();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [fgView, setFgView] = useState<'open' | 'closed'>('open');
 
