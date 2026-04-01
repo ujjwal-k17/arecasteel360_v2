@@ -206,6 +206,12 @@ export default function FGInventoryTab() {
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
 
+  const [materialTab, setMaterialTab] = useState('all');
+
+  const uniqueMaterials = useMemo(() => {
+    return [...new Set(items.map(i => i.material || '').filter(Boolean))].sort();
+  }, [items]);
+
   const skuGroups = useMemo(() => {
     const map = new Map<string, SKUGroup>();
     for (const item of filteredItems) {
@@ -220,6 +226,11 @@ export default function FGInventoryTab() {
     }
     return Array.from(map.values());
   }, [filteredItems, soldByItem, defectiveByItem]);
+
+  const displayedSkuGroups = useMemo(() => {
+    if (materialTab === 'all') return skuGroups;
+    return skuGroups.filter(g => (g.material || '') === materialTab);
+  }, [skuGroups, materialTab]);
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
@@ -318,6 +329,29 @@ export default function FGInventoryTab() {
         </div>
       </div>
 
+      {/* Material Tabs */}
+      <div className="flex items-center gap-1 flex-wrap bg-muted/50 rounded-lg p-1">
+        <Button
+          size="sm"
+          variant={materialTab === 'all' ? 'default' : 'ghost'}
+          className="text-xs h-7 px-3"
+          onClick={() => setMaterialTab('all')}
+        >
+          All
+        </Button>
+        {uniqueMaterials.map(mat => (
+          <Button
+            key={mat}
+            size="sm"
+            variant={materialTab === mat ? 'default' : 'ghost'}
+            className="text-xs h-7 px-3"
+            onClick={() => setMaterialTab(mat)}
+          >
+            {mat}
+          </Button>
+        ))}
+      </div>
+
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
@@ -347,10 +381,10 @@ export default function FGInventoryTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {skuGroups.length === 0 && (
+            {displayedSkuGroups.length === 0 && (
               <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
-            {skuGroups.map(g => {
+            {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
               return (
                 <>

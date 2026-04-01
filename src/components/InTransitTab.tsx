@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
-import { uniqueCaseInsensitive } from '@/lib/utils';
+import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
 import { useBatches, useInsertBatches, useUpdateBatch, useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { parseExcelFile, generateTemplate } from '@/lib/excel-utils';
@@ -107,6 +107,18 @@ export default function InTransitTab() {
     });
     return groups;
   }, [filteredBatches]);
+
+  const [materialTab, setMaterialTab] = useState<string>('all');
+
+  const uniqueMaterials = useMemo(() => {
+    if (!batches) return [];
+    return uniqueCaseInsensitive(batches.filter(b => b.status === statusFilter).map(b => b.material || '').filter(Boolean)).sort();
+  }, [batches, statusFilter]);
+
+  const displayedSkuGroups = useMemo(() => {
+    if (materialTab === 'all') return skuGroups;
+    return skuGroups.filter(g => eqCI(g.material || '', materialTab));
+  }, [skuGroups, materialTab]);
 
   const totalNetWeight = useMemo(() => filteredBatches.reduce((s, b) => s + (b.net_weight || 0), 0), [filteredBatches]);
 
@@ -307,6 +319,29 @@ export default function InTransitTab() {
         )}
       </div>
 
+      {/* Material Tabs */}
+      <div className="flex items-center gap-1 flex-wrap bg-muted/50 rounded-lg p-1">
+        <Button
+          size="sm"
+          variant={materialTab === 'all' ? 'default' : 'ghost'}
+          className="text-xs h-7 px-3"
+          onClick={() => setMaterialTab('all')}
+        >
+          All
+        </Button>
+        {uniqueMaterials.map(mat => (
+          <Button
+            key={mat}
+            size="sm"
+            variant={materialTab === mat ? 'default' : 'ghost'}
+            className="text-xs h-7 px-3"
+            onClick={() => setMaterialTab(mat)}
+          >
+            {mat}
+          </Button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
         {filterableFields.map(f => (
@@ -336,10 +371,10 @@ export default function InTransitTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {skuGroups.length === 0 && (
+              {displayedSkuGroups.length === 0 && (
                 <TableRow><TableCell colSpan={skuCols.length} className="text-center text-muted-foreground py-8">No batches found.</TableCell></TableRow>
               )}
-              {skuGroups.map(group => (
+              {displayedSkuGroups.map(group => (
                 <>
                   {/* SKU Summary Row */}
                   <TableRow
