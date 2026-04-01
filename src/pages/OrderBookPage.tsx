@@ -582,23 +582,59 @@ export default function OrderBookPage() {
                             <TableCell className="text-right font-mono">{g.totalDispatched.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-mono">{balance.toFixed(2)}</TableCell>
                           </TableRow>
-                          {isExp && g.orders.map((o: any) => {
-                            const t = getOrderTotals(o);
-                            const isOrderExp = expanded.has(o.id);
-                            return (
-                              <>
-                                <TableRow key={o.id} className="cursor-pointer bg-background" onClick={() => toggleExpand(o.id)}>
-                                  <TableCell className="pl-8">{isOrderExp ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</TableCell>
-                                  <TableCell className="text-xs">{o.order_number} {o.po_number ? `(PO: ${o.po_number})` : ''}</TableCell>
-                                  <TableCell className="text-xs text-right">{o.order_date || '-'}</TableCell>
-                                  <TableCell className="text-xs text-right font-mono">{t.total.toFixed(2)}</TableCell>
-                                  <TableCell className="text-xs text-right font-mono">{t.dispatched.toFixed(2)}</TableCell>
-                                  <TableCell className="text-xs text-right font-mono">{t.balance.toFixed(2)}</TableCell>
-                                </TableRow>
-                                {isOrderExp && renderSubRows(o)}
-                              </>
-                            );
-                          })}
+                          {isExp && (
+                            <TableRow key={`cust-${g.name}-items`}>
+                              <TableCell colSpan={6} className="p-0 bg-muted/20">
+                                <div className="px-4 py-2">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs">Order ID</TableHead>
+                                        <TableHead className="text-xs">PO Number</TableHead>
+                                        <TableHead className="text-xs">Order Date</TableHead>
+                                        <TableHead className="text-xs">SKU</TableHead>
+                                        <TableHead className="text-xs">Form</TableHead>
+                                        <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
+                                        <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
+                                        <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
+                                        <TableHead className="text-xs">Comments</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {g.orders.map((o: any) => {
+                                        const subRows = getSubRows(o);
+                                        return subRows.filter(r => !r.isExtra).map((row, idx) => (
+                                          <TableRow key={`${o.id}-${row.key}`}>
+                                            {idx === 0 ? (
+                                              <TableCell className="text-xs font-mono" rowSpan={subRows.filter(r => !r.isExtra).length}>
+                                                {o.order_number}
+                                              </TableCell>
+                                            ) : null}
+                                            {idx === 0 ? (
+                                              <TableCell className="text-xs" rowSpan={subRows.filter(r => !r.isExtra).length}>
+                                                {o.po_number || '-'}
+                                              </TableCell>
+                                            ) : null}
+                                            {idx === 0 ? (
+                                              <TableCell className="text-xs" rowSpan={subRows.filter(r => !r.isExtra).length}>
+                                                {o.order_date || '-'}
+                                              </TableCell>
+                                            ) : null}
+                                            <TableCell className="text-xs">{row.label}</TableCell>
+                                            <TableCell className="text-xs">{row.form}</TableCell>
+                                            <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
+                                            <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
+                                            <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">{row.comments || '-'}</TableCell>
+                                          </TableRow>
+                                        ));
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
                         </>
                       );
                     })}
