@@ -435,6 +435,7 @@ export default function FGInventoryTab() {
             </TableRow>
             <TableRow className="bg-muted/20">
               <TableHead />
+              <TableHead />
               <TableHead><FilterSelect value={filterMaterial} onChange={setFilterMaterial} options={uniqueVals.material} placeholder="Material" /></TableHead>
               <TableHead><FilterSelect value={filterMake} onChange={setFilterMake} options={uniqueVals.make} placeholder="Make" /></TableHead>
               <TableHead><FilterSelect value={filterProcess} onChange={setFilterProcess} options={uniqueVals.process} placeholder="Process" /></TableHead>
@@ -448,7 +449,7 @@ export default function FGInventoryTab() {
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -456,6 +457,7 @@ export default function FGInventoryTab() {
                 <>
                   <TableRow key={g.key} className="cursor-pointer hover:bg-muted/30 bg-muted/10 font-medium" onClick={() => toggleExpand(g.key)}>
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                    <TableCell />
                     <TableCell className="text-sm">{g.material}</TableCell>
                     <TableCell className="text-sm">{g.make}</TableCell>
                     <TableCell className="text-sm">{g.process}</TableCell>
