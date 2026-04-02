@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
+import { uniqueCaseInsensitive, eqCI, fmtNum } from '@/lib/utils';
 import { useAllBatches, useAllActions, getSKUKey, calcBalanceQty, calcUsableBalanceQty, useInsertBatches, type Batch, type InventoryAction } from '@/hooks/useBatches';
 import { useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useQueryClient } from '@tanstack/react-query';
@@ -397,11 +397,11 @@ export default function CoilsInventoryTab() {
       <div className="flex items-center gap-4 text-sm">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Balance Qty:</span>{' '}
-          <span className="font-semibold font-mono-num">{grandTotalBalanceQty.toFixed(2)} Kg</span>
+          <span className="font-semibold font-mono-num">{fmtNum(grandTotalBalanceQty)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Usable Qty:</span>{' '}
-          <span className="font-semibold font-mono-num">{grandTotalUsableQty.toFixed(2)} Kg</span>
+          <span className="font-semibold font-mono-num">{fmtNum(grandTotalUsableQty)} Kg</span>
         </div>
       </div>
 
@@ -468,8 +468,8 @@ export default function CoilsInventoryTab() {
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
                   <TableCell className="text-sm">{g.coating || '-'}</TableCell>
                   <TableCell className="text-sm">{g.grade || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{g.totalUsableQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{g.totalBalanceQty.toFixed(2)}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalUsableQty)}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
                 </TableRow>
                 {expandedSKU === g.key && (
                   <TableRow key={`${g.key}-detail`}>

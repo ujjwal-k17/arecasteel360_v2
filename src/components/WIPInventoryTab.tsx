@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
+import { uniqueCaseInsensitive, eqCI, fmtNum } from '@/lib/utils';
 import { useWIPItems } from '@/hooks/useProcessing';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -133,7 +133,7 @@ export default function WIPInventoryTab() {
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
         <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-          Total: {grandTotalQty.toFixed(2)} Kg ({filteredItems.length} items)
+          Total: {fmtNum(grandTotalQty)} Kg ({filteredItems.length} items)
         </div>
       </div>
 
@@ -199,7 +199,7 @@ export default function WIPInventoryTab() {
                     <TableCell className="text-sm font-mono-num whitespace-nowrap">{g.thickness ?? '-'} x {g.width ?? '-'} x Coil</TableCell>
                     <TableCell className="text-sm">{g.coating}</TableCell>
                     <TableCell className="text-sm">{g.grade}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
                     <TableCell><span className="text-xs text-muted-foreground">{g.items.length} item{g.items.length !== 1 ? 's' : ''}</span></TableCell>
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {

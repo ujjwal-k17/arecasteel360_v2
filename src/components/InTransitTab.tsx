@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
-import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
+import { uniqueCaseInsensitive, eqCI, fmtNum } from '@/lib/utils';
 import { useBatches, useUpdateBatch, useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -319,7 +319,7 @@ export default function InTransitTab() {
       <div className="flex items-center gap-4 text-sm">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Net Weight:</span>{' '}
-          <span className="font-semibold font-mono-num">{totalNetWeight.toFixed(2)} Kg</span>
+          <span className="font-semibold font-mono-num">{fmtNum(totalNetWeight)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Batches:</span>{' '}
@@ -410,8 +410,8 @@ export default function InTransitTab() {
                     <TableCell className="text-sm font-mono-num">{group.length ?? '-'}</TableCell>
                     <TableCell className="text-sm">{group.coating || '-'}</TableCell>
                     <TableCell className="text-sm">{group.grade || '-'}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{group.totalNetWeight.toFixed(2)}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{group.totalGrossWeight.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(group.totalNetWeight)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(group.totalGrossWeight)}</TableCell>
                   </TableRow>
 
                   {/* Expanded batch detail table */}

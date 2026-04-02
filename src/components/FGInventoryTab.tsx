@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useFGItems } from '@/hooks/useProcessing';
+import { fmtNum, fmtInt } from '@/lib/utils';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -325,7 +326,7 @@ export default function FGInventoryTab() {
           </div>
         </div>
         <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-          Total: {grandTotalQty.toFixed(2)} Kg · {grandTotalPcs} Pcs ({filteredItems.length} items)
+          Total: {fmtNum(grandTotalQty)} Kg · {fmtInt(grandTotalPcs)} Pcs ({filteredItems.length} items)
         </div>
       </div>
 
@@ -396,8 +397,8 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm font-mono-num whitespace-nowrap">{formatDimensions(g.thickness, g.width, g.length, g.process)}</TableCell>
                     <TableCell className="text-sm">{g.coating}</TableCell>
                     <TableCell className="text-sm">{g.grade}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalPcs}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtInt(g.totalPcs)}</TableCell>
                     <TableCell />
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {

@@ -29,3 +29,13 @@ export function normalizeCoating(val: string | null | undefined): string {
   if (!val) return '';
   return val.replace(/(\d+)\s+gsm/gi, '$1gsm');
 }
+
+/** Format a number with Indian-style commas (e.g. 1,23,456.78) */
+export function fmtNum(value: number, decimals = 2): string {
+  return value.toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+/** Format an integer with Indian-style commas (no decimals) */
+export function fmtInt(value: number): string {
+  return value.toLocaleString('en-IN');
+}
