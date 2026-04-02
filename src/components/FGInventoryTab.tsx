@@ -605,10 +605,7 @@ export default function FGInventoryTab() {
                 <SelectTrigger><SelectValue placeholder={saleCustomerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
                 <SelectContent>
                   {filteredSaleOrders.map((o: any) => {
-                    const oItems = o.order_items || [];
-                    const totalOrd = oItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
-                    const totalDisp = oItems.reduce((s: number, i: any) => s + ((allDispatches || []).filter((d: any) => d.order_item_id === i.id).reduce((a: number, d: any) => a + (d.dispatch_qty || 0), 0)), 0);
-                    const bal = totalOrd - totalDisp;
+                    const bal = getOrderBalance(o);
                     const dateStr = o.order_date ? new Date(o.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '';
                     return (
                       <SelectItem key={o.id} value={o.order_number}>
