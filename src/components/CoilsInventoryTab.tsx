@@ -78,6 +78,7 @@ export default function CoilsInventoryTab() {
   const { data: actions } = useAllActions();
   const { data: processingRecords } = useAllProcessingRecords();
   const { data: orders } = useOrders();
+  const { coatingByMaterial, gradeByMaterial } = useDerivedOptions();
   const deleteBatch = useDeleteBatch();
   const bulkDeleteBatches = useBulkDeleteBatches();
   const { isAdmin } = useAuth();
