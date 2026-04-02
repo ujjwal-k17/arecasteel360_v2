@@ -326,7 +326,7 @@ export default function FGInventoryTab() {
           </div>
         </div>
         <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-          Total: {grandTotalQty.toFixed(2)} Kg · {grandTotalPcs} Pcs ({filteredItems.length} items)
+          Total: {fmtNum(grandTotalQty)} Kg · {fmtInt(grandTotalPcs)} Pcs ({filteredItems.length} items)
         </div>
       </div>
 
