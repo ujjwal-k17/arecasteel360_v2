@@ -319,7 +319,7 @@ export default function InTransitTab() {
       <div className="flex items-center gap-4 text-sm">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Net Weight:</span>{' '}
-          <span className="font-semibold font-mono-num">{totalNetWeight.toFixed(2)} Kg</span>
+          <span className="font-semibold font-mono-num">{fmtNum(totalNetWeight)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Batches:</span>{' '}
