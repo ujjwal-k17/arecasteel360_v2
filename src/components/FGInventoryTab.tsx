@@ -109,7 +109,10 @@ export default function FGInventoryTab() {
       const { error } = await supabase.from('fg_sales' as any).insert(sale);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fg_sales'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fg_sales'] });
+      queryClient.invalidateQueries({ queryKey: ['non_dispatch_sales_by_order'] });
+    },
   });
 
   const insertFGDefective = useMutation({
