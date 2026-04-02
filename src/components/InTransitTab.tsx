@@ -42,7 +42,7 @@ function getInTransitSKUKey(b: any): string {
 export default function InTransitTab() {
   const [statusFilter, setStatusFilter] = useState<string>('in-transit');
   const { data: batches, isLoading } = useBatches(statusFilter);
-  const insertBatches = useInsertBatches();
+  
   const updateBatch = useUpdateBatch();
   const deleteBatch = useDeleteBatch();
   const bulkDelete = useBulkDeleteBatches();
