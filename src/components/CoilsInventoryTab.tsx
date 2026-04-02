@@ -811,8 +811,8 @@ export default function CoilsInventoryTab() {
               {inTransitBatches.length === 0 && <p className="text-sm text-muted-foreground">No in-transit batches available.</p>}
               <div className="max-h-60 overflow-y-auto space-y-1">
                 {inTransitBatches.filter(b => !importSearch || b.batch_number.toLowerCase().includes(importSearch.toLowerCase())).map(b => {
-                  const complete = isBatchComplete(b);
-                  const missing = getMissingFields(b);
+                  const complete = isBatchComplete(b, coatingByMaterial, gradeByMaterial);
+                  const missing = getMissingFields(b, coatingByMaterial, gradeByMaterial);
                   const isDuplicate = existingBatchNumbers.has(b.batch_number);
                   return (
                     <div key={b.id}
