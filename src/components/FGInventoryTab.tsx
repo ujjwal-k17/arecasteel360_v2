@@ -662,6 +662,98 @@ export default function FGInventoryTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Sale Dialog */}
+      <Dialog open={bulkSaleOpen} onOpenChange={(o) => { if (!o) { setBulkSaleOpen(false); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Sale — {selectedFGItems.length} Items</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Customer Name</Label>
+                <Select value={bulkSaleCustomerId} onValueChange={(v) => { setBulkSaleCustomerId(v); setBulkSaleForm(f => ({ ...f, order_id: '' })); }}>
+                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>
+                    {(customers || []).map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Order Number</Label>
+                <Select value={bulkSaleForm.order_id} onValueChange={v => setBulkSaleForm(f => ({ ...f, order_id: v }))} disabled={!bulkSaleCustomerId}>
+                  <SelectTrigger><SelectValue placeholder={bulkSaleCustomerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
+                  <SelectContent>
+                    {filteredBulkSaleOrders.map((o: any) => {
+                      const oItems = o.order_items || [];
+                      const totalOrd = oItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
+                      const totalDisp = oItems.reduce((s: number, i: any) => s + ((allDispatches || []).filter((d: any) => d.order_item_id === i.id).reduce((a: number, d: any) => a + (d.dispatch_qty || 0), 0)), 0);
+                      const bal = totalOrd - totalDisp;
+                      return (
+                        <SelectItem key={o.id} value={o.order_number}>
+                          {o.order_number} — Bal: {bal.toFixed(0)} Kg
+                        </SelectItem>
+                      );
+                    })}
+                    {filteredBulkSaleOrders.length === 0 && bulkSaleCustomerId && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No open orders</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Invoice Number</Label><Input value={bulkSaleForm.invoice_number} onChange={e => setBulkSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
+              <div><Label className="text-xs">Invoice Date</Label><Input type="date" value={bulkSaleForm.sales_date} onChange={e => setBulkSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border mt-2">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs">SKU</TableHead>
+                  <TableHead className="text-xs">Batch</TableHead>
+                  <TableHead className="text-xs text-right">Available</TableHead>
+                  <TableHead className="text-xs text-right w-32">Sale Qty (Kg)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedFGItems.map(item => {
+                  const avail = getAvailableQty(item);
+                  const skuLabel = [item.material, item.thickness ? `${item.thickness}mm` : null, item.width ? `${item.width}W` : null, item.length ? `${item.length}L` : null, item.coating, item.grade].filter(Boolean).join(' | ') || '-';
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="text-xs">{skuLabel}</TableCell>
+                      <TableCell className="text-xs">{getBatchNumber(item)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono-num">{avail.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          className="h-7 text-xs text-right"
+                          value={bulkQuantities[item.id] || ''}
+                          onChange={e => setBulkQuantities(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBulkSaleOpen(false)}>Cancel</Button>
+            <Button onClick={handleBulkSaleSubmit} disabled={insertFGSale.isPending}>
+              {insertFGSale.isPending ? 'Saving...' : `Record Sale (${selectedFGItems.filter(i => Number(bulkQuantities[i.id]) > 0).length} items)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
