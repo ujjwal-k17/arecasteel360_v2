@@ -1339,6 +1339,10 @@ export type Database = {
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
+      cascade_dropdown_rename: {
+        Args: { p_category: string; p_new_value: string; p_old_value: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

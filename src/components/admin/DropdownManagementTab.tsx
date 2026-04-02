@@ -60,11 +60,27 @@ export default function DropdownManagementTab() {
 
   const handleSaveEdit = async () => {
     if (!editingId || !editValue.trim()) return;
-    const { error } = await supabase.from('dropdown_options').update({ value: editValue.trim() }).eq('id', editingId);
+    const oldOption = (options || []).find((o: any) => o.id === editingId);
+    if (!oldOption) return;
+    const oldValue = oldOption.value;
+    const newVal = editValue.trim();
+    const { error } = await supabase.from('dropdown_options').update({ value: newVal }).eq('id', editingId);
     if (error) { toast.error('Failed'); return; }
-    toast.success('Updated');
+    // Cascade rename across all inventory tables
+    if (oldValue !== newVal) {
+      const { error: cascadeErr } = await supabase.rpc('cascade_dropdown_rename', {
+        p_category: oldOption.category,
+        p_old_value: oldValue,
+        p_new_value: newVal,
+      });
+      if (cascadeErr) { toast.error('Updated option but failed to cascade: ' + cascadeErr.message); }
+    }
+    toast.success('Updated & cascaded to all inventory');
     setEditingId(null);
     qc.invalidateQueries({ queryKey: ['dropdown_options'] });
+    qc.invalidateQueries({ queryKey: ['batches'] });
+    qc.invalidateQueries({ queryKey: ['wip_items'] });
+    qc.invalidateQueries({ queryKey: ['fg_items'] });
   };
 
   const handleToggleActive = async (id: string, currentActive: boolean) => {
