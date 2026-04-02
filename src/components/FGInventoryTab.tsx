@@ -410,6 +410,7 @@ export default function FGInventoryTab() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8" />
+              <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Make</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process</TableHead>
