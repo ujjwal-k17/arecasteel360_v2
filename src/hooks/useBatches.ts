@@ -125,6 +125,7 @@ export function useInsertAction() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory_actions'] });
       qc.invalidateQueries({ queryKey: ['batches'] });
+      qc.invalidateQueries({ queryKey: ['non_dispatch_sales_by_order'] });
     },
   });
 }
