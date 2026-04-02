@@ -42,10 +42,10 @@ const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
   'purchase_date', 'purchase_from',
 ];
 
-function isBatchComplete(b: Batch): boolean {
+function isBatchComplete(b: Batch, coatingByMaterial: Record<string, string[]>, gradeByMaterial: Record<string, string[]>): boolean {
   const mat = b.material || '';
-  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
-  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+  const coatingOptions = mat ? (coatingByMaterial[mat] || []) : [];
+  const gradeOptions = mat ? (gradeByMaterial[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS.every(f => {
     if (f === 'coating' && coatingOptions.length === 0) return true;
     if (f === 'grade' && gradeOptions.length === 0) return true;
@@ -53,10 +53,10 @@ function isBatchComplete(b: Batch): boolean {
   });
 }
 
-function getMissingFields(b: Batch): string[] {
+function getMissingFields(b: Batch, coatingByMaterial: Record<string, string[]>, gradeByMaterial: Record<string, string[]>): string[] {
   const mat = b.material || '';
-  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
-  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+  const coatingOptions = mat ? (coatingByMaterial[mat] || []) : [];
+  const gradeOptions = mat ? (gradeByMaterial[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS
     .filter(f => {
       if (f === 'coating' && coatingOptions.length === 0) return false;
