@@ -233,20 +233,24 @@ export default function OrderBookPage() {
         if (!grouped[r.order_number]) grouped[r.order_number] = [];
         grouped[r.order_number].push(r);
       });
-      let created = 0, skipped = 0;
+      let created = 0;
+      const skipReasons: string[] = [];
       for (const [orderNum, items] of Object.entries(grouped)) {
         const custName = items[0].customer_name;
         const cust = customers?.find(c => c.customer_name.toLowerCase() === custName?.toLowerCase());
-        if (!cust) { skipped++; continue; }
+        if (!cust) { skipReasons.push(`Order "${orderNum}": Customer "${custName || '(empty)'}" not found in master data`); continue; }
         try {
           await insertOrder.mutateAsync({
             order: { order_number: orderNum, customer_id: cust.id, comments: items[0].comments || undefined, order_date: items[0].order_date || undefined },
             items: items.filter(i => i.material || i.net_weight).map(i => ({ material: i.material, form: i.form, thickness: i.thickness, width: i.width, length: i.length, coating: i.coating, grade: i.grade, net_weight: i.net_weight, comments: i.item_comments })),
           });
           created++;
-        } catch { skipped++; }
+        } catch (insertErr: any) { skipReasons.push(`Order "${orderNum}": ${insertErr?.message || 'Insert failed'}`); }
       }
-      toast.success(`Imported ${created} orders${skipped > 0 ? `, ${skipped} skipped` : ''}`);
+      if (skipReasons.length > 0) {
+        toast.error(`${skipReasons.length} order(s) skipped:\n${skipReasons.slice(0, 5).join('\n')}${skipReasons.length > 5 ? `\n...and ${skipReasons.length - 5} more` : ''}`, { duration: 10000 });
+      }
+      if (created > 0) toast.success(`Imported ${created} order(s)`);
     } catch (err: any) {
       toast.error(err.message || 'Failed to parse Excel');
     }
