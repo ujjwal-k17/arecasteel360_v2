@@ -107,7 +107,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
               <Select value={salesForm} onValueChange={setSalesForm}>
                 <SelectTrigger><SelectValue placeholder="Select form" /></SelectTrigger>
                 <SelectContent>
-                  {FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  {forms.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
