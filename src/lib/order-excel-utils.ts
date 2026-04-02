@@ -56,12 +56,37 @@ function parseNum(v: unknown): number | undefined {
   return isNaN(n) ? undefined : n;
 }
 
+function parseDate(val: unknown): string | undefined {
+  if (val == null || val === '') return undefined;
+  // JS Date object (from cellDates:true)
+  if (val instanceof Date) {
+    const y = val.getFullYear(), m = val.getMonth() + 1, d = val.getDate();
+    if (y > 1000) return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return undefined;
+  }
+  // Excel serial number
+  if (typeof val === 'number' && val > 1 && val < 100000) {
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    const dt = new Date(epoch.getTime() + val * 86400000);
+    return dt.toISOString().split('T')[0];
+  }
+  // String date
+  const s = String(val).trim();
+  const native = new Date(s);
+  if (!isNaN(native.getTime()) && native.getFullYear() > 1000) {
+    const y = native.getFullYear(), m = native.getMonth() + 1, d = native.getDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  return undefined;
+}
+
 export function parseOrderExcel(file: File): Promise<OrderExcelRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const wb = XLSX.read(e.target?.result, { type: 'binary' });
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array', cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
         if (raw.length === 0) { resolve([]); return; }
@@ -78,6 +103,7 @@ export function parseOrderExcel(file: File): Promise<OrderExcelRow[]> {
           Object.entries(mapping).forEach(([orig, mapped]) => {
             let val = r[orig];
             if (NUMERIC_FIELDS.includes(mapped)) val = parseNum(val);
+            else if (mapped === 'order_date') val = parseDate(val);
             else val = val != null ? String(val).trim() : undefined;
             if (val !== undefined && val !== '') row[mapped] = val;
           });
@@ -90,7 +116,7 @@ export function parseOrderExcel(file: File): Promise<OrderExcelRow[]> {
       }
     };
     reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   });
 }
 
