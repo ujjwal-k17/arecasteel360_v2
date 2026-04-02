@@ -9,7 +9,7 @@ import { usePackCoilSale } from '@/hooks/useProcessing';
 import { useInsertAction } from '@/hooks/useBatches';
 import type { Batch, InventoryAction } from '@/hooks/useBatches';
 import { calcUsableBalanceQty } from '@/hooks/useBatches';
-import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
+import { useCustomers, useOrders, useAllDispatches, useNonDispatchSalesByOrder } from '@/hooks/useOrders';
 
 interface Props {
   batch: Batch;
@@ -28,6 +28,7 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const { data: customers } = useCustomers();
   const { data: orders } = useOrders();
   const { data: allDispatches } = useAllDispatches();
+  const { data: nonDispatchSales } = useNonDispatchSalesByOrder();
 
   const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
@@ -56,11 +57,8 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
     return orders.filter((o: any) => o.customer_id === customerId && o.status === 'open');
   }, [orders, customerId]);
 
-  // Compute order balance qty for selected order
-  const orderBalanceQty = useMemo(() => {
-    if (!orderId || !orders) return null;
-    const order = orders.find((o: any) => o.order_number === orderId);
-    if (!order) return null;
+  // Helper to compute order balance including all sale sources
+  const getOrderBalance = (order: any) => {
     const orderItems = order.order_items || [];
     const totalOrderQty = orderItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
     const dispatchMap = new Map<string, number>();
@@ -68,8 +66,17 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
       dispatchMap.set(d.order_item_id, (dispatchMap.get(d.order_item_id) || 0) + (d.dispatch_qty || 0));
     });
     const totalDispatched = orderItems.reduce((s: number, i: any) => s + (dispatchMap.get(i.id) || 0), 0);
-    return totalOrderQty - totalDispatched;
-  }, [orderId, orders, allDispatches]);
+    const nonDispatchQty = nonDispatchSales?.get(order.order_number) || 0;
+    return totalOrderQty - totalDispatched - nonDispatchQty;
+  };
+
+  // Compute order balance qty for selected order
+  const orderBalanceQty = useMemo(() => {
+    if (!orderId || !orders) return null;
+    const order = orders.find((o: any) => o.order_number === orderId);
+    if (!order) return null;
+    return getOrderBalance(order);
+  }, [orderId, orders, allDispatches, nonDispatchSales]);
 
   const handleCustomerChange = (val: string) => {
     setCustomerId(val);
@@ -162,10 +169,7 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
               <SelectTrigger><SelectValue placeholder={customerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
               <SelectContent>
               {filteredOrders.map((o: any) => {
-                  const oItems = o.order_items || [];
-                  const totalOrd = oItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
-                  const totalDisp = oItems.reduce((s: number, i: any) => s + ((allDispatches || []).filter((d: any) => d.order_item_id === i.id).reduce((a: number, d: any) => a + (d.dispatch_qty || 0), 0)), 0);
-                  const bal = totalOrd - totalDisp;
+                  const bal = getOrderBalance(o);
                   const dateStr = o.order_date ? new Date(o.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '';
                   return (
                     <SelectItem key={o.id} value={o.order_number}>

@@ -213,3 +213,43 @@ export function useInsertDispatches() {
     },
   });
 }
+
+// ---------- Non-dispatch sales by order number ----------
+// Aggregates sales qty from fg_sales + inventory_actions (sales types) by order_number
+export function useNonDispatchSalesByOrder() {
+  return useQuery({
+    queryKey: ['non_dispatch_sales_by_order'],
+    queryFn: async () => {
+      const map = new Map<string, number>();
+
+      // FG sales
+      const { data: fgSales } = await supabase.from('fg_sales' as any).select('order_id, quantity');
+      for (const s of (fgSales || []) as any[]) {
+        if (s.order_id) {
+          map.set(s.order_id, (map.get(s.order_id) || 0) + (Number(s.quantity) || 0));
+        }
+      }
+
+      // Inventory actions (pack_coil_sale, loose_coil_sale, sales)
+      const { data: actions } = await supabase
+        .from('inventory_actions')
+        .select('order_id, net_weight, action_type')
+        .in('action_type', ['sales', 'pack_coil_sale', 'loose_coil_sale']);
+      for (const a of (actions || []) as any[]) {
+        if (a.order_id) {
+          map.set(a.order_id, (map.get(a.order_id) || 0) + (Number(a.net_weight) || 0));
+        }
+      }
+
+      // Defective sales
+      const { data: defSales } = await supabase.from('defective_sales' as any).select('order_id, quantity');
+      for (const d of (defSales || []) as any[]) {
+        if (d.order_id) {
+          map.set(d.order_id, (map.get(d.order_id) || 0) + (Number(d.quantity) || 0));
+        }
+      }
+
+      return map;
+    },
+  });
+}

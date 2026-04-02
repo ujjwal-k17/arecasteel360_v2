@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
+import { useCustomers, useOrders, useAllDispatches, useNonDispatchSalesByOrder } from '@/hooks/useOrders';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitApproval } from '@/hooks/useActionLog';
 
@@ -64,17 +64,15 @@ export default function FGInventoryTab() {
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
   const { data: allDispatches } = useAllDispatches();
+  const { data: nonDispatchSales } = useNonDispatchSalesByOrder();
 
   const filteredSaleOrders = useMemo(() => {
     if (!allOrders || !saleCustomerId) return [];
     return allOrders.filter((o: any) => o.customer_id === saleCustomerId && o.status === 'open');
   }, [allOrders, saleCustomerId]);
 
-  // Compute order balance qty for selected order in sale dialog
-  const saleOrderBalanceQty = useMemo(() => {
-    if (!saleForm.order_id || !allOrders) return null;
-    const order = allOrders.find((o: any) => o.order_number === saleForm.order_id);
-    if (!order) return null;
+  // Helper to compute order balance including all sale sources
+  const getOrderBalance = (order: any) => {
     const orderItems = order.order_items || [];
     const totalOrderQty = orderItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
     const dispatchMap = new Map<string, number>();
@@ -82,8 +80,17 @@ export default function FGInventoryTab() {
       dispatchMap.set(d.order_item_id, (dispatchMap.get(d.order_item_id) || 0) + (d.dispatch_qty || 0));
     });
     const totalDispatched = orderItems.reduce((s: number, i: any) => s + (dispatchMap.get(i.id) || 0), 0);
-    return totalOrderQty - totalDispatched;
-  }, [saleForm.order_id, allOrders, allDispatches]);
+    const nonDispatchQty = nonDispatchSales?.get(order.order_number) || 0;
+    return totalOrderQty - totalDispatched - nonDispatchQty;
+  };
+
+  // Compute order balance qty for selected order in sale dialog
+  const saleOrderBalanceQty = useMemo(() => {
+    if (!saleForm.order_id || !allOrders) return null;
+    const order = allOrders.find((o: any) => o.order_number === saleForm.order_id);
+    if (!order) return null;
+    return getOrderBalance(order);
+  }, [saleForm.order_id, allOrders, allDispatches, nonDispatchSales]);
 
   // Fetch FG sales & defectives
   const { data: fgSales } = useQuery({
@@ -109,7 +116,10 @@ export default function FGInventoryTab() {
       const { error } = await supabase.from('fg_sales' as any).insert(sale);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fg_sales'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fg_sales'] });
+      queryClient.invalidateQueries({ queryKey: ['non_dispatch_sales_by_order'] });
+    },
   });
 
   const insertFGDefective = useMutation({
@@ -595,10 +605,7 @@ export default function FGInventoryTab() {
                 <SelectTrigger><SelectValue placeholder={saleCustomerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
                 <SelectContent>
                   {filteredSaleOrders.map((o: any) => {
-                    const oItems = o.order_items || [];
-                    const totalOrd = oItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
-                    const totalDisp = oItems.reduce((s: number, i: any) => s + ((allDispatches || []).filter((d: any) => d.order_item_id === i.id).reduce((a: number, d: any) => a + (d.dispatch_qty || 0), 0)), 0);
-                    const bal = totalOrd - totalDisp;
+                    const bal = getOrderBalance(o);
                     const dateStr = o.order_date ? new Date(o.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '';
                     return (
                       <SelectItem key={o.id} value={o.order_number}>
@@ -689,10 +696,7 @@ export default function FGInventoryTab() {
                   <SelectTrigger><SelectValue placeholder={bulkSaleCustomerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
                   <SelectContent>
                     {filteredBulkSaleOrders.map((o: any) => {
-                      const oItems = o.order_items || [];
-                      const totalOrd = oItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
-                      const totalDisp = oItems.reduce((s: number, i: any) => s + ((allDispatches || []).filter((d: any) => d.order_item_id === i.id).reduce((a: number, d: any) => a + (d.dispatch_qty || 0), 0)), 0);
-                      const bal = totalOrd - totalDisp;
+                      const bal = getOrderBalance(o);
                       return (
                         <SelectItem key={o.id} value={o.order_number}>
                           {o.order_number} — Bal: {bal.toFixed(0)} Kg
