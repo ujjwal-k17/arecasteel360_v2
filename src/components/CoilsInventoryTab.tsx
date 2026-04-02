@@ -18,7 +18,7 @@ import { useUndoAction } from '@/hooks/useUndoAction';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import InventoryFieldSelect from './InventoryFieldSelect';
-import { COATING_BY_MATERIAL, GRADE_BY_MATERIAL } from '@/lib/inventory-options';
+import { useDerivedOptions } from '@/hooks/useDropdownOptions';
 import ProcessingDialog from './ProcessingDialog';
 import PackCoilSaleDialog from './PackCoilSaleDialog';
 import { isFieldValueValid } from '@/lib/field-validation';
@@ -49,10 +49,10 @@ const REQUIRED_IMPORT_FIELDS: (keyof Batch)[] = [
   'purchase_date', 'purchase_from',
 ];
 
-function isBatchComplete(b: Batch): boolean {
+function isBatchComplete(b: Batch, coatingByMaterial: Record<string, string[]>, gradeByMaterial: Record<string, string[]>): boolean {
   const mat = b.material || '';
-  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
-  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+  const coatingOptions = mat ? (coatingByMaterial[mat] || []) : [];
+  const gradeOptions = mat ? (gradeByMaterial[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS.every(f => {
     if (f === 'coating' && coatingOptions.length === 0) return true;
     if (f === 'grade' && gradeOptions.length === 0) return true;
@@ -60,10 +60,10 @@ function isBatchComplete(b: Batch): boolean {
   });
 }
 
-function getMissingFields(b: Batch): string[] {
+function getMissingFields(b: Batch, coatingByMaterial: Record<string, string[]>, gradeByMaterial: Record<string, string[]>): string[] {
   const mat = b.material || '';
-  const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
-  const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+  const coatingOptions = mat ? (coatingByMaterial[mat] || []) : [];
+  const gradeOptions = mat ? (gradeByMaterial[mat] || []) : [];
   return REQUIRED_IMPORT_FIELDS
     .filter(f => {
       if (f === 'coating' && coatingOptions.length === 0) return false;
@@ -78,6 +78,7 @@ export default function CoilsInventoryTab() {
   const { data: actions } = useAllActions();
   const { data: processingRecords } = useAllProcessingRecords();
   const { data: orders } = useOrders();
+  const { coatingByMaterial, gradeByMaterial } = useDerivedOptions();
   const deleteBatch = useDeleteBatch();
   const bulkDeleteBatches = useBulkDeleteBatches();
   const { isAdmin } = useAuth();
@@ -263,8 +264,8 @@ export default function CoilsInventoryTab() {
 
   const isNewBatchValid = () => {
     const mat = newBatch.material;
-    const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
-    const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+    const coatingOptions = mat ? (coatingByMaterial[mat] || []) : [];
+    const gradeOptions = mat ? (gradeByMaterial[mat] || []) : [];
     return Object.entries(newBatch).every(([key, v]) => {
       if (key === 'coating' && coatingOptions.length === 0) return true;
       if (key === 'grade' && gradeOptions.length === 0) return true;
@@ -810,8 +811,8 @@ export default function CoilsInventoryTab() {
               {inTransitBatches.length === 0 && <p className="text-sm text-muted-foreground">No in-transit batches available.</p>}
               <div className="max-h-60 overflow-y-auto space-y-1">
                 {inTransitBatches.filter(b => !importSearch || b.batch_number.toLowerCase().includes(importSearch.toLowerCase())).map(b => {
-                  const complete = isBatchComplete(b);
-                  const missing = getMissingFields(b);
+                  const complete = isBatchComplete(b, coatingByMaterial, gradeByMaterial);
+                  const missing = getMissingFields(b, coatingByMaterial, gradeByMaterial);
                   const isDuplicate = existingBatchNumbers.has(b.batch_number);
                   return (
                     <div key={b.id}

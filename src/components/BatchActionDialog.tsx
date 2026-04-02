@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { FORMS } from '@/lib/inventory-options';
+import { useDerivedOptions } from '@/hooks/useDropdownOptions';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 const SCRAP_TYPES = ['End Pcs', 'Trimming', 'Metal Cover', 'Non metal cover', 'Short qty'];
@@ -20,6 +20,7 @@ interface Props {
 
 export default function BatchActionDialog({ batch, actionType, open, onClose }: Props) {
   const insertAction = useInsertAction();
+  const { forms } = useDerivedOptions();
 
   // Sales state
   const [orderId, setOrderId] = useState('');
@@ -106,7 +107,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
               <Select value={salesForm} onValueChange={setSalesForm}>
                 <SelectTrigger><SelectValue placeholder="Select form" /></SelectTrigger>
                 <SelectContent>
-                  {FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  {forms.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
