@@ -64,17 +64,15 @@ export default function FGInventoryTab() {
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
   const { data: allDispatches } = useAllDispatches();
+  const { data: nonDispatchSales } = useNonDispatchSalesByOrder();
 
   const filteredSaleOrders = useMemo(() => {
     if (!allOrders || !saleCustomerId) return [];
     return allOrders.filter((o: any) => o.customer_id === saleCustomerId && o.status === 'open');
   }, [allOrders, saleCustomerId]);
 
-  // Compute order balance qty for selected order in sale dialog
-  const saleOrderBalanceQty = useMemo(() => {
-    if (!saleForm.order_id || !allOrders) return null;
-    const order = allOrders.find((o: any) => o.order_number === saleForm.order_id);
-    if (!order) return null;
+  // Helper to compute order balance including all sale sources
+  const getOrderBalance = (order: any) => {
     const orderItems = order.order_items || [];
     const totalOrderQty = orderItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
     const dispatchMap = new Map<string, number>();
@@ -82,8 +80,17 @@ export default function FGInventoryTab() {
       dispatchMap.set(d.order_item_id, (dispatchMap.get(d.order_item_id) || 0) + (d.dispatch_qty || 0));
     });
     const totalDispatched = orderItems.reduce((s: number, i: any) => s + (dispatchMap.get(i.id) || 0), 0);
-    return totalOrderQty - totalDispatched;
-  }, [saleForm.order_id, allOrders, allDispatches]);
+    const nonDispatchQty = nonDispatchSales?.get(order.order_number) || 0;
+    return totalOrderQty - totalDispatched - nonDispatchQty;
+  };
+
+  // Compute order balance qty for selected order in sale dialog
+  const saleOrderBalanceQty = useMemo(() => {
+    if (!saleForm.order_id || !allOrders) return null;
+    const order = allOrders.find((o: any) => o.order_number === saleForm.order_id);
+    if (!order) return null;
+    return getOrderBalance(order);
+  }, [saleForm.order_id, allOrders, allDispatches, nonDispatchSales]);
 
   // Fetch FG sales & defectives
   const { data: fgSales } = useQuery({
