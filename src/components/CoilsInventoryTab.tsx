@@ -397,7 +397,7 @@ export default function CoilsInventoryTab() {
       <div className="flex items-center gap-4 text-sm">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Balance Qty:</span>{' '}
-          <span className="font-semibold font-mono-num">{grandTotalBalanceQty.toFixed(2)} Kg</span>
+          <span className="font-semibold font-mono-num">{fmtNum(grandTotalBalanceQty)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Total Usable Qty:</span>{' '}
