@@ -377,8 +377,20 @@ export default function FGInventoryTab() {
             ))}
           </div>
         </div>
-        <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-          Total: {fmtNum(grandTotalQty)} Kg · {fmtInt(grandTotalPcs)} Pcs ({filteredItems.length} items)
+        <div className="flex items-center gap-3">
+          {selectedItems.size > 0 && fgView === 'open' && (
+            <Button size="sm" className="gap-2" onClick={() => {
+              setBulkQuantities(Object.fromEntries(
+                selectedFGItems.map(i => [i.id, getAvailableQty(i).toFixed(2)])
+              ));
+              setBulkSaleOpen(true);
+            }}>
+              <ShoppingCart className="h-4 w-4" /> Bulk Sale ({selectedItems.size})
+            </Button>
+          )}
+          <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
+            Total: {fmtNum(grandTotalQty)} Kg · {fmtInt(grandTotalPcs)} Pcs ({filteredItems.length} items)
+          </div>
         </div>
       </div>
 
