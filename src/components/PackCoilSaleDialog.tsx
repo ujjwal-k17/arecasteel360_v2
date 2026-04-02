@@ -9,7 +9,7 @@ import { usePackCoilSale } from '@/hooks/useProcessing';
 import { useInsertAction } from '@/hooks/useBatches';
 import type { Batch, InventoryAction } from '@/hooks/useBatches';
 import { calcUsableBalanceQty } from '@/hooks/useBatches';
-import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
+import { useCustomers, useOrders, useAllDispatches, useNonDispatchSalesByOrder } from '@/hooks/useOrders';
 
 interface Props {
   batch: Batch;
