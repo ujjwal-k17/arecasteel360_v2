@@ -471,8 +471,13 @@ export default function FGInventoryTab() {
                   {isOpen && g.items.map((item: any) => {
                     const availQty = getAvailableQty(item);
                     return (
-                      <TableRow key={item.id} className="bg-background">
+                      <TableRow key={item.id} className={`bg-background ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
                         <TableCell />
+                        <TableCell className="w-8 px-2" onClick={e => e.stopPropagation()}>
+                          {fgView === 'open' && availQty > 0 && (
+                            <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleSelectItem(item.id)} />
+                          )}
+                        </TableCell>
                         <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
