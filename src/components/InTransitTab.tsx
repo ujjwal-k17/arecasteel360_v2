@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
-import { uniqueCaseInsensitive, eqCI } from '@/lib/utils';
+import { uniqueCaseInsensitive, eqCI, fmtNum } from '@/lib/utils';
 import { useBatches, useUpdateBatch, useDeleteBatch, useBulkDeleteBatches } from '@/hooks/useBatches';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
