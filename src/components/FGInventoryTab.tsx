@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useOrders, useAllDispatches } from '@/hooks/useOrders';
@@ -39,6 +40,11 @@ export default function FGInventoryTab() {
   const submitApproval = useSubmitApproval();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [fgView, setFgView] = useState<'open' | 'closed'>('open');
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [bulkSaleOpen, setBulkSaleOpen] = useState(false);
+  const [bulkSaleCustomerId, setBulkSaleCustomerId] = useState('');
+  const [bulkSaleForm, setBulkSaleForm] = useState({ invoice_number: '', order_id: '', sales_date: '' });
+  const [bulkQuantities, setBulkQuantities] = useState<Record<string, string>>({});
 
   // Filters
   const [filterMaterial, setFilterMaterial] = useState('all');
@@ -237,6 +243,52 @@ export default function FGInventoryTab() {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   };
 
+  const toggleSelectItem = (id: string) => {
+    setSelectedItems(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  };
+
+  const selectedFGItems = useMemo(() => {
+    return filteredItems.filter(i => selectedItems.has(i.id));
+  }, [filteredItems, selectedItems]);
+
+  const filteredBulkSaleOrders = useMemo(() => {
+    if (!allOrders || !bulkSaleCustomerId) return [];
+    return allOrders.filter((o: any) => o.customer_id === bulkSaleCustomerId && o.status === 'open');
+  }, [allOrders, bulkSaleCustomerId]);
+
+  const handleBulkSaleSubmit = async () => {
+    const itemsToSell = selectedFGItems.filter(i => {
+      const qty = Number(bulkQuantities[i.id]) || 0;
+      return qty > 0;
+    });
+    if (itemsToSell.length === 0) { toast.error('Enter quantity for at least one item'); return; }
+    for (const item of itemsToSell) {
+      const qty = Number(bulkQuantities[item.id]);
+      const avail = getAvailableQty(item);
+      if (qty > avail + 0.01) {
+        toast.error(`Quantity exceeds available for batch ${getBatchNumber(item)}`);
+        return;
+      }
+    }
+    try {
+      for (const item of itemsToSell) {
+        await insertFGSale.mutateAsync({
+          fg_item_id: item.id,
+          invoice_number: bulkSaleForm.invoice_number || null,
+          order_id: bulkSaleForm.order_id || null,
+          quantity: Number(bulkQuantities[item.id]),
+          sales_date: bulkSaleForm.sales_date || null,
+        });
+      }
+      toast.success(`Sale recorded for ${itemsToSell.length} items`);
+      setBulkSaleOpen(false);
+      setSelectedItems(new Set());
+      setBulkSaleCustomerId('');
+      setBulkSaleForm({ invoice_number: '', order_id: '', sales_date: '' });
+      setBulkQuantities({});
+    } catch { toast.error('Failed to record bulk sale'); }
+  };
+
   const formatDimensions = (t: any, w: any, l: any, process: string) => {
     const isSlit = (process || '').toLowerCase().includes('slit');
     return `${t ?? '-'} x ${w ?? '-'} x ${isSlit ? 'Coil' : (l ?? '-')}`;
@@ -325,8 +377,20 @@ export default function FGInventoryTab() {
             ))}
           </div>
         </div>
-        <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-          Total: {fmtNum(grandTotalQty)} Kg · {fmtInt(grandTotalPcs)} Pcs ({filteredItems.length} items)
+        <div className="flex items-center gap-3">
+          {selectedItems.size > 0 && fgView === 'open' && (
+            <Button size="sm" className="gap-2" onClick={() => {
+              setBulkQuantities(Object.fromEntries(
+                selectedFGItems.map(i => [i.id, getAvailableQty(i).toFixed(2)])
+              ));
+              setBulkSaleOpen(true);
+            }}>
+              <ShoppingCart className="h-4 w-4" /> Bulk Sale ({selectedItems.size})
+            </Button>
+          )}
+          <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
+            Total: {fmtNum(grandTotalQty)} Kg · {fmtInt(grandTotalPcs)} Pcs ({filteredItems.length} items)
+          </div>
         </div>
       </div>
 
@@ -358,6 +422,7 @@ export default function FGInventoryTab() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8" />
+              <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Make</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process</TableHead>
@@ -369,6 +434,7 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
             </TableRow>
             <TableRow className="bg-muted/20">
+              <TableHead />
               <TableHead />
               <TableHead><FilterSelect value={filterMaterial} onChange={setFilterMaterial} options={uniqueVals.material} placeholder="Material" /></TableHead>
               <TableHead><FilterSelect value={filterMake} onChange={setFilterMake} options={uniqueVals.make} placeholder="Make" /></TableHead>
@@ -383,7 +449,7 @@ export default function FGInventoryTab() {
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -391,6 +457,7 @@ export default function FGInventoryTab() {
                 <>
                   <TableRow key={g.key} className="cursor-pointer hover:bg-muted/30 bg-muted/10 font-medium" onClick={() => toggleExpand(g.key)}>
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                    <TableCell />
                     <TableCell className="text-sm">{g.material}</TableCell>
                     <TableCell className="text-sm">{g.make}</TableCell>
                     <TableCell className="text-sm">{g.process}</TableCell>
@@ -404,8 +471,13 @@ export default function FGInventoryTab() {
                   {isOpen && g.items.map((item: any) => {
                     const availQty = getAvailableQty(item);
                     return (
-                      <TableRow key={item.id} className="bg-background">
+                      <TableRow key={item.id} className={`bg-background ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
                         <TableCell />
+                        <TableCell className="w-8 px-2" onClick={e => e.stopPropagation()}>
+                          {fgView === 'open' && availQty > 0 && (
+                            <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleSelectItem(item.id)} />
+                          )}
+                        </TableCell>
                         <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
@@ -586,6 +658,98 @@ export default function FGInventoryTab() {
             <Button variant="ghost" onClick={() => setDefectDialog(null)}>Cancel</Button>
             <Button onClick={handleDefectSubmit} disabled={insertFGDefective.isPending} variant="destructive">
               {insertFGDefective.isPending ? 'Saving...' : 'Record Defective'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Sale Dialog */}
+      <Dialog open={bulkSaleOpen} onOpenChange={(o) => { if (!o) { setBulkSaleOpen(false); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Sale — {selectedFGItems.length} Items</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Customer Name</Label>
+                <Select value={bulkSaleCustomerId} onValueChange={(v) => { setBulkSaleCustomerId(v); setBulkSaleForm(f => ({ ...f, order_id: '' })); }}>
+                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>
+                    {(customers || []).map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Order Number</Label>
+                <Select value={bulkSaleForm.order_id} onValueChange={v => setBulkSaleForm(f => ({ ...f, order_id: v }))} disabled={!bulkSaleCustomerId}>
+                  <SelectTrigger><SelectValue placeholder={bulkSaleCustomerId ? 'Select order' : 'Select customer first'} /></SelectTrigger>
+                  <SelectContent>
+                    {filteredBulkSaleOrders.map((o: any) => {
+                      const oItems = o.order_items || [];
+                      const totalOrd = oItems.reduce((s: number, i: any) => s + (i.net_weight || 0), 0);
+                      const totalDisp = oItems.reduce((s: number, i: any) => s + ((allDispatches || []).filter((d: any) => d.order_item_id === i.id).reduce((a: number, d: any) => a + (d.dispatch_qty || 0), 0)), 0);
+                      const bal = totalOrd - totalDisp;
+                      return (
+                        <SelectItem key={o.id} value={o.order_number}>
+                          {o.order_number} — Bal: {bal.toFixed(0)} Kg
+                        </SelectItem>
+                      );
+                    })}
+                    {filteredBulkSaleOrders.length === 0 && bulkSaleCustomerId && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">No open orders</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Invoice Number</Label><Input value={bulkSaleForm.invoice_number} onChange={e => setBulkSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
+              <div><Label className="text-xs">Invoice Date</Label><Input type="date" value={bulkSaleForm.sales_date} onChange={e => setBulkSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border mt-2">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs">SKU</TableHead>
+                  <TableHead className="text-xs">Batch</TableHead>
+                  <TableHead className="text-xs text-right">Available</TableHead>
+                  <TableHead className="text-xs text-right w-32">Sale Qty (Kg)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedFGItems.map(item => {
+                  const avail = getAvailableQty(item);
+                  const skuLabel = [item.material, item.thickness ? `${item.thickness}mm` : null, item.width ? `${item.width}W` : null, item.length ? `${item.length}L` : null, item.coating, item.grade].filter(Boolean).join(' | ') || '-';
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="text-xs">{skuLabel}</TableCell>
+                      <TableCell className="text-xs">{getBatchNumber(item)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono-num">{avail.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          className="h-7 text-xs text-right"
+                          value={bulkQuantities[item.id] || ''}
+                          onChange={e => setBulkQuantities(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBulkSaleOpen(false)}>Cancel</Button>
+            <Button onClick={handleBulkSaleSubmit} disabled={insertFGSale.isPending}>
+              {insertFGSale.isPending ? 'Saving...' : `Record Sale (${selectedFGItems.filter(i => Number(bulkQuantities[i.id]) > 0).length} items)`}
             </Button>
           </DialogFooter>
         </DialogContent>
