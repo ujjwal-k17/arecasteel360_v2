@@ -243,6 +243,52 @@ export default function FGInventoryTab() {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   };
 
+  const toggleSelectItem = (id: string) => {
+    setSelectedItems(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  };
+
+  const selectedFGItems = useMemo(() => {
+    return filteredItems.filter(i => selectedItems.has(i.id));
+  }, [filteredItems, selectedItems]);
+
+  const filteredBulkSaleOrders = useMemo(() => {
+    if (!allOrders || !bulkSaleCustomerId) return [];
+    return allOrders.filter((o: any) => o.customer_id === bulkSaleCustomerId && o.status === 'open');
+  }, [allOrders, bulkSaleCustomerId]);
+
+  const handleBulkSaleSubmit = async () => {
+    const itemsToSell = selectedFGItems.filter(i => {
+      const qty = Number(bulkQuantities[i.id]) || 0;
+      return qty > 0;
+    });
+    if (itemsToSell.length === 0) { toast.error('Enter quantity for at least one item'); return; }
+    for (const item of itemsToSell) {
+      const qty = Number(bulkQuantities[item.id]);
+      const avail = getAvailableQty(item);
+      if (qty > avail + 0.01) {
+        toast.error(`Quantity exceeds available for batch ${getBatchNumber(item)}`);
+        return;
+      }
+    }
+    try {
+      for (const item of itemsToSell) {
+        await insertFGSale.mutateAsync({
+          fg_item_id: item.id,
+          invoice_number: bulkSaleForm.invoice_number || null,
+          order_id: bulkSaleForm.order_id || null,
+          quantity: Number(bulkQuantities[item.id]),
+          sales_date: bulkSaleForm.sales_date || null,
+        });
+      }
+      toast.success(`Sale recorded for ${itemsToSell.length} items`);
+      setBulkSaleOpen(false);
+      setSelectedItems(new Set());
+      setBulkSaleCustomerId('');
+      setBulkSaleForm({ invoice_number: '', order_id: '', sales_date: '' });
+      setBulkQuantities({});
+    } catch { toast.error('Failed to record bulk sale'); }
+  };
+
   const formatDimensions = (t: any, w: any, l: any, process: string) => {
     const isSlit = (process || '').toLowerCase().includes('slit');
     return `${t ?? '-'} x ${w ?? '-'} x ${isSlit ? 'Coil' : (l ?? '-')}`;
