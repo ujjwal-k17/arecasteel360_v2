@@ -40,6 +40,11 @@ export default function FGInventoryTab() {
   const submitApproval = useSubmitApproval();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [fgView, setFgView] = useState<'open' | 'closed'>('open');
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [bulkSaleOpen, setBulkSaleOpen] = useState(false);
+  const [bulkSaleCustomerId, setBulkSaleCustomerId] = useState('');
+  const [bulkSaleForm, setBulkSaleForm] = useState({ invoice_number: '', order_id: '', sales_date: '' });
+  const [bulkQuantities, setBulkQuantities] = useState<Record<string, string>>({});
 
   // Filters
   const [filterMaterial, setFilterMaterial] = useState('all');
