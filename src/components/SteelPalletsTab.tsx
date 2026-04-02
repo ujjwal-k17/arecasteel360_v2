@@ -214,9 +214,9 @@ export default function SteelPalletsTab() {
       toast.success('Inventory uploaded');
       queryClient.invalidateQueries({ queryKey: ['steel_pallet_skus'] });
       queryClient.invalidateQueries({ queryKey: ['steel_pallet_purchases'] });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Failed to parse file');
+      toast.error(`Upload failed: ${err?.message || 'Could not read the file. Ensure it is a valid .xlsx or .csv file with columns: Pallet Size, Weight (Kg), # of Pcs.'}`, { duration: 8000 });
     }
     e.target.value = '';
   };
