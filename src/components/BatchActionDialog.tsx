@@ -20,6 +20,7 @@ interface Props {
 
 export default function BatchActionDialog({ batch, actionType, open, onClose }: Props) {
   const insertAction = useInsertAction();
+  const { forms } = useDerivedOptions();
 
   // Sales state
   const [orderId, setOrderId] = useState('');
