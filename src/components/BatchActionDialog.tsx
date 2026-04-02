@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { FORMS } from '@/lib/inventory-options';
+import { useDerivedOptions } from '@/hooks/useDropdownOptions';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 const SCRAP_TYPES = ['End Pcs', 'Trimming', 'Metal Cover', 'Non metal cover', 'Short qty'];

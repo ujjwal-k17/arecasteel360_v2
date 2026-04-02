@@ -192,8 +192,8 @@ export default function PhysicalInventoryTab() {
 
   const isNewBatchValid = () => {
     const mat = newBatch.material;
-    const coatingOptions = mat ? (COATING_BY_MATERIAL[mat] || []) : [];
-    const gradeOptions = mat ? (GRADE_BY_MATERIAL[mat] || []) : [];
+    const coatingOptions = mat ? (coatingByMaterial[mat] || []) : [];
+    const gradeOptions = mat ? (gradeByMaterial[mat] || []) : [];
     return Object.entries(newBatch).every(([key, v]) => {
       if (key === 'coating' && coatingOptions.length === 0) return true;
       if (key === 'grade' && gradeOptions.length === 0) return true;
