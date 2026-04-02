@@ -28,6 +28,7 @@ export default function PackCoilSaleDialog({ batch, allActions, processingRecord
   const { data: customers } = useCustomers();
   const { data: orders } = useOrders();
   const { data: allDispatches } = useAllDispatches();
+  const { data: nonDispatchSales } = useNonDispatchSalesByOrder();
 
   const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
