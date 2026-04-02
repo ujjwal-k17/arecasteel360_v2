@@ -133,7 +133,7 @@ export default function WIPInventoryTab() {
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
         <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-          Total: {grandTotalQty.toFixed(2)} Kg ({filteredItems.length} items)
+          Total: {fmtNum(grandTotalQty)} Kg ({filteredItems.length} items)
         </div>
       </div>
 
