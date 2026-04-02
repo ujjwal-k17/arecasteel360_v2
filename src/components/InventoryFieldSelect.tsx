@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MATERIALS, MAKES, COATING_BY_MATERIAL, GRADE_BY_MATERIAL, FORMS } from '@/lib/inventory-options';
+import { useDerivedOptions } from '@/hooks/useDropdownOptions';
 
 interface Props {
   field: string;
@@ -12,25 +12,27 @@ interface Props {
 
 /**
  * Renders a Select dropdown for material, make, coating, or grade fields.
- * For coating & grade, options depend on the selected material.
+ * Options are fetched from the dropdown_options database table.
  */
 export default function InventoryFieldSelect({ field, value, material, onChange, className, placeholder }: Props) {
+  const { materials, makes, forms, coatingByMaterial, gradeByMaterial } = useDerivedOptions();
+
   let options: string[] = [];
 
   if (field === 'material') {
-    options = MATERIALS;
+    options = materials;
   } else if (field === 'make') {
-    options = MAKES;
+    options = makes;
   } else if (field === 'coating') {
-    options = material ? (COATING_BY_MATERIAL[material] || []) : [];
+    options = material ? (coatingByMaterial[material] || []) : [];
   } else if (field === 'grade') {
-    options = material ? (GRADE_BY_MATERIAL[material] || []) : [];
+    options = material ? (gradeByMaterial[material] || []) : [];
   } else if (field === 'form') {
-    options = FORMS;
+    options = forms;
   }
 
   if (options.length === 0) {
-    return null; // No dropdown needed (e.g. coating for HR)
+    return null;
   }
 
   return (
