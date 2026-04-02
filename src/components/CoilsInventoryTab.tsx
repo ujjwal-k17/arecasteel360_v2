@@ -468,8 +468,8 @@ export default function CoilsInventoryTab() {
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
                   <TableCell className="text-sm">{g.coating || '-'}</TableCell>
                   <TableCell className="text-sm">{g.grade || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{g.totalUsableQty.toFixed(2)}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{g.totalBalanceQty.toFixed(2)}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalUsableQty)}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
                 </TableRow>
                 {expandedSKU === g.key && (
                   <TableRow key={`${g.key}-detail`}>

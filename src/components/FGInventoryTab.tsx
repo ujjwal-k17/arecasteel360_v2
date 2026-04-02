@@ -397,8 +397,8 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm font-mono-num whitespace-nowrap">{formatDimensions(g.thickness, g.width, g.length, g.process)}</TableCell>
                     <TableCell className="text-sm">{g.coating}</TableCell>
                     <TableCell className="text-sm">{g.grade}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalQty.toFixed(2)}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalPcs}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtInt(g.totalPcs)}</TableCell>
                     <TableCell />
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {

@@ -410,8 +410,8 @@ export default function InTransitTab() {
                     <TableCell className="text-sm font-mono-num">{group.length ?? '-'}</TableCell>
                     <TableCell className="text-sm">{group.coating || '-'}</TableCell>
                     <TableCell className="text-sm">{group.grade || '-'}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{group.totalNetWeight.toFixed(2)}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{group.totalGrossWeight.toFixed(2)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(group.totalNetWeight)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(group.totalGrossWeight)}</TableCell>
                   </TableRow>
 
                   {/* Expanded batch detail table */}
