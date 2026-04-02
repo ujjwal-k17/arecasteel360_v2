@@ -179,23 +179,39 @@ export default function InTransitTab() {
     if (!file) return;
     try {
       const rows = await parseExcelFile(file);
-      if (rows.length === 0) { toast.error('No valid rows found'); return; }
+      if (rows.length === 0) { toast.error('No valid rows found in the file. Ensure the first row has headers like "Batch Number", "Material", etc.'); return; }
       const existingBatchNumbers = new Set((batches || []).map(b => b.batch_number));
       const newRows = rows.filter(r => !existingBatchNumbers.has(r.batch_number));
       const duplicateCount = rows.length - newRows.length;
       if (newRows.length === 0) { toast.info(`All ${rows.length} batches already exist — skipped`); return; }
-      await insertBatches.mutateAsync(newRows.map(r => ({
-        batch_number: r.batch_number, material: r.material || null, make: r.make || null,
-        thickness: r.thickness || null, width: r.width || null,
-        length: r.length != null ? String(r.length) : null,
-        coating: r.coating || null, grade: r.grade || null, form: r.form || null,
-        gross_weight: r.gross_weight || null, net_weight: r.net_weight || null,
-        coil_number: r.coil_number || null, purchase_date: r.purchase_date || null, purchase_from: r.purchase_from || null,
-      })));
-      toast.success(`${newRows.length} batches imported${duplicateCount > 0 ? `, ${duplicateCount} duplicates skipped` : ''}`);
+      const errors: string[] = [];
+      let successCount = 0;
+      for (let i = 0; i < newRows.length; i++) {
+        const r = newRows[i];
+        const { error } = await supabase.from('batches').insert({
+          batch_number: r.batch_number, material: r.material || null, make: r.make || null,
+          thickness: r.thickness || null, width: r.width || null,
+          length: r.length != null ? String(r.length) : null,
+          coating: r.coating || null, grade: r.grade || null, form: r.form || null,
+          gross_weight: r.gross_weight || null, net_weight: r.net_weight || null,
+          coil_number: r.coil_number || null, purchase_date: r.purchase_date || null, purchase_from: r.purchase_from || null,
+          status: 'in-transit',
+        } as any);
+        if (error) {
+          errors.push(`Row ${i + 2} (${r.batch_number}): ${error.message}`);
+        } else {
+          successCount++;
+        }
+      }
+      if (errors.length > 0) {
+        toast.error(`${errors.length} row(s) failed:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...and ${errors.length - 5} more` : ''}`, { duration: 10000 });
+      }
+      if (successCount > 0) {
+        toast.success(`${successCount} batches imported${duplicateCount > 0 ? `, ${duplicateCount} duplicates skipped` : ''}`);
+      }
     } catch (err) {
       console.error('Import error:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to parse file');
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : 'Could not read the file. Ensure it is a valid .xlsx or .csv file.'}`, { duration: 8000 });
     }
     e.target.value = '';
   };

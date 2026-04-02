@@ -222,17 +222,23 @@ function TransporterSection() {
       const wb = XLSX.read(ab);
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(ws);
+      if (rows.length === 0) { toast.error('No rows found. Ensure headers like "Name" or "Transporter Name" exist.'); e.target.value = ''; return; }
       let count = 0;
-      for (const r of rows) {
+      const errors: string[] = [];
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
         const name = r['Name'] || r['Transporter Name'] || r['name'];
-        if (!name) continue;
+        if (!name) { errors.push(`Row ${i + 2}: Missing transporter name`); continue; }
         const { error } = await supabase.from('transporters').insert({ name: String(name).trim() });
-        if (!error) count++;
+        if (error) { errors.push(`Row ${i + 2} (${String(name).trim()}): ${error.message}`); } else { count++; }
       }
-      toast.success(`${count} transporter(s) imported`);
+      if (errors.length > 0) {
+        toast.error(`${errors.length} row(s) failed:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...and ${errors.length - 5} more` : ''}`, { duration: 10000 });
+      }
+      if (count > 0) toast.success(`${count} transporter(s) imported`);
       qc.invalidateQueries({ queryKey: ['all_transporters'] });
       qc.invalidateQueries({ queryKey: ['transporters'] });
-    } catch { toast.error('Failed to parse'); }
+    } catch (err: any) { toast.error(`Upload failed: ${err?.message || 'Could not read the file.'}`, { duration: 8000 }); }
     e.target.value = '';
   };
 
