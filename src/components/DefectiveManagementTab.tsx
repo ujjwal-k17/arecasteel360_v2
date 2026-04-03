@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useAllBatches, useAllActions, getSKUKey, type Batch, type InventoryAction } from '@/hooks/useBatches';
+import { useAllBatches, useAllActions, type InventoryAction } from '@/hooks/useBatches';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useDefectiveSales, useInsertDefectiveSale } from '@/hooks/useScrapSales';
 import { useOrders } from '@/hooks/useOrders';
