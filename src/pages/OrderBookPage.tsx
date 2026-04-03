@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useOrders, useCustomers, useInsertOrder, useAllDispatches, useDeleteOrder } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2, X, XCircle, RotateCcw } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2, X, XCircle, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
