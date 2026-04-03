@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useOrders, useCustomers, useInsertOrder, useAllDispatches, useDeleteOrder } from '@/hooks/useOrders';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2, X, XCircle, RotateCcw } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, ChevronRight, Pencil, Download, Upload, Trash2, X, XCircle, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +28,8 @@ const skuKey = (item: { material?: string | null; thickness?: number | null; wid
   [item.material || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].join('|');
 
 type DatePreset = 'all' | 'current_month' | 'today' | 'custom';
+type SortField = 'order_number' | 'customer_name' | 'order_date';
+type SortDir = 'asc' | 'desc' | null;
 
 export default function OrderBookPage() {
   const { data: orders, isLoading } = useOrders();
@@ -53,6 +55,8 @@ export default function OrderBookPage() {
   const [filterPoNumber, setFilterPoNumber] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterOrderDate, setFilterOrderDate] = useState('');
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
 
   // Date range
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
@@ -200,8 +204,36 @@ export default function OrderBookPage() {
     });
   };
 
-  const filteredOpenOrders = useMemo(() => applyFilters(openOrders), [openOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
-  const filteredClosedOrders = useMemo(() => applyFilters(closedOrders), [closedOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc');
+      if (sortDir === 'desc') setSortField(null);
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const applySorting = (list: any[]) => {
+    if (!sortField || !sortDir) return list;
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      let va: string, vb: string;
+      if (sortField === 'order_number') { va = a.order_number || ''; vb = b.order_number || ''; }
+      else if (sortField === 'customer_name') { va = (a.customers as any)?.customer_name || ''; vb = (b.customers as any)?.customer_name || ''; }
+      else { va = a.order_date || ''; vb = b.order_date || ''; }
+      return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    });
+    return sorted;
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field || !sortDir) return <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === 'asc' ? <ArrowUp className="inline h-3 w-3 ml-1" /> : <ArrowDown className="inline h-3 w-3 ml-1" />;
+  };
+
+  const filteredOpenOrders = useMemo(() => applySorting(applyFilters(openOrders)), [openOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange, sortField, sortDir]);
+  const filteredClosedOrders = useMemo(() => applySorting(applyFilters(closedOrders)), [closedOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange, sortField, sortDir]);
 
   // Summary totals
   const summaryTotals = useMemo(() => {
@@ -262,7 +294,7 @@ export default function OrderBookPage() {
       <TableHead className="w-8"></TableHead>
       <TableHead>
         <div className="space-y-1">
-          <span>Order ID</span>
+          <span className="cursor-pointer select-none" onClick={() => toggleSort('order_number')}>Order ID <SortIcon field="order_number" /></span>
           <Input placeholder="Filter..." value={filterOrderId} onChange={e => setFilterOrderId(e.target.value)} className="h-7 text-xs" />
         </div>
       </TableHead>
@@ -274,13 +306,13 @@ export default function OrderBookPage() {
       </TableHead>
       <TableHead>
         <div className="space-y-1">
-          <span>Customer Name</span>
+          <span className="cursor-pointer select-none" onClick={() => toggleSort('customer_name')}>Customer Name <SortIcon field="customer_name" /></span>
           <Input placeholder="Filter..." value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} className="h-7 text-xs" />
         </div>
       </TableHead>
       <TableHead>
         <div className="space-y-1">
-          <span>Order Date</span>
+          <span className="cursor-pointer select-none" onClick={() => toggleSort('order_date')}>Order Date <SortIcon field="order_date" /></span>
           <Input placeholder="YYYY-MM-DD" value={filterOrderDate} onChange={e => setFilterOrderDate(e.target.value)} className="h-7 text-xs" />
         </div>
       </TableHead>
