@@ -55,6 +55,8 @@ export default function OrderBookPage() {
   const [filterPoNumber, setFilterPoNumber] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterOrderDate, setFilterOrderDate] = useState('');
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
 
   // Date range
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
