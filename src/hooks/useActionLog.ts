@@ -140,11 +140,63 @@ export function useReviewApproval() {
           // Move WIP item back to Coil Inventory
           const { data: wipItem } = await supabase.from('wip_items').select('*').eq('id', entityId).single();
           if (wipItem) {
-            if ((wipItem as any).processing_record_id) {
-              await supabase.from('processing_output_items').delete().eq('processing_record_id', (wipItem as any).processing_record_id);
-              await supabase.from('processing_records').delete().eq('id', (wipItem as any).processing_record_id);
-            }
+            const procRecId = (wipItem as any).processing_record_id;
+            const sourceBatchId = (wipItem as any).source_batch_id;
+
+            // Delete the WIP item first
             await supabase.from('wip_items').delete().eq('id', entityId);
+
+            if (procRecId) {
+              // Check if any other WIP items still reference this processing record
+              const { data: remainingWip } = await supabase
+                .from('wip_items')
+                .select('id')
+                .eq('processing_record_id', procRecId);
+
+              if (!remainingWip || remainingWip.length === 0) {
+                // Last WIP item moved back — clean up processing record, output items, and associated scrap/defective actions
+                await supabase.from('processing_output_items').delete().eq('processing_record_id', procRecId);
+
+                // Get the processing record to find the batch_id
+                const { data: procRec } = await supabase
+                  .from('processing_records')
+                  .select('batch_id, created_at')
+                  .eq('id', procRecId)
+                  .single();
+
+                await supabase.from('processing_records').delete().eq('id', procRecId);
+
+                // Delete scrap/defective actions that were created during this processing
+                // (created within 5 seconds of the processing record)
+                if (procRec && (procRec as any).batch_id) {
+                  const batchId = (procRec as any).batch_id;
+                  const procTime = new Date((procRec as any).created_at).getTime();
+                  const { data: batchActions } = await supabase
+                    .from('inventory_actions')
+                    .select('*')
+                    .eq('batch_id', batchId)
+                    .in('action_type', ['scrap', 'defective']);
+
+                  if (batchActions) {
+                    const idsToDelete = batchActions
+                      .filter((a: any) => Math.abs(new Date(a.created_at).getTime() - procTime) < 5000)
+                      .map((a: any) => a.id);
+                    if (idsToDelete.length > 0) {
+                      await supabase.from('inventory_actions').delete().in('id', idsToDelete);
+                    }
+                  }
+
+                  // Reset batch_status if no other processing records reference this batch
+                  const { data: otherProcs } = await supabase
+                    .from('processing_records')
+                    .select('id')
+                    .eq('batch_id', batchId);
+                  if (!otherProcs || otherProcs.length === 0) {
+                    await supabase.from('batches').update({ batch_status: null } as any).eq('id', batchId);
+                  }
+                }
+              }
+            }
           }
         } else if (entityType === 'order') {
           // Delete order items first, then the order

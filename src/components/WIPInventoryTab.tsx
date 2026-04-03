@@ -399,12 +399,29 @@ export default function WIPInventoryTab() {
                                 e.stopPropagation();
                                 if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)? Quantity will be restored to the source coil.`)) return;
                                 try {
-                                  if (item.processing_record_id) {
-                                    await supabase.from('processing_output_items').delete().eq('processing_record_id', item.processing_record_id);
-                                    await supabase.from('processing_records').delete().eq('id', item.processing_record_id);
-                                  }
+                                  const procRecId = item.processing_record_id;
                                   const { error } = await supabase.from('wip_items').delete().eq('id', item.id);
                                   if (error) throw error;
+                                  if (procRecId) {
+                                    const { data: remainingWip } = await supabase.from('wip_items').select('id').eq('processing_record_id', procRecId);
+                                    if (!remainingWip || remainingWip.length === 0) {
+                                      await supabase.from('processing_output_items').delete().eq('processing_record_id', procRecId);
+                                      const { data: procRec } = await supabase.from('processing_records').select('batch_id, created_at').eq('id', procRecId).single();
+                                      await supabase.from('processing_records').delete().eq('id', procRecId);
+                                      if (procRec) {
+                                        const procTime = new Date((procRec as any).created_at).getTime();
+                                        const { data: batchActions } = await supabase.from('inventory_actions').select('*').eq('batch_id', (procRec as any).batch_id).in('action_type', ['scrap', 'defective']);
+                                        if (batchActions) {
+                                          const idsToDelete = batchActions.filter((a: any) => Math.abs(new Date(a.created_at).getTime() - procTime) < 5000).map((a: any) => a.id);
+                                          if (idsToDelete.length > 0) await supabase.from('inventory_actions').delete().in('id', idsToDelete);
+                                        }
+                                        const { data: otherProcs } = await supabase.from('processing_records').select('id').eq('batch_id', (procRec as any).batch_id);
+                                        if (!otherProcs || otherProcs.length === 0) {
+                                          await supabase.from('batches').update({ batch_status: null } as any).eq('id', (procRec as any).batch_id);
+                                        }
+                                      }
+                                    }
+                                  }
                                   queryClient.invalidateQueries({ queryKey: ['wip_items'] });
                                   queryClient.invalidateQueries({ queryKey: ['batches'] });
                                   queryClient.invalidateQueries({ queryKey: ['processing_records'] });
