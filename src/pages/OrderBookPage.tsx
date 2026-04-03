@@ -28,6 +28,8 @@ const skuKey = (item: { material?: string | null; thickness?: number | null; wid
   [item.material || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].join('|');
 
 type DatePreset = 'all' | 'current_month' | 'today' | 'custom';
+type SortField = 'order_number' | 'customer_name' | 'order_date';
+type SortDir = 'asc' | 'desc' | null;
 
 export default function OrderBookPage() {
   const { data: orders, isLoading } = useOrders();
