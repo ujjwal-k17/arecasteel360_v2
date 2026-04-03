@@ -294,7 +294,7 @@ export default function OrderBookPage() {
       <TableHead className="w-8"></TableHead>
       <TableHead>
         <div className="space-y-1">
-          <span>Order ID</span>
+          <span className="cursor-pointer select-none" onClick={() => toggleSort('order_number')}>Order ID <SortIcon field="order_number" /></span>
           <Input placeholder="Filter..." value={filterOrderId} onChange={e => setFilterOrderId(e.target.value)} className="h-7 text-xs" />
         </div>
       </TableHead>
@@ -306,13 +306,13 @@ export default function OrderBookPage() {
       </TableHead>
       <TableHead>
         <div className="space-y-1">
-          <span>Customer Name</span>
+          <span className="cursor-pointer select-none" onClick={() => toggleSort('customer_name')}>Customer Name <SortIcon field="customer_name" /></span>
           <Input placeholder="Filter..." value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} className="h-7 text-xs" />
         </div>
       </TableHead>
       <TableHead>
         <div className="space-y-1">
-          <span>Order Date</span>
+          <span className="cursor-pointer select-none" onClick={() => toggleSort('order_date')}>Order Date <SortIcon field="order_date" /></span>
           <Input placeholder="YYYY-MM-DD" value={filterOrderDate} onChange={e => setFilterOrderDate(e.target.value)} className="h-7 text-xs" />
         </div>
       </TableHead>
