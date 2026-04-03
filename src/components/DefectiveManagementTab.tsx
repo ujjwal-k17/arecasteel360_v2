@@ -99,7 +99,7 @@ export default function DefectiveManagementTab() {
     (fgDefectives || []).forEach((d: any) => {
       const fgItem = d.fg_items;
       const skuKey = fgItem
-        ? `${fgItem.material || '-'} | ${fgItem.thickness ?? '-'}x${fgItem.width ?? '-'} | ${fgItem.coating || '-'} | ${fgItem.grade || '-'}`
+        ? `${fgItem.material || '-'} | ${fgItem.thickness ?? '-'}x${fgItem.width ?? '-'}${fgItem.length ? `x${fgItem.length}` : ''} | ${fgItem.coating || '-'} | ${fgItem.grade || '-'}`
         : '-';
       addToGroup(skuKey, {
         id: d.id,
@@ -117,7 +117,7 @@ export default function DefectiveManagementTab() {
     (wipDefectives || []).forEach((d: any) => {
       const wipItem = d.wip_items;
       const skuKey = wipItem
-        ? `${wipItem.material || '-'} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
+        ? `${wipItem.material || '-'} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'}${wipItem.length ? `x${wipItem.length}` : ''} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
         : '-';
       addToGroup(skuKey, {
         id: d.id,
