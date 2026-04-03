@@ -343,7 +343,7 @@ export default function FGInventoryTab() {
       });
       toast.success('Defective recorded');
       setDefectDialog(null);
-      setDefectForm({ defect_type: '', quantity: '' });
+      setDefectForm({ defect_type: '', quantity: '', num_pcs: '' });
     } catch { toast.error('Failed to record defective'); }
   };
 
