@@ -204,8 +204,36 @@ export default function OrderBookPage() {
     });
   };
 
-  const filteredOpenOrders = useMemo(() => applyFilters(openOrders), [openOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
-  const filteredClosedOrders = useMemo(() => applyFilters(closedOrders), [closedOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange]);
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc');
+      if (sortDir === 'desc') setSortField(null);
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const applySorting = (list: any[]) => {
+    if (!sortField || !sortDir) return list;
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      let va: string, vb: string;
+      if (sortField === 'order_number') { va = a.order_number || ''; vb = b.order_number || ''; }
+      else if (sortField === 'customer_name') { va = (a.customers as any)?.customer_name || ''; vb = (b.customers as any)?.customer_name || ''; }
+      else { va = a.order_date || ''; vb = b.order_date || ''; }
+      return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    });
+    return sorted;
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field || !sortDir) return <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === 'asc' ? <ArrowUp className="inline h-3 w-3 ml-1" /> : <ArrowDown className="inline h-3 w-3 ml-1" />;
+  };
+
+  const filteredOpenOrders = useMemo(() => applySorting(applyFilters(openOrders)), [openOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange, sortField, sortDir]);
+  const filteredClosedOrders = useMemo(() => applySorting(applyFilters(closedOrders)), [closedOrders, filterOrderId, filterPoNumber, filterCustomer, filterOrderDate, dateRange, sortField, sortDir]);
 
   // Summary totals
   const summaryTotals = useMemo(() => {
