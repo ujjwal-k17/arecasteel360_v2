@@ -117,7 +117,7 @@ export default function DefectiveManagementTab() {
     (wipDefectives || []).forEach((d: any) => {
       const wipItem = d.wip_items;
       const skuKey = wipItem
-        ? `${wipItem.material || '-'} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
+        ? `${wipItem.material || '-'} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'}${wipItem.length ? `x${wipItem.length}` : ''} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
         : '-';
       addToGroup(skuKey, {
         id: d.id,
