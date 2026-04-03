@@ -1261,6 +1261,38 @@ export type Database = {
         }
         Relationships: []
       }
+      wip_defectives: {
+        Row: {
+          created_at: string
+          defect_type: string
+          id: string
+          quantity: number | null
+          wip_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          defect_type: string
+          id?: string
+          quantity?: number | null
+          wip_item_id: string
+        }
+        Update: {
+          created_at?: string
+          defect_type?: string
+          id?: string
+          quantity?: number | null
+          wip_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wip_defectives_wip_item_id_fkey"
+            columns: ["wip_item_id"]
+            isOneToOne: false
+            referencedRelation: "wip_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wip_items: {
         Row: {
           coating: string | null
