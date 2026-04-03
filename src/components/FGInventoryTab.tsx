@@ -659,6 +659,18 @@ export default function FGInventoryTab() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="text-xs"># Pcs</Label>
+              <Input type="number" value={defectForm.num_pcs} onChange={e => {
+                const pcs = e.target.value;
+                const numPcs = Number(pcs) || 0;
+                const t = defectDialog?.thickness || 0;
+                const w = defectDialog?.width || 0;
+                const l = defectDialog?.length || 0;
+                const calcWt = t * w * l * numPcs * 0.00000785;
+                setDefectForm(v => ({ ...v, num_pcs: pcs, quantity: calcWt > 0 ? calcWt.toFixed(2) : '' }));
+              }} />
+            </div>
             <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={defectForm.quantity} onChange={e => setDefectForm(v => ({ ...v, quantity: e.target.value }))} /></div>
           </div>
           <DialogFooter>
