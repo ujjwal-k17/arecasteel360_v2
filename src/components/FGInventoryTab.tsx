@@ -59,7 +59,7 @@ export default function FGInventoryTab() {
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
   const [saleCustomerId, setSaleCustomerId] = useState('');
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
-  const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '' });
+  const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
@@ -343,7 +343,7 @@ export default function FGInventoryTab() {
       });
       toast.success('Defective recorded');
       setDefectDialog(null);
-      setDefectForm({ defect_type: '', quantity: '' });
+      setDefectForm({ defect_type: '', quantity: '', num_pcs: '' });
     } catch { toast.error('Failed to record defective'); }
   };
 
@@ -658,6 +658,18 @@ export default function FGInventoryTab() {
                   {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label className="text-xs"># Pcs</Label>
+              <Input type="number" value={defectForm.num_pcs} onChange={e => {
+                const pcs = e.target.value;
+                const numPcs = Number(pcs) || 0;
+                const t = defectDialog?.thickness || 0;
+                const w = defectDialog?.width || 0;
+                const l = defectDialog?.length || 0;
+                const calcWt = t * w * l * numPcs * 0.00000785;
+                setDefectForm(v => ({ ...v, num_pcs: pcs, quantity: calcWt > 0 ? calcWt.toFixed(2) : '' }));
+              }} />
             </div>
             <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={defectForm.quantity} onChange={e => setDefectForm(v => ({ ...v, quantity: e.target.value }))} /></div>
           </div>
