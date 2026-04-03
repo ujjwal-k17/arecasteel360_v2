@@ -59,7 +59,7 @@ export default function FGInventoryTab() {
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
   const [saleCustomerId, setSaleCustomerId] = useState('');
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
-  const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '' });
+  const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
