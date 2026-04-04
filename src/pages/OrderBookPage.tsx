@@ -115,6 +115,26 @@ export default function OrderBookPage() {
     },
   });
 
+  // Fetch all FG items for inventory qty lookup
+  const { data: allFgItems } = useQuery({
+    queryKey: ['fg_items_for_order_book'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fg_items').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Aggregate FG inventory qty by SKU key
+  const fgQtyBySku = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const item of allFgItems || []) {
+      const key = skuKey(item);
+      map[key] = (map[key] || 0) + (Number(item.qty) || 0);
+    }
+    return map;
+  }, [allFgItems]);
+
   const salesByOrder = useMemo(() => {
     const map: Record<string, Record<string, { label: string; qty: number }>> = {};
     const addSale = (orderNumber: string, item: any, qty: number) => {
