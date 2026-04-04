@@ -121,6 +121,16 @@ export default function FGInventoryTab() {
     },
   });
 
+  // Fetch pallet SKUs for consumption
+  const { data: palletSkus } = useQuery({
+    queryKey: ['pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const insertFGSale = useMutation({
     mutationFn: async (sale: any) => {
       const { error } = await supabase.from('fg_sales' as any).insert(sale);
