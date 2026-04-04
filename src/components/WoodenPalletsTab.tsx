@@ -413,8 +413,8 @@ export default function WoodenPalletsTab() {
             {filteredSkus.map(sku => {
               const summary = skuSummary.get(sku.id) || { balanceWeight: 0, balancePcs: 0, lastPurchase: null, lastConsumption: null };
               const isOpen = expanded.has(sku.id);
-              const skuPurchases = (purchases || []).filter(p => p.pallet_sku_id === sku.id);
-              const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
+      const skuPurchases = (purchases || []).filter(p => p.pallet_sku_id === sku.id);
+      const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
 
               return (
                 <>
@@ -431,9 +431,6 @@ export default function WoodenPalletsTab() {
                       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                         <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowPurchase(sku)}>
                           <ShoppingCart className="h-3 w-3" /> Purchase
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowConsumption(sku)}>
-                          <Package className="h-3 w-3" /> Consumption
                         </Button>
                       </div>
                     </TableCell>
