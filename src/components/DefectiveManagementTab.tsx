@@ -273,9 +273,12 @@ export default function DefectiveManagementTab() {
                                   <TableCell className="text-xs">{d.defectType}</TableCell>
                                   <TableCell className="text-xs font-mono-num">{d.netWeight.toFixed(2)}</TableCell>
                                   <TableCell className="text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '-'}</TableCell>
-                                  <TableCell>
+                                  <TableCell className="flex gap-1">
                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(d); }}>
                                       Sell
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setMoveBackDialog(d); }}>
+                                      <Undo2 className="h-3 w-3" /> Move Back
                                     </Button>
                                   </TableCell>
                                 </TableRow>
