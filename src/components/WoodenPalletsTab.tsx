@@ -121,16 +121,22 @@ export default function WoodenPalletsTab() {
       const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
       const purchaseWeight = skuPurchases.reduce((s, p) => s + (p.weight_kg || 0), 0);
       const purchasePcs = skuPurchases.reduce((s, p) => s + (p.num_pcs || 0), 0);
-      const consumptionWeight = skuConsumptions.reduce((s, c) => s + (c.weight_kg || 0), 0);
       const consumptionPcs = skuConsumptions.reduce((s, c) => s + (c.num_pcs || 0), 0);
-      const lastPurchase = skuPurchases.length > 0 ? skuPurchases[0].purchase_date : null;
+
+      // Use latest purchase weight-per-piece ratio for consumption weight calc
+      // Sort by date descending, pick the first with valid pcs
+      const sortedPurchases = [...skuPurchases].sort((a, b) => b.purchase_date.localeCompare(a.purchase_date));
+      const latestWithPcs = sortedPurchases.find(p => p.num_pcs > 0);
+      const avgWeightPerPc = latestWithPcs ? (latestWithPcs.weight_kg / latestWithPcs.num_pcs) : 0;
+
+      const consumptionWeight = consumptionPcs * avgWeightPerPc;
+
+      const balancePcs = purchasePcs - consumptionPcs;
+      const balanceWeight = purchaseWeight - consumptionWeight;
+
+      const lastPurchase = skuPurchases.length > 0 ? sortedPurchases[0].purchase_date : null;
       const lastConsumption = skuConsumptions.length > 0 ? skuConsumptions[0].consumption_date : null;
-      map.set(sku.id, {
-        balanceWeight: purchaseWeight - consumptionWeight,
-        balancePcs: purchasePcs - consumptionPcs,
-        lastPurchase,
-        lastConsumption,
-      });
+      map.set(sku.id, { balanceWeight, balancePcs, lastPurchase, lastConsumption });
     });
     return map;
   }, [skus, purchases, consumptions]);
