@@ -832,7 +832,33 @@ export default function FGInventoryTab() {
             </Table>
           </div>
 
-          <DialogFooter>
+          {/* Wooden Pallet Consumption */}
+          <div className="border-t pt-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox id="bulk-pallet-check" checked={bulkPalletEnabled} onCheckedChange={(v) => setBulkPalletEnabled(!!v)} />
+              <Label htmlFor="bulk-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
+            </div>
+            {bulkPalletEnabled && (
+              <div className="grid grid-cols-2 gap-3 pl-6">
+                <div>
+                  <Label className="text-xs">Pallet Size</Label>
+                  <Select value={bulkPalletSkuId} onValueChange={setBulkPalletSkuId}>
+                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                    <SelectContent>
+                      {(palletSkus || []).map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs"># of Pcs</Label>
+                  <Input type="number" value={bulkPalletPcs} onChange={e => setBulkPalletPcs(e.target.value)} placeholder="0" />
+                </div>
+              </div>
+            )}
+          </div>
+
             <Button variant="ghost" onClick={() => setBulkSaleOpen(false)}>Cancel</Button>
             <Button onClick={handleBulkSaleSubmit} disabled={insertFGSale.isPending}>
               {insertFGSale.isPending ? 'Saving...' : `Record Sale (${selectedFGItems.filter(i => Number(bulkQuantities[i.id]) > 0).length} items)`}
