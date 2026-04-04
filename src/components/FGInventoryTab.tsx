@@ -61,6 +61,16 @@ export default function FGInventoryTab() {
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
+  // Pallet consumption state (individual sale)
+  const [palletEnabled, setPalletEnabled] = useState(false);
+  const [palletSkuId, setPalletSkuId] = useState('');
+  const [palletPcs, setPalletPcs] = useState('');
+
+  // Pallet consumption state (bulk sale)
+  const [bulkPalletEnabled, setBulkPalletEnabled] = useState(false);
+  const [bulkPalletSkuId, setBulkPalletSkuId] = useState('');
+  const [bulkPalletPcs, setBulkPalletPcs] = useState('');
+
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
   const { data: allDispatches } = useAllDispatches();
