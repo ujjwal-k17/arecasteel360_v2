@@ -167,6 +167,30 @@ export default function DefectiveManagementTab() {
     } catch { toast.error('Failed'); }
   };
 
+  const handleMoveBack = async () => {
+    if (!moveBackDialog) return;
+    try {
+      if (moveBackDialog.source === 'coil') {
+        const { error } = await supabase.from('inventory_actions').delete().eq('id', moveBackDialog.id);
+        if (error) throw error;
+      } else if (moveBackDialog.source === 'fg') {
+        const { error } = await supabase.from('fg_defectives').delete().eq('id', moveBackDialog.id);
+        if (error) throw error;
+      } else if (moveBackDialog.source === 'wip') {
+        const { error } = await supabase.from('wip_defectives').delete().eq('id', moveBackDialog.id);
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['inventory_actions'] });
+      queryClient.invalidateQueries({ queryKey: ['fg_defectives'] });
+      queryClient.invalidateQueries({ queryKey: ['wip_defectives'] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      queryClient.invalidateQueries({ queryKey: ['fg_items'] });
+      queryClient.invalidateQueries({ queryKey: ['wip_items'] });
+      toast.success(`Moved back to ${moveBackDialog.source === 'coil' ? 'Coil' : moveBackDialog.source === 'fg' ? 'FG' : 'WIP'} inventory`);
+      setMoveBackDialog(null);
+    } catch { toast.error('Move back failed'); }
+  };
+
   const handleDownloadExcel = () => {
     const rows: { SKU: string; Source: string; 'Defect Type': string; 'Net Weight (Kg)': string; Date: string }[] = [];
     skuGroups.forEach(g => {
