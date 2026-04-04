@@ -570,11 +570,30 @@ export default function FGInventoryTab() {
                                 if (!confirm(`Delete this FG item (${availQty.toFixed(2)} Kg)? Quantity will be restored to ${restoreTo}.`)) return;
                                 try {
                                   if (item.source_type === 'wip' && item.source_id) {
-                                    // Restore qty to WIP item
-                                    const { data: wipItem } = await supabase.from('wip_items').select('qty, status').eq('id', item.source_id).single();
+                                    // Try to restore qty to WIP item
+                                    const { data: wipItem } = await supabase.from('wip_items').select('id, qty, status').eq('id', item.source_id).maybeSingle();
                                     if (wipItem) {
+                                      // source_id correctly points to a WIP item
                                       const newQty = (wipItem.qty || 0) + (item.qty || 0);
                                       await supabase.from('wip_items').update({ qty: newQty, status: 'active' } as any).eq('id', item.source_id);
+                                    } else {
+                                      // Legacy: source_id might be a batch ID — re-create WIP item
+                                      await supabase.from('wip_items').insert({
+                                        source_batch_id: item.source_id,
+                                        processing_record_id: item.processing_record_id,
+                                        material: item.material,
+                                        make: item.make,
+                                        process: item.process,
+                                        thickness: item.thickness,
+                                        width: item.width,
+                                        length: item.length,
+                                        coating: item.coating,
+                                        grade: item.grade,
+                                        qty: item.qty,
+                                        num_pcs: item.num_pcs,
+                                        order_id: item.order_id,
+                                        status: 'active',
+                                      } as any);
                                     }
                                   }
                                   // Delete associated processing output items & record
