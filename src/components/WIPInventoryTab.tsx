@@ -178,7 +178,7 @@ export default function WIPInventoryTab() {
         const availQty = getAvailableQty(item);
         if (availQty <= 0) continue;
         const { error: fgError } = await supabase.from('fg_items').insert({
-          source_id: item.source_batch_id,
+          source_id: item.id,
           source_type: 'wip',
           processing_record_id: item.processing_record_id,
           material: item.material,
