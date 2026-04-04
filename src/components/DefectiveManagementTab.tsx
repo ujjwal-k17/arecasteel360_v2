@@ -351,6 +351,22 @@ export default function DefectiveManagementTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move Back Confirmation */}
+      <AlertDialog open={!!moveBackDialog} onOpenChange={() => setMoveBackDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move Back to Source?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will move {moveBackDialog?.netWeight.toFixed(2)} Kg back to {moveBackDialog?.source === 'coil' ? 'Coil' : moveBackDialog?.source === 'fg' ? 'FG' : 'WIP'} inventory and remove it from defective.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMoveBack}>Move Back</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
