@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RefreshCw, ChevronRight, ChevronDown, Trash2, Undo2, ArrowRightCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import WIPProcessingDialog from './WIPProcessingDialog';
+import BulkWIPProcessingDialog from './BulkWIPProcessingDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitApproval } from '@/hooks/useActionLog';
 
