@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RefreshCw, ChevronRight, ChevronDown, Trash2, Undo2, ArrowRightCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import WIPProcessingDialog from './WIPProcessingDialog';
+import BulkWIPProcessingDialog from './BulkWIPProcessingDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitApproval } from '@/hooks/useActionLog';
 
@@ -40,6 +41,7 @@ export default function WIPInventoryTab() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkProcessOpen, setBulkProcessOpen] = useState(false);
 
   // Defective dialog
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
@@ -242,9 +244,16 @@ export default function WIPInventoryTab() {
         </Button>
         <div className="flex items-center gap-3">
           {selectedItems.size > 0 && (
-            <Button size="sm" className="gap-2" onClick={() => setBulkMoveOpen(true)}>
-              <ArrowRightCircle className="h-4 w-4" /> Bulk Move to FG ({selectedItems.size})
-            </Button>
+            <>
+              {selectedWIPItems.some(i => i.process === 'Slit Coil') && (
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => setBulkProcessOpen(true)}>
+                  Bulk Process CTL ({selectedWIPItems.filter(i => i.process === 'Slit Coil').length})
+                </Button>
+              )}
+              <Button size="sm" className="gap-2" onClick={() => setBulkMoveOpen(true)}>
+                <ArrowRightCircle className="h-4 w-4" /> Bulk Move to FG ({selectedItems.size})
+              </Button>
+            </>
           )}
           <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
             Total: {fmtNum(grandTotalQty)} Kg ({filteredItems.length} items)
@@ -520,6 +529,17 @@ export default function WIPInventoryTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Process CTL Dialog */}
+      {bulkProcessOpen && (
+        <BulkWIPProcessingDialog
+          wipItems={selectedWIPItems}
+          open={bulkProcessOpen}
+          onClose={() => { setBulkProcessOpen(false); setSelectedItems(new Set()); }}
+          batchMap={batchMap}
+          getAvailableQty={getAvailableQty}
+        />
+      )}
     </div>
   );
 }
