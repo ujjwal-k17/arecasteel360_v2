@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import OrderIdCombobox from '@/components/OrderIdCombobox';
 
-import { ChevronDown, ChevronRight, RefreshCw, Download } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ChevronDown, ChevronRight, RefreshCw, Download, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -43,6 +44,7 @@ export default function DefectiveManagementTab() {
   const [sellDialog, setSellDialog] = useState<DefectiveDetail | null>(null);
   const [saleForm, setSaleForm] = useState({ order_id: '', invoice_number: '', sales_date: '', quantity: '' });
   const [expandedSku, setExpandedSku] = useState<string | null>(null);
+  const [moveBackDialog, setMoveBackDialog] = useState<DefectiveDetail | null>(null);
 
   // FG defectives
   const { data: fgDefectives } = useQuery({
@@ -165,6 +167,30 @@ export default function DefectiveManagementTab() {
     } catch { toast.error('Failed'); }
   };
 
+  const handleMoveBack = async () => {
+    if (!moveBackDialog) return;
+    try {
+      if (moveBackDialog.source === 'coil') {
+        const { error } = await supabase.from('inventory_actions').delete().eq('id', moveBackDialog.id);
+        if (error) throw error;
+      } else if (moveBackDialog.source === 'fg') {
+        const { error } = await supabase.from('fg_defectives').delete().eq('id', moveBackDialog.id);
+        if (error) throw error;
+      } else if (moveBackDialog.source === 'wip') {
+        const { error } = await supabase.from('wip_defectives').delete().eq('id', moveBackDialog.id);
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['inventory_actions'] });
+      queryClient.invalidateQueries({ queryKey: ['fg_defectives'] });
+      queryClient.invalidateQueries({ queryKey: ['wip_defectives'] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      queryClient.invalidateQueries({ queryKey: ['fg_items'] });
+      queryClient.invalidateQueries({ queryKey: ['wip_items'] });
+      toast.success(`Moved back to ${moveBackDialog.source === 'coil' ? 'Coil' : moveBackDialog.source === 'fg' ? 'FG' : 'WIP'} inventory`);
+      setMoveBackDialog(null);
+    } catch { toast.error('Move back failed'); }
+  };
+
   const handleDownloadExcel = () => {
     const rows: { SKU: string; Source: string; 'Defect Type': string; 'Net Weight (Kg)': string; Date: string }[] = [];
     skuGroups.forEach(g => {
@@ -247,9 +273,12 @@ export default function DefectiveManagementTab() {
                                   <TableCell className="text-xs">{d.defectType}</TableCell>
                                   <TableCell className="text-xs font-mono-num">{d.netWeight.toFixed(2)}</TableCell>
                                   <TableCell className="text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '-'}</TableCell>
-                                  <TableCell>
+                                  <TableCell className="flex gap-1">
                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(d); }}>
                                       Sell
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setMoveBackDialog(d); }}>
+                                      <Undo2 className="h-3 w-3" /> Move Back
                                     </Button>
                                   </TableCell>
                                 </TableRow>
@@ -322,6 +351,22 @@ export default function DefectiveManagementTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move Back Confirmation */}
+      <AlertDialog open={!!moveBackDialog} onOpenChange={() => setMoveBackDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move Back to Source?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will move {moveBackDialog?.netWeight.toFixed(2)} Kg back to {moveBackDialog?.source === 'coil' ? 'Coil' : moveBackDialog?.source === 'fg' ? 'FG' : 'WIP'} inventory and remove it from defective.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMoveBack}>Move Back</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
