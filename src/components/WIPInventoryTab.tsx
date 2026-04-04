@@ -40,6 +40,7 @@ export default function WIPInventoryTab() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkProcessOpen, setBulkProcessOpen] = useState(false);
 
   // Defective dialog
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
