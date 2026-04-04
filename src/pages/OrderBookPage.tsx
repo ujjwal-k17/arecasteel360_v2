@@ -368,6 +368,7 @@ export default function OrderBookPage() {
                   <TableHead className="text-xs">SKU</TableHead>
                   <TableHead className="text-xs">Form</TableHead>
                   <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
+                  <TableHead className="text-xs text-right">FG Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
                   <TableHead className="text-xs">Comments</TableHead>
