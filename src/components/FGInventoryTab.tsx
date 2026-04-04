@@ -310,12 +310,17 @@ export default function FGInventoryTab() {
           sales_date: bulkSaleForm.sales_date || null,
         });
       }
+      // Record pallet consumption for bulk sale
+      if (bulkPalletEnabled && bulkPalletSkuId && Number(bulkPalletPcs) > 0) {
+        await insertPalletConsumption(bulkPalletSkuId, Number(bulkPalletPcs), bulkSaleForm.order_id || null, bulkSaleForm.sales_date || null);
+      }
       toast.success(`Sale recorded for ${itemsToSell.length} items`);
       setBulkSaleOpen(false);
       setSelectedItems(new Set());
       setBulkSaleCustomerId('');
       setBulkSaleForm({ invoice_number: '', order_id: '', sales_date: '' });
       setBulkQuantities({});
+      setBulkPalletEnabled(false); setBulkPalletSkuId(''); setBulkPalletPcs('');
     } catch { toast.error('Failed to record bulk sale'); }
   };
 
