@@ -859,6 +859,7 @@ export default function FGInventoryTab() {
             )}
           </div>
 
+          <DialogFooter>
             <Button variant="ghost" onClick={() => setBulkSaleOpen(false)}>Cancel</Button>
             <Button onClick={handleBulkSaleSubmit} disabled={insertFGSale.isPending}>
               {insertFGSale.isPending ? 'Saving...' : `Record Sale (${selectedFGItems.filter(i => Number(bulkQuantities[i.id]) > 0).length} items)`}
