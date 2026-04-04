@@ -204,6 +204,7 @@ export default function PhysicalInventoryTab() {
   const handleAddNew = async () => {
     if (!isNewBatchValid()) { toast.error('All fields are mandatory'); return; }
     if (existingBatchNumbers.has(newBatch.batch_number)) { toast.error(`Batch number "${newBatch.batch_number}" already exists`); return; }
+    if (Number(newBatch.gross_weight) > 0 && Number(newBatch.net_weight) > 0 && Number(newBatch.gross_weight) <= Number(newBatch.net_weight)) { toast.error('Gross Weight must be higher than Net Weight'); return; }
     try {
       await insertBatches.mutateAsync([{
         batch_number: newBatch.batch_number, material: newBatch.material || null, make: newBatch.make || null,

@@ -163,6 +163,12 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       }
     }
 
+    const shortQtyVal = Number(scrapEntries['Short qty'] || 0);
+    if (shortQtyVal > 80) {
+      toast.error('Short Qty must not exceed 80 Kgs');
+      return;
+    }
+
     if (exceedsUsable) {
       toast.error(`Total (${totalCommitted.toFixed(2)} Kg) exceeds usable qty (${usableQty.toFixed(2)} Kg)`);
       return;

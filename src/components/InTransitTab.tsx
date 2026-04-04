@@ -189,6 +189,12 @@ export default function InTransitTab() {
       let successCount = 0;
       for (let i = 0; i < newRows.length; i++) {
         const r = newRows[i];
+        const gwVal = Number(r.gross_weight || 0);
+        const nwVal = Number(r.net_weight || 0);
+        if (gwVal > 0 && nwVal > 0 && gwVal <= nwVal) {
+          errors.push(`Row ${i + 2} (${r.batch_number}): Gross Weight must be higher than Net Weight`);
+          continue;
+        }
         const { error } = await supabase.from('batches').insert({
           batch_number: r.batch_number, material: r.material || null, make: r.make || null,
           thickness: r.thickness || null, width: r.width || null,
@@ -240,6 +246,9 @@ export default function InTransitTab() {
 
   const saveEdit = async () => {
     if (!editingId) return;
+    const gw = Number((editValues as any).gross_weight || 0);
+    const nw = Number((editValues as any).net_weight || 0);
+    if (gw > 0 && nw > 0 && gw <= nw) { toast.error('Gross Weight must be higher than Net Weight'); return; }
     try {
       const { id: _id, created_at: _ca, updated_at: _ua, ...updateFields } = editValues as any;
       await updateBatch.mutateAsync({ id: editingId, ...updateFields } as any);
