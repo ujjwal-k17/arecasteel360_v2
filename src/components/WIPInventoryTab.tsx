@@ -529,6 +529,17 @@ export default function WIPInventoryTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Process CTL Dialog */}
+      {bulkProcessOpen && (
+        <BulkWIPProcessingDialog
+          wipItems={selectedWIPItems}
+          open={bulkProcessOpen}
+          onClose={() => { setBulkProcessOpen(false); setSelectedItems(new Set()); }}
+          batchMap={batchMap}
+          getAvailableQty={getAvailableQty}
+        />
+      )}
     </div>
   );
 }
