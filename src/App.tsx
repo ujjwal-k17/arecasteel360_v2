@@ -19,7 +19,15 @@ import NotFound from "./pages/NotFound";
 
 import SetupPage from "./pages/SetupPage";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,    // data stays fresh for 2 minutes
+      gcTime: 5 * 60 * 1000,       // cache kept for 5 minutes
+      refetchOnWindowFocus: false,  // don't refetch when switching browser tabs
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
