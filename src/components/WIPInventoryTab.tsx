@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { uniqueCaseInsensitive, eqCI, fmtNum } from '@/lib/utils';
-import { useWIPItems } from '@/hooks/useProcessing';
+import { useWIPItems, useWIPProcessing } from '@/hooks/useProcessing';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
