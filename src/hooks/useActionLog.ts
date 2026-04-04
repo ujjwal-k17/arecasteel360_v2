@@ -121,10 +121,28 @@ export function useReviewApproval() {
           const { data: fgItem } = await supabase.from('fg_items').select('*').eq('id', entityId).single();
           if (fgItem) {
             if (meta.source_type === 'wip' && meta.source_id) {
-              const { data: wipItem } = await supabase.from('wip_items').select('qty, status').eq('id', meta.source_id).single();
+              const { data: wipItem } = await supabase.from('wip_items').select('id, qty, status').eq('id', meta.source_id).maybeSingle();
               if (wipItem) {
                 const newQty = ((wipItem as any).qty || 0) + ((fgItem as any).qty || 0);
                 await supabase.from('wip_items').update({ qty: newQty, status: 'active' } as any).eq('id', meta.source_id);
+              } else {
+                // Legacy: source_id might be a batch ID — re-create WIP item
+                await supabase.from('wip_items').insert({
+                  source_batch_id: meta.source_id,
+                  processing_record_id: (fgItem as any).processing_record_id,
+                  material: (fgItem as any).material,
+                  make: (fgItem as any).make,
+                  process: (fgItem as any).process,
+                  thickness: (fgItem as any).thickness,
+                  width: (fgItem as any).width,
+                  length: (fgItem as any).length,
+                  coating: (fgItem as any).coating,
+                  grade: (fgItem as any).grade,
+                  qty: (fgItem as any).qty,
+                  num_pcs: (fgItem as any).num_pcs,
+                  order_id: (fgItem as any).order_id,
+                  status: 'active',
+                } as any);
               }
             }
             if ((fgItem as any).processing_record_id) {
