@@ -40,6 +40,10 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
   );
 
   const handleSubmit = async () => {
+    if (actionType === 'scrap') {
+      const shortQtyVal = Number(scrapEntries['Short qty'] || 0);
+      if (shortQtyVal > 80) { toast.error('Short Qty must not exceed 80 Kgs'); return; }
+    }
     try {
       if (actionType === 'sales') {
         await insertAction.mutateAsync({

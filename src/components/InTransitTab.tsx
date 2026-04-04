@@ -189,6 +189,12 @@ export default function InTransitTab() {
       let successCount = 0;
       for (let i = 0; i < newRows.length; i++) {
         const r = newRows[i];
+        const gwVal = Number(r.gross_weight || 0);
+        const nwVal = Number(r.net_weight || 0);
+        if (gwVal > 0 && nwVal > 0 && gwVal <= nwVal) {
+          errors.push(`Row ${i + 2} (${r.batch_number}): Gross Weight must be higher than Net Weight`);
+          continue;
+        }
         const { error } = await supabase.from('batches').insert({
           batch_number: r.batch_number, material: r.material || null, make: r.make || null,
           thickness: r.thickness || null, width: r.width || null,
