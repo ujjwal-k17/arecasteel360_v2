@@ -128,7 +128,7 @@ export default function OrderBookPage() {
     };
     for (const s of coilSales || []) {
       const batch = (s as any).batches;
-      if (batch && s.order_id) addSale(s.order_id, batch, s.net_weight || 0);
+      if (batch && s.order_id) addSale(s.order_id, { ...batch, length: null }, s.net_weight || 0);
     }
     for (const s of fgSales || []) {
       const fgItem = (s as any).fg_items;
