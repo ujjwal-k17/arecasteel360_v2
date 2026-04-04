@@ -380,6 +380,7 @@ export default function OrderBookPage() {
                     <TableCell className="text-xs">{row.label}</TableCell>
                     <TableCell className="text-xs">{row.form}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{(fgQtyBySku[row.skuKeyVal] || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{row.comments || '-'}</TableCell>
@@ -388,7 +389,7 @@ export default function OrderBookPage() {
                 {subRows.some(r => r.isExtra) && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
+                      <TableCell colSpan={7} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
                         Additional dispatches (not in order)
                       </TableCell>
                     </TableRow>
@@ -400,6 +401,7 @@ export default function OrderBookPage() {
                         </TableCell>
                         <TableCell className="text-xs">{row.form}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
+                        <TableCell className="text-xs text-right font-mono">{(fgQtyBySku[row.skuKeyVal] || 0).toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
                         <TableCell className="text-xs text-muted-foreground">-</TableCell>
