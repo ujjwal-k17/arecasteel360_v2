@@ -115,6 +115,26 @@ export default function OrderBookPage() {
     },
   });
 
+  // Fetch all FG items for inventory qty lookup
+  const { data: allFgItems } = useQuery({
+    queryKey: ['fg_items_for_order_book'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fg_items').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Aggregate FG inventory qty by SKU key
+  const fgQtyBySku = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const item of allFgItems || []) {
+      const key = skuKey(item);
+      map[key] = (map[key] || 0) + (Number(item.qty) || 0);
+    }
+    return map;
+  }, [allFgItems]);
+
   const salesByOrder = useMemo(() => {
     const map: Record<string, Record<string, { label: string; qty: number }>> = {};
     const addSale = (orderNumber: string, item: any, qty: number) => {
@@ -167,17 +187,17 @@ export default function OrderBookPage() {
     const orderItems = order.order_items || [];
     const orderSales = salesByOrder[order.order_number] || {};
     const matchedKeys = new Set<string>();
-    const rows: { key: string; label: string; form: string; comments: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
+    const rows: { key: string; skuKeyVal: string; label: string; form: string; comments: string; orderQty: number; dispatchQty: number; isExtra: boolean }[] = [];
     for (const item of orderItems) {
       const key = skuKey(item);
       const salesEntry = orderSales[key];
       const dq = salesEntry ? salesEntry.qty : 0;
       if (salesEntry) matchedKeys.add(key);
-      rows.push({ key: item.id, label: getSkuLabel(item), form: item.form || '-', comments: item.comments || '', orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
+      rows.push({ key: item.id, skuKeyVal: key, label: getSkuLabel(item), form: item.form || '-', comments: item.comments || '', orderQty: Number(item.net_weight) || 0, dispatchQty: dq, isExtra: false });
     }
     for (const [key, entry] of Object.entries(orderSales)) {
       if (!matchedKeys.has(key)) {
-        rows.push({ key: `extra-${key}`, label: entry.label, form: '-', comments: '', orderQty: 0, dispatchQty: entry.qty, isExtra: true });
+        rows.push({ key: `extra-${key}`, skuKeyVal: key, label: entry.label, form: '-', comments: '', orderQty: 0, dispatchQty: entry.qty, isExtra: true });
       }
     }
     return rows;
@@ -348,6 +368,7 @@ export default function OrderBookPage() {
                   <TableHead className="text-xs">SKU</TableHead>
                   <TableHead className="text-xs">Form</TableHead>
                   <TableHead className="text-xs text-right">Order Qty (Kg)</TableHead>
+                  <TableHead className="text-xs text-right">FG Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Dispatch Qty (Kg)</TableHead>
                   <TableHead className="text-xs text-right">Balance Qty (Kg)</TableHead>
                   <TableHead className="text-xs">Comments</TableHead>
@@ -359,6 +380,7 @@ export default function OrderBookPage() {
                     <TableCell className="text-xs">{row.label}</TableCell>
                     <TableCell className="text-xs">{row.form}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.orderQty.toFixed(2)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{(fgQtyBySku[row.skuKeyVal] || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{(row.orderQty - row.dispatchQty).toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{row.comments || '-'}</TableCell>
@@ -367,7 +389,7 @@ export default function OrderBookPage() {
                 {subRows.some(r => r.isExtra) && (
                   <>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
+                      <TableCell colSpan={7} className="text-xs font-semibold text-muted-foreground pt-3 pb-1 border-t">
                         Additional dispatches (not in order)
                       </TableCell>
                     </TableRow>
@@ -379,6 +401,7 @@ export default function OrderBookPage() {
                         </TableCell>
                         <TableCell className="text-xs">{row.form}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
+                        <TableCell className="text-xs text-right font-mono">{(fgQtyBySku[row.skuKeyVal] || 0).toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono">{row.dispatchQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs text-right font-mono text-muted-foreground">-</TableCell>
                         <TableCell className="text-xs text-muted-foreground">-</TableCell>
