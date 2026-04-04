@@ -121,16 +121,22 @@ export default function WoodenPalletsTab() {
       const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
       const purchaseWeight = skuPurchases.reduce((s, p) => s + (p.weight_kg || 0), 0);
       const purchasePcs = skuPurchases.reduce((s, p) => s + (p.num_pcs || 0), 0);
-      const consumptionWeight = skuConsumptions.reduce((s, c) => s + (c.weight_kg || 0), 0);
       const consumptionPcs = skuConsumptions.reduce((s, c) => s + (c.num_pcs || 0), 0);
-      const lastPurchase = skuPurchases.length > 0 ? skuPurchases[0].purchase_date : null;
+
+      // Use latest purchase weight-per-piece ratio for consumption weight calc
+      // Sort by date descending, pick the first with valid pcs
+      const sortedPurchases = [...skuPurchases].sort((a, b) => b.purchase_date.localeCompare(a.purchase_date));
+      const latestWithPcs = sortedPurchases.find(p => p.num_pcs > 0);
+      const avgWeightPerPc = latestWithPcs ? (latestWithPcs.weight_kg / latestWithPcs.num_pcs) : 0;
+
+      const consumptionWeight = consumptionPcs * avgWeightPerPc;
+
+      const balancePcs = purchasePcs - consumptionPcs;
+      const balanceWeight = purchaseWeight - consumptionWeight;
+
+      const lastPurchase = skuPurchases.length > 0 ? sortedPurchases[0].purchase_date : null;
       const lastConsumption = skuConsumptions.length > 0 ? skuConsumptions[0].consumption_date : null;
-      map.set(sku.id, {
-        balanceWeight: purchaseWeight - consumptionWeight,
-        balancePcs: purchasePcs - consumptionPcs,
-        lastPurchase,
-        lastConsumption,
-      });
+      map.set(sku.id, { balanceWeight, balancePcs, lastPurchase, lastConsumption });
     });
     return map;
   }, [skus, purchases, consumptions]);
@@ -413,8 +419,8 @@ export default function WoodenPalletsTab() {
             {filteredSkus.map(sku => {
               const summary = skuSummary.get(sku.id) || { balanceWeight: 0, balancePcs: 0, lastPurchase: null, lastConsumption: null };
               const isOpen = expanded.has(sku.id);
-              const skuPurchases = (purchases || []).filter(p => p.pallet_sku_id === sku.id);
-              const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
+      const skuPurchases = (purchases || []).filter(p => p.pallet_sku_id === sku.id);
+      const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
 
               return (
                 <>
@@ -431,9 +437,6 @@ export default function WoodenPalletsTab() {
                       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                         <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowPurchase(sku)}>
                           <ShoppingCart className="h-3 w-3" /> Purchase
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowConsumption(sku)}>
-                          <Package className="h-3 w-3" /> Consumption
                         </Button>
                       </div>
                     </TableCell>
@@ -578,42 +581,6 @@ export default function WoodenPalletsTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Consumption Dialog */}
-      <Dialog open={!!showConsumption} onOpenChange={() => setShowConsumption(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Record Consumption - {showConsumption?.pallet_size}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Date *</Label>
-              <Input type="date" value={consumptionForm.date} onChange={e => setConsumptionForm(v => ({ ...v, date: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Order ID</Label>
-              <OrderIdCombobox
-                value={consumptionForm.orderId}
-                onChange={v => setConsumptionForm(f => ({ ...f, orderId: v }))}
-                orders={(orders || []) as any[]}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Weight (Kg) *</Label>
-              <Input type="number" value={consumptionForm.weight} onChange={e => setConsumptionForm(v => ({ ...v, weight: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs"># of Pcs *</Label>
-              <Input type="number" value={consumptionForm.pcs} onChange={e => setConsumptionForm(v => ({ ...v, pcs: e.target.value }))} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowConsumption(null)}>Cancel</Button>
-            <Button onClick={handleConsumptionSubmit} disabled={insertConsumption.isPending}>
-              {insertConsumption.isPending ? 'Saving...' : 'Record Consumption'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
