@@ -44,6 +44,7 @@ export default function DefectiveManagementTab() {
   const [sellDialog, setSellDialog] = useState<DefectiveDetail | null>(null);
   const [saleForm, setSaleForm] = useState({ order_id: '', invoice_number: '', sales_date: '', quantity: '' });
   const [expandedSku, setExpandedSku] = useState<string | null>(null);
+  const [moveBackDialog, setMoveBackDialog] = useState<DefectiveDetail | null>(null);
 
   // FG defectives
   const { data: fgDefectives } = useQuery({
