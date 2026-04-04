@@ -243,9 +243,16 @@ export default function WIPInventoryTab() {
         </Button>
         <div className="flex items-center gap-3">
           {selectedItems.size > 0 && (
-            <Button size="sm" className="gap-2" onClick={() => setBulkMoveOpen(true)}>
-              <ArrowRightCircle className="h-4 w-4" /> Bulk Move to FG ({selectedItems.size})
-            </Button>
+            <>
+              {selectedWIPItems.some(i => i.process === 'Slit Coil') && (
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => setBulkProcessOpen(true)}>
+                  Bulk Process CTL ({selectedWIPItems.filter(i => i.process === 'Slit Coil').length})
+                </Button>
+              )}
+              <Button size="sm" className="gap-2" onClick={() => setBulkMoveOpen(true)}>
+                <ArrowRightCircle className="h-4 w-4" /> Bulk Move to FG ({selectedItems.size})
+              </Button>
+            </>
           )}
           <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
             Total: {fmtNum(grandTotalQty)} Kg ({filteredItems.length} items)
