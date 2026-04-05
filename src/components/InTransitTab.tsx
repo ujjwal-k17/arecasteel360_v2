@@ -36,7 +36,7 @@ interface SKUGroup {
 }
 
 function getInTransitSKUKey(b: any): string {
-  return [b.material, b.make, b.form, b.thickness, b.width, b.length, b.coating, b.grade].map(v => v ?? '').join('|');
+  return [b.material, b.make, b.form, b.thickness, b.width, b.length, b.coating, b.grade].map(v => String(v ?? '').toLowerCase()).join('|');
 }
 
 export default function InTransitTab() {
