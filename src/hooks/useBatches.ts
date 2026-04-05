@@ -176,5 +176,5 @@ export function calcBalanceQty(batch: Batch, actions: InventoryAction[], process
 
 // SKU key
 export function getSKUKey(b: Batch): string {
-  return [b.material, b.make, b.grade, b.coating, b.thickness, b.width].filter(Boolean).join(' × ');
+  return [b.material, b.make, b.grade, b.coating, b.thickness, b.width].filter(Boolean).map(v => String(v).toLowerCase()).join(' × ');
 }
