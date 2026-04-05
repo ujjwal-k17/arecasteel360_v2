@@ -21,7 +21,6 @@ const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 interface SKUGroup {
   key: string;
   material: string;
-  make: string;
   process: string;
   thickness: number | null;
   width: number | null;
