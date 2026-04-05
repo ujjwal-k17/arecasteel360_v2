@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useFGItems } from '@/hooks/useProcessing';
-import { fmtNum, fmtInt, eqCI, uniqueCaseInsensitive } from '@/lib/utils';
+import { fmtNum, fmtInt, eqCI } from '@/lib/utils';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
