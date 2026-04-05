@@ -125,15 +125,43 @@ export default function OrderBookPage() {
     },
   });
 
-  // Aggregate FG inventory qty by SKU key
+  // Fetch FG sales & defectives to compute net FG inventory
+  const { data: allFgSalesForQty } = useQuery({
+    queryKey: ['fg_sales_for_qty'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fg_sales').select('fg_item_id, quantity');
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: allFgDefectivesForQty } = useQuery({
+    queryKey: ['fg_defectives_for_qty'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fg_defectives').select('fg_item_id, quantity');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Aggregate FG inventory qty by SKU key (net of sales & defectives)
   const fgQtyBySku = useMemo(() => {
+    // Build per-item deduction map
+    const deductions: Record<string, number> = {};
+    for (const s of allFgSalesForQty || []) {
+      deductions[s.fg_item_id] = (deductions[s.fg_item_id] || 0) + (Number(s.quantity) || 0);
+    }
+    for (const d of allFgDefectivesForQty || []) {
+      deductions[d.fg_item_id] = (deductions[d.fg_item_id] || 0) + (Number(d.quantity) || 0);
+    }
+
     const map: Record<string, number> = {};
     for (const item of allFgItems || []) {
       const key = skuKey(item);
-      map[key] = (map[key] || 0) + (Number(item.qty) || 0);
+      const netQty = (Number(item.qty) || 0) - (deductions[item.id] || 0);
+      map[key] = (map[key] || 0) + netQty;
     }
     return map;
-  }, [allFgItems]);
+  }, [allFgItems, allFgSalesForQty, allFgDefectivesForQty]);
 
   const salesByOrder = useMemo(() => {
     const map: Record<string, Record<string, { label: string; qty: number }>> = {};
