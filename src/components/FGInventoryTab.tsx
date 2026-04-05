@@ -21,7 +21,6 @@ const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 interface SKUGroup {
   key: string;
   material: string;
-  make: string;
   process: string;
   thickness: number | null;
   width: number | null;
@@ -48,7 +47,7 @@ export default function FGInventoryTab() {
 
   // Filters
   const [filterMaterial, setFilterMaterial] = useState('all');
-  const [filterMake, setFilterMake] = useState('all');
+  
   const [filterProcess, setFilterProcess] = useState('all');
   const [filterCoating, setFilterCoating] = useState('all');
   const [filterGrade, setFilterGrade] = useState('all');
@@ -232,13 +231,12 @@ export default function FGInventoryTab() {
       if (fgView === 'open' && availQty <= 0) return false;
       if (fgView === 'closed' && availQty > 0) return false;
       return (filterMaterial === 'all' || eqCI(i.material || '-', filterMaterial)) &&
-        (filterMake === 'all' || eqCI(i.make || '-', filterMake)) &&
         (filterProcess === 'all' || eqCI(i.process || '-', filterProcess)) &&
         (filterCoating === 'all' || eqCI(i.coating || '-', filterCoating)) &&
         (filterGrade === 'all' || eqCI(i.grade || '-', filterGrade)) &&
         (filterDimension === 'all' || getDimLabel(i) === filterDimension);
     });
-  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
+  }, [items, filterMaterial, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
 
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
@@ -252,9 +250,9 @@ export default function FGInventoryTab() {
   const skuGroups = useMemo(() => {
     const map = new Map<string, SKUGroup>();
     for (const item of filteredItems) {
-      const key = [item.material || '', item.make || '', item.process || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
+      const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, items: [] });
       }
       const g = map.get(key)!;
       g.totalQty += getAvailableQty(item);
@@ -477,7 +475,6 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Make</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Dimensions</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
@@ -490,7 +487,6 @@ export default function FGInventoryTab() {
               <TableHead />
               <TableHead />
               <TableHead><FilterSelect value={filterMaterial} onChange={setFilterMaterial} options={uniqueVals.material} placeholder="Material" /></TableHead>
-              <TableHead><FilterSelect value={filterMake} onChange={setFilterMake} options={uniqueVals.make} placeholder="Make" /></TableHead>
               <TableHead><FilterSelect value={filterProcess} onChange={setFilterProcess} options={uniqueVals.process} placeholder="Process" /></TableHead>
               <TableHead><FilterSelect value={filterDimension} onChange={setFilterDimension} options={uniqueVals.dimension} placeholder="Dimensions" /></TableHead>
               <TableHead><FilterSelect value={filterCoating} onChange={setFilterCoating} options={uniqueVals.coating} placeholder="Coating" /></TableHead>
@@ -502,7 +498,7 @@ export default function FGInventoryTab() {
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -512,7 +508,6 @@ export default function FGInventoryTab() {
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell />
                     <TableCell className="text-sm">{g.material}</TableCell>
-                    <TableCell className="text-sm">{g.make}</TableCell>
                     <TableCell className="text-sm">{g.process}</TableCell>
                     <TableCell className="text-sm font-mono-num whitespace-nowrap">{formatDimensions(g.thickness, g.width, g.length, g.process)}</TableCell>
                     <TableCell className="text-sm">{g.coating}</TableCell>
@@ -531,8 +526,8 @@ export default function FGInventoryTab() {
                             <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleSelectItem(item.id)} />
                           )}
                         </TableCell>
-                        <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
+                        <TableCell className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
+                        <TableCell className="text-xs text-muted-foreground"><span className="text-muted-foreground">Make: </span>{item.make || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
