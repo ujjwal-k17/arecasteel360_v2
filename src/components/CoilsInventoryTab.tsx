@@ -178,8 +178,7 @@ export default function CoilsInventoryTab() {
   }, [filteredBatches, allActions, allProcRecords]);
 
   const uniqueMaterials = useMemo(() => {
-    const mats = [...new Set(receivedBatches.map(b => b.material || 'Unknown'))].sort();
-    return mats;
+    return uniqueCaseInsensitive(receivedBatches.map(b => b.material || '').filter(Boolean));
   }, [receivedBatches]);
 
   const displayedSkuGroups = useMemo(() => {
