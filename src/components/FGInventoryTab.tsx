@@ -527,8 +527,8 @@ export default function FGInventoryTab() {
                             <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleSelectItem(item.id)} />
                           )}
                         </TableCell>
-                        <TableCell colSpan={2} className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.process || '-'}</TableCell>
+                        <TableCell className="text-xs"><span className="text-muted-foreground">Batch: </span><span className="font-medium">{getBatchNumber(item)}</span></TableCell>
+                        <TableCell className="text-xs text-muted-foreground"><span className="text-muted-foreground">Make: </span>{item.make || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
