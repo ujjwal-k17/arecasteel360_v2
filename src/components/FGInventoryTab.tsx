@@ -266,7 +266,7 @@ export default function FGInventoryTab() {
 
   const displayedSkuGroups = useMemo(() => {
     if (materialTab === 'all') return skuGroups;
-    return skuGroups.filter(g => (g.material || '') === materialTab);
+    return skuGroups.filter(g => eqCI(g.material || '', materialTab));
   }, [skuGroups, materialTab]);
 
   const toggleExpand = (key: string) => {

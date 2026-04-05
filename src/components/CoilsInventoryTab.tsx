@@ -183,7 +183,7 @@ export default function CoilsInventoryTab() {
 
   const displayedSkuGroups = useMemo(() => {
     if (materialTab === 'all') return skuGroups;
-    return skuGroups.filter(g => (g.material || 'Unknown') === materialTab);
+    return skuGroups.filter(g => eqCI(g.material || '', materialTab));
   }, [skuGroups, materialTab]);
 
   const grandTotalBalanceQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalBalanceQty, 0), [displayedSkuGroups]);
