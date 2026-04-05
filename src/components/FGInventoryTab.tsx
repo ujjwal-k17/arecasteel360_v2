@@ -231,11 +231,11 @@ export default function FGInventoryTab() {
       const availQty = getAvailableQty(i);
       if (fgView === 'open' && availQty <= 0) return false;
       if (fgView === 'closed' && availQty > 0) return false;
-      return (filterMaterial === 'all' || (i.material || '-') === filterMaterial) &&
-        (filterMake === 'all' || (i.make || '-') === filterMake) &&
-        (filterProcess === 'all' || (i.process || '-') === filterProcess) &&
-        (filterCoating === 'all' || (i.coating || '-') === filterCoating) &&
-        (filterGrade === 'all' || (i.grade || '-') === filterGrade) &&
+      return (filterMaterial === 'all' || eqCI(i.material || '-', filterMaterial)) &&
+        (filterMake === 'all' || eqCI(i.make || '-', filterMake)) &&
+        (filterProcess === 'all' || eqCI(i.process || '-', filterProcess)) &&
+        (filterCoating === 'all' || eqCI(i.coating || '-', filterCoating)) &&
+        (filterGrade === 'all' || eqCI(i.grade || '-', filterGrade)) &&
         (filterDimension === 'all' || getDimLabel(i) === filterDimension);
     });
   }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
