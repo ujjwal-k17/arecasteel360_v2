@@ -231,13 +231,12 @@ export default function FGInventoryTab() {
       if (fgView === 'open' && availQty <= 0) return false;
       if (fgView === 'closed' && availQty > 0) return false;
       return (filterMaterial === 'all' || eqCI(i.material || '-', filterMaterial)) &&
-        (filterMake === 'all' || eqCI(i.make || '-', filterMake)) &&
         (filterProcess === 'all' || eqCI(i.process || '-', filterProcess)) &&
         (filterCoating === 'all' || eqCI(i.coating || '-', filterCoating)) &&
         (filterGrade === 'all' || eqCI(i.grade || '-', filterGrade)) &&
         (filterDimension === 'all' || getDimLabel(i) === filterDimension);
     });
-  }, [items, filterMaterial, filterMake, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
+  }, [items, filterMaterial, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
 
   const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
   const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
