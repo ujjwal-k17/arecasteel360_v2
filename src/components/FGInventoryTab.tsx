@@ -47,7 +47,7 @@ export default function FGInventoryTab() {
 
   // Filters
   const [filterMaterial, setFilterMaterial] = useState('all');
-  const [filterMake, setFilterMake] = useState('all');
+  
   const [filterProcess, setFilterProcess] = useState('all');
   const [filterCoating, setFilterCoating] = useState('all');
   const [filterGrade, setFilterGrade] = useState('all');
