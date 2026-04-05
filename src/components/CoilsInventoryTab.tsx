@@ -178,13 +178,12 @@ export default function CoilsInventoryTab() {
   }, [filteredBatches, allActions, allProcRecords]);
 
   const uniqueMaterials = useMemo(() => {
-    const mats = [...new Set(receivedBatches.map(b => b.material || 'Unknown'))].sort();
-    return mats;
+    return uniqueCaseInsensitive(receivedBatches.map(b => b.material || '').filter(Boolean));
   }, [receivedBatches]);
 
   const displayedSkuGroups = useMemo(() => {
     if (materialTab === 'all') return skuGroups;
-    return skuGroups.filter(g => (g.material || 'Unknown') === materialTab);
+    return skuGroups.filter(g => eqCI(g.material || '', materialTab));
   }, [skuGroups, materialTab]);
 
   const grandTotalBalanceQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalBalanceQty, 0), [displayedSkuGroups]);
