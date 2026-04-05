@@ -509,7 +509,6 @@ export default function FGInventoryTab() {
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell />
                     <TableCell className="text-sm">{g.material}</TableCell>
-                    <TableCell className="text-sm">{g.make}</TableCell>
                     <TableCell className="text-sm">{g.process}</TableCell>
                     <TableCell className="text-sm font-mono-num whitespace-nowrap">{formatDimensions(g.thickness, g.width, g.length, g.process)}</TableCell>
                     <TableCell className="text-sm">{g.coating}</TableCell>
