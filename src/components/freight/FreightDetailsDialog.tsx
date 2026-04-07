@@ -14,8 +14,8 @@ interface FreightDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   invoiceNumber: string;
   transporters: { id: string; name: string }[];
-  existingData?: { transporter_id: string | null; total_freight: number | null; gst: number | null } | null;
-  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number }) => void;
+  existingData?: { transporter_id: string | null; total_freight: number | null; gst: number | null; tds: number | null } | null;
+  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number }) => void;
 }
 
 export function FreightDetailsDialog({

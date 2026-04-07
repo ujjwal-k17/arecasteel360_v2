@@ -661,7 +661,7 @@ function FreightPage() {
           <DialogHeader><DialogTitle>Record Payment — {paymentDialog.invoiceNumber}</DialogTitle></DialogHeader>
           {(() => {
             const freightRecord = (transporterFreightMap || {})[paymentDialog.invoiceNumber];
-            const totalAmount = freightRecord ? ((freightRecord.total_freight || 0) + (freightRecord.gst || 0)) : 0;
+            const totalAmount = freightRecord ? ((freightRecord.total_freight || 0) + (freightRecord.gst || 0) - (freightRecord.tds || 0)) : 0;
             const alreadyPaid = freightRecord ? (paidAmountByFreightId[freightRecord.id] || 0) : 0;
             const remaining = totalAmount - alreadyPaid;
             const enteredAmount = parseFloat(paymentDialog.amount) || 0;
