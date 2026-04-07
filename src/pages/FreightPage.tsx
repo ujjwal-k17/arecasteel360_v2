@@ -912,7 +912,7 @@ function TransporterDispatchTable({
 
   const getPaymentStatus = (freightData: any) => {
     if (!freightData) return 'Unpaid';
-    const totalAmount = (freightData.total_freight || 0) + (freightData.gst || 0);
+    const totalAmount = (freightData.total_freight || 0) + (freightData.gst || 0) - (freightData.tds || 0);
     if (totalAmount <= 0) return 'Unpaid';
     const paid = paidAmountByFreightId[freightData.id] || 0;
     if (paid <= 0) return 'Unpaid';
