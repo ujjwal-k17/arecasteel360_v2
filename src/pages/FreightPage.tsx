@@ -139,6 +139,21 @@ function FreightPage() {
     },
   });
 
+  // In-transit batches go directly to Ex-Sales / FOR Purchases
+  const { data: intransitBatches } = useQuery({
+    queryKey: ['freight_intransit_batches'],
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from('batches')
+        .select('batch_number, purchase_date, purchase_from, material, gross_weight') as any)
+        .eq('status', 'received')
+        .eq('from_intransit', true)
+        .order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data as { batch_number: string; purchase_date: string | null; purchase_from: string | null; material: string | null; gross_weight: number | null }[];
+    },
+  });
+
   const { data: transporters } = useQuery({
     queryKey: ['transporters_list'],
     queryFn: async () => {
@@ -308,8 +323,19 @@ function FreightPage() {
       } as InvoiceSummary & { purchaseBatches?: PurchaseSummary[] };
     });
 
-    return [...salesItems, ...purchaseItems];
-  }, [invoiceSummaries, purchaseSummaries]);
+    // In-transit batches go directly to Ex-Sales / FOR Purchases
+    const intransitItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = (intransitBatches || []).map((b: any) => ({
+      invoice_number: b.batch_number,
+      invoice_date: b.purchase_date,
+      order_id: null,
+      customer_name: b.purchase_from,
+      total_qty: b.gross_weight || 0,
+      dispatch_type: 'Ex-Sales',
+      source_type: 'purchase',
+    }));
+
+    return [...salesItems, ...purchaseItems, ...intransitItems];
+  }, [invoiceSummaries, purchaseSummaries, intransitBatches]);
 
   const filteredMappedItems = useMemo(() => {
     return allMappedItems.filter(s => {
@@ -454,7 +480,7 @@ function FreightPage() {
   });
 
   const refreshAll = () => {
-    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments', 'freight_batches'].forEach(k =>
+    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments', 'freight_batches', 'freight_intransit_batches'].forEach(k =>
       queryClient.invalidateQueries({ queryKey: [k] })
     );
     toast.success('Refreshed');
