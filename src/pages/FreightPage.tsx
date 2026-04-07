@@ -139,6 +139,21 @@ function FreightPage() {
     },
   });
 
+  // In-transit batches go directly to Ex-Sales / FOR Purchases
+  const { data: intransitBatches } = useQuery({
+    queryKey: ['freight_intransit_batches'],
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from('batches')
+        .select('batch_number, purchase_date, purchase_from, material, gross_weight') as any)
+        .eq('status', 'received')
+        .eq('from_intransit', true)
+        .order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data as { batch_number: string; purchase_date: string | null; purchase_from: string | null; material: string | null; gross_weight: number | null }[];
+    },
+  });
+
   const { data: transporters } = useQuery({
     queryKey: ['transporters_list'],
     queryFn: async () => {
