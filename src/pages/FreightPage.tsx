@@ -323,8 +323,19 @@ function FreightPage() {
       } as InvoiceSummary & { purchaseBatches?: PurchaseSummary[] };
     });
 
-    return [...salesItems, ...purchaseItems];
-  }, [invoiceSummaries, purchaseSummaries]);
+    // In-transit batches go directly to Ex-Sales / FOR Purchases
+    const intransitItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = (intransitBatches || []).map((b: any) => ({
+      invoice_number: b.batch_number,
+      invoice_date: b.purchase_date,
+      order_id: null,
+      customer_name: b.purchase_from,
+      total_qty: b.gross_weight || 0,
+      dispatch_type: 'Ex-Sales',
+      source_type: 'purchase',
+    }));
+
+    return [...salesItems, ...purchaseItems, ...intransitItems];
+  }, [invoiceSummaries, purchaseSummaries, intransitBatches]);
 
   const filteredMappedItems = useMemo(() => {
     return allMappedItems.filter(s => {
