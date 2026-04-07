@@ -146,7 +146,6 @@ function FreightPage() {
       const { data, error } = await (supabase
         .from('batches')
         .select('batch_number, purchase_date, purchase_from, material, gross_weight') as any)
-        .eq('status', 'received')
         .eq('from_intransit', true)
         .order('purchase_date', { ascending: false });
       if (error) throw error;
