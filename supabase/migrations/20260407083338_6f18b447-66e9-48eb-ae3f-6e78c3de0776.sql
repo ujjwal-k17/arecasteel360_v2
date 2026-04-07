@@ -1,0 +1,1 @@
+ALTER TABLE public.transporter_freight ADD COLUMN tds numeric DEFAULT 0;

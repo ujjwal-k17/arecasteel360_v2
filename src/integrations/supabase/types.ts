@@ -1059,6 +1059,7 @@ export type Database = {
           id: string
           invoice_number: string
           status: string
+          tds: number | null
           total_freight: number | null
           transporter_id: string | null
           updated_at: string
@@ -1070,6 +1071,7 @@ export type Database = {
           id?: string
           invoice_number: string
           status?: string
+          tds?: number | null
           total_freight?: number | null
           transporter_id?: string | null
           updated_at?: string
@@ -1081,6 +1083,7 @@ export type Database = {
           id?: string
           invoice_number?: string
           status?: string
+          tds?: number | null
           total_freight?: number | null
           transporter_id?: string | null
           updated_at?: string
