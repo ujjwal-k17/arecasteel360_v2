@@ -30,6 +30,7 @@ export function FreightDetailsDialog({
   const [transporterId, setTransporterId] = useState('');
   const [totalFreight, setTotalFreight] = useState('');
   const [gst, setGst] = useState('');
+  const [tds, setTds] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -38,6 +39,7 @@ export function FreightDetailsDialog({
       setTransporterId(existingData?.transporter_id || '');
       setTotalFreight(existingData?.total_freight?.toString() || '');
       setGst(existingData?.gst?.toString() || '');
+      setTds(existingData?.tds?.toString() || '');
       setShowAddNew(false);
       setNewName('');
     }
