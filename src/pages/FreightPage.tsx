@@ -1244,6 +1244,12 @@ function TransporterDispatchTable({
                                 <span className="text-muted-foreground font-medium">GST:</span>{' '}
                                 <span className="font-semibold font-mono-num">₹{(freightData.gst || 0).toLocaleString('en-IN')}</span>
                               </div>
+                              {(freightData.tds || 0) > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground font-medium">TDS:</span>{' '}
+                                  <span className="font-semibold font-mono-num text-red-600">-₹{(freightData.tds || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                              )}
                               <div>
                                 <span className="text-muted-foreground font-medium">Total:</span>{' '}
                                 <span className="font-semibold font-mono-num">₹{totalAmount.toLocaleString('en-IN')}</span>
