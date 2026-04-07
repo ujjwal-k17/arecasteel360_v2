@@ -129,10 +129,19 @@ export function FreightDetailsDialog({
               onChange={e => setGst(e.target.value)}
             />
           </div>
-          {(totalFreight || gst) && (
+          <div className="space-y-2">
+            <Label>TDS (₹)</Label>
+            <Input
+              type="number"
+              placeholder="Enter TDS amount"
+              value={tds}
+              onChange={e => setTds(e.target.value)}
+            />
+          </div>
+          {(totalFreight || gst || tds) && (
             <div className="bg-muted/50 rounded-md px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Total (Freight + GST):</span>{' '}
-              <span className="font-semibold">₹{((parseFloat(totalFreight) || 0) + (parseFloat(gst) || 0)).toLocaleString('en-IN')}</span>
+              <span className="text-muted-foreground">Total (Freight + GST - TDS):</span>{' '}
+              <span className="font-semibold">₹{((parseFloat(totalFreight) || 0) + (parseFloat(gst) || 0) - (parseFloat(tds) || 0)).toLocaleString('en-IN')}</span>
             </div>
           )}
         </div>
