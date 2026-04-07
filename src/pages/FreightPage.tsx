@@ -124,8 +124,20 @@ function FreightPage() {
     },
   });
 
-  // Purchases tab - no longer shows batches from in-transit
-  const batches: any[] = [];
+  // Purchases tab - only batches NOT from in-transit (directly added to coils)
+  const { data: batches } = useQuery({
+    queryKey: ['freight_batches'],
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from('batches')
+        .select('batch_number, purchase_date, purchase_from, material, gross_weight') as any)
+        .eq('status', 'received')
+        .eq('from_intransit', false)
+        .order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data as { batch_number: string; purchase_date: string | null; purchase_from: string | null; material: string | null; gross_weight: number | null }[];
+    },
+  });
 
   const { data: transporters } = useQuery({
     queryKey: ['transporters_list'],
@@ -442,7 +454,7 @@ function FreightPage() {
   });
 
   const refreshAll = () => {
-    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments'].forEach(k =>
+    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments', 'freight_batches'].forEach(k =>
       queryClient.invalidateQueries({ queryKey: [k] })
     );
     toast.success('Refreshed');

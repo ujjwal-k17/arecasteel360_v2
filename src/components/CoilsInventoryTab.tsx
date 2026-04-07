@@ -302,6 +302,7 @@ export default function CoilsInventoryTab() {
         await supabase.from('batches').update({
           status: 'received',
           batch_status: (batch as any)?.form || 'Pack coil',
+          from_intransit: true,
         } as any).eq('id', id);
       }
       toast.success(`${ids.length} batch(es) moved to coils inventory`);
