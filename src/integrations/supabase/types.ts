@@ -86,6 +86,7 @@ export type Database = {
           colour: string | null
           created_at: string
           form: string | null
+          from_intransit: boolean
           grade: string | null
           gross_weight: number | null
           gsm: number | null
@@ -109,6 +110,7 @@ export type Database = {
           colour?: string | null
           created_at?: string
           form?: string | null
+          from_intransit?: boolean
           grade?: string | null
           gross_weight?: number | null
           gsm?: number | null
@@ -132,6 +134,7 @@ export type Database = {
           colour?: string | null
           created_at?: string
           form?: string | null
+          from_intransit?: boolean
           grade?: string | null
           gross_weight?: number | null
           gsm?: number | null
