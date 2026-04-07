@@ -124,28 +124,8 @@ function FreightPage() {
     },
   });
 
-  // Fetch batches for Purchases tab - only those with invoice_details (source_type='purchase')
-  const { data: batches } = useQuery({
-    queryKey: ['freight_batches'],
-    queryFn: async () => {
-      // First get batch numbers that have invoice_details with source_type='purchase'
-      const { data: purchaseInvoices, error: invErr } = await supabase
-        .from('invoice_details')
-        .select('invoice_number')
-        .eq('source_type', 'purchase');
-      if (invErr) throw invErr;
-      const purchaseBatchNumbers = (purchaseInvoices || []).map(i => i.invoice_number);
-      if (purchaseBatchNumbers.length === 0) return [];
-      const { data, error } = await supabase
-        .from('batches')
-        .select('batch_number, purchase_date, purchase_from, material, gross_weight')
-        .eq('status', 'received')
-        .in('batch_number', purchaseBatchNumbers)
-        .order('purchase_date', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Purchases tab - no longer shows batches from in-transit
+  const batches: any[] = [];
 
   const { data: transporters } = useQuery({
     queryKey: ['transporters_list'],
@@ -462,7 +442,7 @@ function FreightPage() {
   });
 
   const refreshAll = () => {
-    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments', 'freight_batches'].forEach(k =>
+    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments'].forEach(k =>
       queryClient.invalidateQueries({ queryKey: [k] })
     );
     toast.success('Refreshed');
