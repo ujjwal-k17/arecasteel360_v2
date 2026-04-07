@@ -68,6 +68,7 @@ export function FreightDetailsDialog({
       transporter_id: transporterId,
       total_freight: parseFloat(totalFreight),
       gst: parseFloat(gst) || 0,
+      tds: parseFloat(tds) || 0,
     });
     onOpenChange(false);
   };
