@@ -124,14 +124,23 @@ function FreightPage() {
     },
   });
 
-  // Fetch batches for Purchases tab
+  // Fetch batches for Purchases tab - only those with invoice_details (source_type='purchase')
   const { data: batches } = useQuery({
     queryKey: ['freight_batches'],
     queryFn: async () => {
+      // First get batch numbers that have invoice_details with source_type='purchase'
+      const { data: purchaseInvoices, error: invErr } = await supabase
+        .from('invoice_details')
+        .select('invoice_number')
+        .eq('source_type', 'purchase');
+      if (invErr) throw invErr;
+      const purchaseBatchNumbers = (purchaseInvoices || []).map(i => i.invoice_number);
+      if (purchaseBatchNumbers.length === 0) return [];
       const { data, error } = await supabase
         .from('batches')
         .select('batch_number, purchase_date, purchase_from, material, gross_weight')
         .eq('status', 'received')
+        .in('batch_number', purchaseBatchNumbers)
         .order('purchase_date', { ascending: false });
       if (error) throw error;
       return data;
@@ -378,16 +387,16 @@ function FreightPage() {
   });
 
   const saveFreightDetails = useMutation({
-    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number }) => {
+    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number }) => {
       const existing = (transporterFreightMap || {})[data.invoice_number];
       if (existing) {
         const { error } = await supabase.from('transporter_freight')
-          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst })
+          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('transporter_freight')
-          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst });
+          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds });
         if (error) throw error;
       }
     },
@@ -431,7 +440,7 @@ function FreightPage() {
     mutationFn: async ({ transporter_freight_id, amount }: { transporter_freight_id: string; amount: number }) => {
       const freightRecord = Object.values(transporterFreightMap || {}).find((r: any) => r.id === transporter_freight_id) as any;
       if (freightRecord) {
-        const totalAmount = (freightRecord.total_freight || 0) + (freightRecord.gst || 0);
+        const totalAmount = (freightRecord.total_freight || 0) + (freightRecord.gst || 0) - (freightRecord.tds || 0);
         const alreadyPaid = paidAmountByFreightId[transporter_freight_id] || 0;
         if (alreadyPaid + amount > totalAmount) {
           throw new Error(`Payment exceeds total amount. Remaining balance: ₹${(totalAmount - alreadyPaid).toLocaleString('en-IN')}`);
@@ -652,7 +661,7 @@ function FreightPage() {
           <DialogHeader><DialogTitle>Record Payment — {paymentDialog.invoiceNumber}</DialogTitle></DialogHeader>
           {(() => {
             const freightRecord = (transporterFreightMap || {})[paymentDialog.invoiceNumber];
-            const totalAmount = freightRecord ? ((freightRecord.total_freight || 0) + (freightRecord.gst || 0)) : 0;
+            const totalAmount = freightRecord ? ((freightRecord.total_freight || 0) + (freightRecord.gst || 0) - (freightRecord.tds || 0)) : 0;
             const alreadyPaid = freightRecord ? (paidAmountByFreightId[freightRecord.id] || 0) : 0;
             const remaining = totalAmount - alreadyPaid;
             const enteredAmount = parseFloat(paymentDialog.amount) || 0;
@@ -903,7 +912,7 @@ function TransporterDispatchTable({
 
   const getPaymentStatus = (freightData: any) => {
     if (!freightData) return 'Unpaid';
-    const totalAmount = (freightData.total_freight || 0) + (freightData.gst || 0);
+    const totalAmount = (freightData.total_freight || 0) + (freightData.gst || 0) - (freightData.tds || 0);
     if (totalAmount <= 0) return 'Unpaid';
     const paid = paidAmountByFreightId[freightData.id] || 0;
     if (paid <= 0) return 'Unpaid';
@@ -964,7 +973,7 @@ function TransporterDispatchTable({
 
   const totalFreight = filtered.reduce((s, r) => {
     const f = transporterFreightMap[r.invoice_number];
-    return s + (f?.total_freight || 0) + (f?.gst || 0);
+    return s + (f?.total_freight || 0) + (f?.gst || 0) - (f?.tds || 0);
   }, 0);
 
   const hasAnyFilter = filterInvoice || filterDate || filterCustomer || filterTransporter || filterApproval || filterPaymentStatus || filterSource;
@@ -1113,7 +1122,7 @@ function TransporterDispatchTable({
               const comments = freightData ? (commentsByFreightId[freightData.id] || []) : [];
               const payments = freightData ? (paymentsByFreightId[freightData.id] || []) : [];
               const paidAmount = freightData ? (paidAmountByFreightId[freightData.id] || 0) : 0;
-              const totalAmount = freightData ? ((freightData.total_freight || 0) + (freightData.gst || 0)) : 0;
+              const totalAmount = freightData ? ((freightData.total_freight || 0) + (freightData.gst || 0) - (freightData.tds || 0)) : 0;
               const paymentStatus = getPaymentStatus(freightData);
               const approvalStatus = getApprovalStatus(freightData);
 
@@ -1235,6 +1244,12 @@ function TransporterDispatchTable({
                                 <span className="text-muted-foreground font-medium">GST:</span>{' '}
                                 <span className="font-semibold font-mono-num">₹{(freightData.gst || 0).toLocaleString('en-IN')}</span>
                               </div>
+                              {(freightData.tds || 0) > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground font-medium">TDS:</span>{' '}
+                                  <span className="font-semibold font-mono-num text-red-600">-₹{(freightData.tds || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                              )}
                               <div>
                                 <span className="text-muted-foreground font-medium">Total:</span>{' '}
                                 <span className="font-semibold font-mono-num">₹{totalAmount.toLocaleString('en-IN')}</span>

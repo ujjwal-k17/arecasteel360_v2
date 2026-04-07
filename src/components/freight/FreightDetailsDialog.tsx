@@ -14,8 +14,8 @@ interface FreightDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   invoiceNumber: string;
   transporters: { id: string; name: string }[];
-  existingData?: { transporter_id: string | null; total_freight: number | null; gst: number | null } | null;
-  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number }) => void;
+  existingData?: { transporter_id: string | null; total_freight: number | null; gst: number | null; tds: number | null } | null;
+  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number }) => void;
 }
 
 export function FreightDetailsDialog({
@@ -30,6 +30,7 @@ export function FreightDetailsDialog({
   const [transporterId, setTransporterId] = useState('');
   const [totalFreight, setTotalFreight] = useState('');
   const [gst, setGst] = useState('');
+  const [tds, setTds] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -38,6 +39,7 @@ export function FreightDetailsDialog({
       setTransporterId(existingData?.transporter_id || '');
       setTotalFreight(existingData?.total_freight?.toString() || '');
       setGst(existingData?.gst?.toString() || '');
+      setTds(existingData?.tds?.toString() || '');
       setShowAddNew(false);
       setNewName('');
     }
@@ -66,6 +68,7 @@ export function FreightDetailsDialog({
       transporter_id: transporterId,
       total_freight: parseFloat(totalFreight),
       gst: parseFloat(gst) || 0,
+      tds: parseFloat(tds) || 0,
     });
     onOpenChange(false);
   };
@@ -126,10 +129,19 @@ export function FreightDetailsDialog({
               onChange={e => setGst(e.target.value)}
             />
           </div>
-          {(totalFreight || gst) && (
+          <div className="space-y-2">
+            <Label>TDS (₹)</Label>
+            <Input
+              type="number"
+              placeholder="Enter TDS amount"
+              value={tds}
+              onChange={e => setTds(e.target.value)}
+            />
+          </div>
+          {(totalFreight || gst || tds) && (
             <div className="bg-muted/50 rounded-md px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Total (Freight + GST):</span>{' '}
-              <span className="font-semibold">₹{((parseFloat(totalFreight) || 0) + (parseFloat(gst) || 0)).toLocaleString('en-IN')}</span>
+              <span className="text-muted-foreground">Total (Freight + GST - TDS):</span>{' '}
+              <span className="font-semibold">₹{((parseFloat(totalFreight) || 0) + (parseFloat(gst) || 0) - (parseFloat(tds) || 0)).toLocaleString('en-IN')}</span>
             </div>
           )}
         </div>
