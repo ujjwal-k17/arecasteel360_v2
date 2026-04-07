@@ -1122,7 +1122,7 @@ function TransporterDispatchTable({
               const comments = freightData ? (commentsByFreightId[freightData.id] || []) : [];
               const payments = freightData ? (paymentsByFreightId[freightData.id] || []) : [];
               const paidAmount = freightData ? (paidAmountByFreightId[freightData.id] || 0) : 0;
-              const totalAmount = freightData ? ((freightData.total_freight || 0) + (freightData.gst || 0)) : 0;
+              const totalAmount = freightData ? ((freightData.total_freight || 0) + (freightData.gst || 0) - (freightData.tds || 0)) : 0;
               const paymentStatus = getPaymentStatus(freightData);
               const approvalStatus = getApprovalStatus(freightData);
 
