@@ -973,7 +973,7 @@ function TransporterDispatchTable({
 
   const totalFreight = filtered.reduce((s, r) => {
     const f = transporterFreightMap[r.invoice_number];
-    return s + (f?.total_freight || 0) + (f?.gst || 0);
+    return s + (f?.total_freight || 0) + (f?.gst || 0) - (f?.tds || 0);
   }, 0);
 
   const hasAnyFilter = filterInvoice || filterDate || filterCustomer || filterTransporter || filterApproval || filterPaymentStatus || filterSource;
