@@ -442,7 +442,7 @@ function FreightPage() {
   });
 
   const refreshAll = () => {
-    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments', 'freight_batches'].forEach(k =>
+    ['freight_inv_actions', 'freight_fg_sales', 'freight_defective_sales', 'freight_orders', 'freight_invoice_details', 'transporter_freight_map', 'transporters_list', 'transporter_freight_comments', 'transporter_freight_payments'].forEach(k =>
       queryClient.invalidateQueries({ queryKey: [k] })
     );
     toast.success('Refreshed');
