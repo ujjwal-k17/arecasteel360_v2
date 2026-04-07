@@ -440,7 +440,7 @@ function FreightPage() {
     mutationFn: async ({ transporter_freight_id, amount }: { transporter_freight_id: string; amount: number }) => {
       const freightRecord = Object.values(transporterFreightMap || {}).find((r: any) => r.id === transporter_freight_id) as any;
       if (freightRecord) {
-        const totalAmount = (freightRecord.total_freight || 0) + (freightRecord.gst || 0);
+        const totalAmount = (freightRecord.total_freight || 0) + (freightRecord.gst || 0) - (freightRecord.tds || 0);
         const alreadyPaid = paidAmountByFreightId[transporter_freight_id] || 0;
         if (alreadyPaid + amount > totalAmount) {
           throw new Error(`Payment exceeds total amount. Remaining balance: ₹${(totalAmount - alreadyPaid).toLocaleString('en-IN')}`);
