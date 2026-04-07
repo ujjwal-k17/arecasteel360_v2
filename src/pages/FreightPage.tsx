@@ -124,8 +124,20 @@ function FreightPage() {
     },
   });
 
-  // Purchases tab - no longer shows batches from in-transit
-  const batches: any[] = [];
+  // Purchases tab - only batches NOT from in-transit (directly added to coils)
+  const { data: batches } = useQuery({
+    queryKey: ['freight_batches'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('batches')
+        .select('batch_number, purchase_date, purchase_from, material, gross_weight')
+        .eq('status', 'received')
+        .eq('from_intransit' as any, false)
+        .order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: transporters } = useQuery({
     queryKey: ['transporters_list'],

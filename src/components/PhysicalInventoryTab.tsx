@@ -224,7 +224,7 @@ export default function PhysicalInventoryTab() {
   const handleImportFromTransit = async (ids: string[]) => {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      const { error } = await supabase.from('batches').update({ status: 'received' }).in('id', ids);
+      const { error } = await supabase.from('batches').update({ status: 'received', from_intransit: true } as any).in('id', ids);
       if (error) throw error;
       toast.success(`${ids.length} batch(es) moved to physical inventory`);
       setShowAddDialog(false); setAddMode(null); setSelectedImportIds(new Set());
