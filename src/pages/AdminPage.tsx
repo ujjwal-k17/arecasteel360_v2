@@ -29,6 +29,7 @@ export default function AdminPage() {
           </TabsTrigger>
           <TabsTrigger value="master">Master Data</TabsTrigger>
           <TabsTrigger value="dropdowns">Dropdowns</TabsTrigger>
+          <TabsTrigger value="backups">Backups</TabsTrigger>
         </TabsList>
         <TabsContent value="users"><UserManagementTab /></TabsContent>
         <TabsContent value="devices"><DeviceManagementTab /></TabsContent>
@@ -36,6 +37,7 @@ export default function AdminPage() {
         <TabsContent value="logs"><ActionLogsTab /></TabsContent>
         <TabsContent value="master"><MasterDataTab /></TabsContent>
         <TabsContent value="dropdowns"><DropdownManagementTab /></TabsContent>
+        <TabsContent value="backups"><BackupsTab /></TabsContent>
       </Tabs>
     </div>
   );
