@@ -25,13 +25,6 @@ export default function BackupsTab() {
   const { data: backups, isLoading } = useQuery({
     queryKey: ['backups-list'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('daily-backup', {
-        body: null,
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      // The function uses query params, so we need to use fetch directly
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/daily-backup?action=list`;
       const res = await fetch(url, {
         headers: {

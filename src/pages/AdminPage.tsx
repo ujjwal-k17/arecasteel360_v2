@@ -5,6 +5,7 @@ import ActionLogsTab from '@/components/admin/ActionLogsTab';
 import DeviceManagementTab from '@/components/admin/DeviceManagementTab';
 import MasterDataTab from '@/components/admin/MasterDataTab';
 import DropdownManagementTab from '@/components/admin/DropdownManagementTab';
+import BackupsTab from '@/components/admin/BackupsTab';
 import { usePendingApprovals } from '@/hooks/useActionLog';
 import { Badge } from '@/components/ui/badge';
 
