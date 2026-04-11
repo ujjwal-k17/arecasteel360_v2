@@ -409,6 +409,8 @@ export default function WIPInventoryTab() {
                                 if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)? Quantity will be restored to the source coil.`)) return;
                                 try {
                                   const procRecId = item.processing_record_id;
+                                  // Delete related defectives first (FK constraint)
+                                  await supabase.from('wip_defectives' as any).delete().eq('wip_item_id', item.id);
                                   const { error } = await supabase.from('wip_items').delete().eq('id', item.id);
                                   if (error) throw error;
                                   if (procRecId) {
