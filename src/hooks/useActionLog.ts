@@ -156,13 +156,17 @@ export function useReviewApproval() {
           }
         } else if (actionType === 'move_back' && entityType === 'wip_item') {
           // Move WIP item back to Coil Inventory
-          const { data: wipItem } = await supabase.from('wip_items').select('*').eq('id', entityId).single();
+          const { data: wipItem } = await supabase.from('wip_items').select('*').eq('id', entityId).maybeSingle();
           if (wipItem) {
             const procRecId = (wipItem as any).processing_record_id;
             const sourceBatchId = (wipItem as any).source_batch_id;
 
-            // Delete the WIP item first
-            await supabase.from('wip_items').delete().eq('id', entityId);
+            // Delete related defectives first (FK constraint)
+            await supabase.from('wip_defectives' as any).delete().eq('wip_item_id', entityId);
+
+            // Delete the WIP item
+            const { error: delErr } = await supabase.from('wip_items').delete().eq('id', entityId);
+            if (delErr) throw new Error(`Failed to delete WIP item: ${delErr.message}`);
 
             if (procRecId) {
               // Check if any other WIP items still reference this processing record
@@ -180,12 +184,11 @@ export function useReviewApproval() {
                   .from('processing_records')
                   .select('batch_id, created_at')
                   .eq('id', procRecId)
-                  .single();
+                  .maybeSingle();
 
                 await supabase.from('processing_records').delete().eq('id', procRecId);
 
                 // Delete scrap/defective actions that were created during this processing
-                // (created within 5 seconds of the processing record)
                 if (procRec && (procRec as any).batch_id) {
                   const batchId = (procRec as any).batch_id;
                   const procTime = new Date((procRec as any).created_at).getTime();
