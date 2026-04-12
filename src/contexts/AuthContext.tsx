@@ -14,6 +14,7 @@ interface AuthContextType {
   isAdmin: boolean;
   permissions: UserPermission[];
   loading: boolean;
+  deviceApproved: boolean | null; // null = still checking
   signOut: () => Promise<void>;
   canView: (page: string) => boolean;
   canEdit: (page: string) => boolean;
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   permissions: [],
   loading: true,
+  deviceApproved: null,
   signOut: async () => {},
   canView: () => false,
   canEdit: () => false,
@@ -32,12 +34,29 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+function getDeviceFingerprint(): string {
+  const parts = [
+    navigator.userAgent,
+    `${screen.width}x${screen.height}`,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    navigator.language,
+  ];
+  let hash = 0;
+  const str = parts.join('|');
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [permissions, setPermissions] = useState<UserPermission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deviceApproved, setDeviceApproved] = useState<boolean | null>(null);
 
   const fetchUserData = async (userId: string) => {
     // Fetch role
@@ -49,6 +68,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const admin = roles?.some((r: any) => r.role === 'admin') ?? false;
     setIsAdmin(admin);
 
+    // Admins bypass device check
+    if (admin) {
+      setDeviceApproved(true);
+    } else {
+      // Check device approval
+      const fingerprint = getDeviceFingerprint();
+      const { data: device } = await supabase
+        .from('user_devices')
+        .select('is_approved')
+        .eq('user_id', userId)
+        .eq('device_fingerprint', fingerprint)
+        .maybeSingle();
+
+      // If no device record yet, it will be created by useDeviceTracking as pending
+      setDeviceApproved(device?.is_approved === true);
+    }
+
     // Fetch permissions
     const { data: perms } = await supabase
       .from('user_permissions')
@@ -58,26 +94,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissions((perms as UserPermission[]) || []);
   };
 
-
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          // Use setTimeout to avoid deadlocks with Supabase client
           setTimeout(() => fetchUserData(newSession.user.id), 0);
         } else {
           setIsAdmin(false);
           setPermissions([]);
+          setDeviceApproved(null);
         }
         setLoading(false);
       }
     );
 
-    // Then get initial session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (s?.user) {
         setSession(s);
@@ -96,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setIsAdmin(false);
     setPermissions([]);
+    setDeviceApproved(null);
   };
 
   const canView = (page: string) => {
@@ -109,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, permissions, loading, signOut, canView, canEdit }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, permissions, loading, deviceApproved, signOut, canView, canEdit }}>
       {children}
     </AuthContext.Provider>
   );

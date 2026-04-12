@@ -1,5 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { LogOut, ShieldAlert } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -8,7 +10,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, page, requireAdmin }: ProtectedRouteProps) {
-  const { user, loading, isAdmin, canView } = useAuth();
+  const { user, loading, isAdmin, canView, deviceApproved, signOut } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +22,33 @@ export default function ProtectedRoute({ children, page, requireAdmin }: Protect
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Block unapproved devices (admins are always approved)
+  if (deviceApproved === false) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4 max-w-md mx-auto p-6">
+          <ShieldAlert className="h-12 w-12 text-amber-500 mx-auto" />
+          <h2 className="text-lg font-semibold text-foreground">Device Not Approved</h2>
+          <p className="text-sm text-muted-foreground">
+            This device has not been approved by an administrator. Please contact your admin to approve this device before you can access the application.
+          </p>
+          <Button variant="outline" size="sm" onClick={signOut} className="gap-2">
+            <LogOut className="h-4 w-4" /> Sign Out
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Still checking device status
+  if (deviceApproved === null && !isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   if (requireAdmin && !isAdmin) {
