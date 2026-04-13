@@ -130,8 +130,6 @@ export default function WIPInventoryTab() {
     return uniqueCaseInsensitive(items.map(i => i.material || '').filter(Boolean)).sort();
   }, [items]);
 
-  const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + (getAvailableQty(i)), 0), [filteredItems, defectiveByItem]);
-
   const skuGroups = useMemo(() => {
     const map = new Map<string, SKUGroup>();
     for (const item of filteredItems) {
@@ -150,6 +148,9 @@ export default function WIPInventoryTab() {
     if (materialTab === 'all') return skuGroups;
     return skuGroups.filter(g => eqCI(g.material || '', materialTab));
   }, [skuGroups, materialTab]);
+
+  const displayedTotalQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalQty, 0), [displayedSkuGroups]);
+  const displayedItemCount = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.items.length, 0), [displayedSkuGroups]);
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
@@ -256,7 +257,7 @@ export default function WIPInventoryTab() {
             </>
           )}
           <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-            Total: {fmtNum(grandTotalQty)} Kg ({filteredItems.length} items)
+            Total: {fmtNum(displayedTotalQty)} Kg ({displayedItemCount} items)
           </div>
         </div>
       </div>
