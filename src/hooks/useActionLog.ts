@@ -145,14 +145,41 @@ export function useReviewApproval() {
                 } as any);
               }
             }
-            if ((fgItem as any).processing_record_id) {
-              await supabase.from('processing_output_items').delete().eq('processing_record_id', (fgItem as any).processing_record_id);
-              const { data: otherFGs } = await supabase.from('fg_items').select('id').eq('processing_record_id', (fgItem as any).processing_record_id).neq('id', entityId);
-              if (!otherFGs || otherFGs.length === 0) {
-                await supabase.from('processing_records').delete().eq('id', (fgItem as any).processing_record_id);
+
+            const procRecId = (fgItem as any).processing_record_id;
+
+            // Delete the FG item FIRST to avoid race conditions
+            await supabase.from('fg_items').delete().eq('id', entityId);
+
+            // Now check if any other FG items still reference this processing record
+            if (procRecId) {
+              const { data: remainingFGs } = await supabase.from('fg_items').select('id').eq('processing_record_id', procRecId);
+              if (!remainingFGs || remainingFGs.length === 0) {
+                // Last FG item removed — clean up processing record and output items
+                await supabase.from('processing_output_items').delete().eq('processing_record_id', procRecId);
+
+                // Get batch_id before deleting the processing record
+                const { data: procRec } = await supabase
+                  .from('processing_records')
+                  .select('batch_id')
+                  .eq('id', procRecId)
+                  .maybeSingle();
+
+                await supabase.from('processing_records').delete().eq('id', procRecId);
+
+                // Reset batch_status if no other processing records reference this batch
+                if (procRec && (procRec as any).batch_id) {
+                  const batchId = (procRec as any).batch_id;
+                  const { data: otherProcs } = await supabase
+                    .from('processing_records')
+                    .select('id')
+                    .eq('batch_id', batchId);
+                  if (!otherProcs || otherProcs.length === 0) {
+                    await supabase.from('batches').update({ batch_status: null } as any).eq('id', batchId);
+                  }
+                }
               }
             }
-            await supabase.from('fg_items').delete().eq('id', entityId);
           }
         } else if (actionType === 'move_back' && entityType === 'wip_item') {
           // Move WIP item back to Coil Inventory
