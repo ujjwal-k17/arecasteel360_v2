@@ -130,9 +130,6 @@ export default function WIPInventoryTab() {
     return uniqueCaseInsensitive(items.map(i => i.material || '').filter(Boolean)).sort();
   }, [items]);
 
-  const displayedTotalQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalQty, 0), [displayedSkuGroups]);
-  const displayedItemCount = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.items.length, 0), [displayedSkuGroups]);
-
   const skuGroups = useMemo(() => {
     const map = new Map<string, SKUGroup>();
     for (const item of filteredItems) {
@@ -151,6 +148,9 @@ export default function WIPInventoryTab() {
     if (materialTab === 'all') return skuGroups;
     return skuGroups.filter(g => eqCI(g.material || '', materialTab));
   }, [skuGroups, materialTab]);
+
+  const displayedTotalQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalQty, 0), [displayedSkuGroups]);
+  const displayedItemCount = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.items.length, 0), [displayedSkuGroups]);
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });

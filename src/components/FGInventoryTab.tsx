@@ -238,10 +238,6 @@ export default function FGInventoryTab() {
     });
   }, [items, filterMaterial, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
 
-  const displayedTotalQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalQty, 0), [displayedSkuGroups]);
-  const displayedTotalPcs = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalPcs, 0), [displayedSkuGroups]);
-  const displayedItemCount = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.items.length, 0), [displayedSkuGroups]);
-
   const [materialTab, setMaterialTab] = useState('all');
 
   const uniqueMaterials = useMemo(() => {
@@ -267,6 +263,10 @@ export default function FGInventoryTab() {
     if (materialTab === 'all') return skuGroups;
     return skuGroups.filter(g => eqCI(g.material || '', materialTab));
   }, [skuGroups, materialTab]);
+
+  const displayedTotalQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalQty, 0), [displayedSkuGroups]);
+  const displayedTotalPcs = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalPcs, 0), [displayedSkuGroups]);
+  const displayedItemCount = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.items.length, 0), [displayedSkuGroups]);
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
