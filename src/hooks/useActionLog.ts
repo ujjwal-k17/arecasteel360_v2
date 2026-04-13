@@ -117,68 +117,88 @@ export function useReviewApproval() {
         const actionType = (approval as any).action_type;
 
         if (actionType === 'move_back' && entityType === 'fg_item') {
-          // Move FG item back to WIP or Coil
+          // Move FG item back — reverse ALL processing impacts on the source batch
           const { data: fgItem } = await supabase.from('fg_items').select('*').eq('id', entityId).single();
           if (fgItem) {
-            if (meta.source_type === 'wip' && meta.source_id) {
-              const { data: wipItem } = await supabase.from('wip_items').select('id, qty, status').eq('id', meta.source_id).maybeSingle();
-              if (wipItem) {
-                const newQty = ((wipItem as any).qty || 0) + ((fgItem as any).qty || 0);
-                await supabase.from('wip_items').update({ qty: newQty, status: 'active' } as any).eq('id', meta.source_id);
-              } else {
-                // Legacy: source_id might be a batch ID — re-create WIP item
-                await supabase.from('wip_items').insert({
-                  source_batch_id: meta.source_id,
-                  processing_record_id: (fgItem as any).processing_record_id,
-                  material: (fgItem as any).material,
-                  make: (fgItem as any).make,
-                  process: (fgItem as any).process,
-                  thickness: (fgItem as any).thickness,
-                  width: (fgItem as any).width,
-                  length: (fgItem as any).length,
-                  coating: (fgItem as any).coating,
-                  grade: (fgItem as any).grade,
-                  qty: (fgItem as any).qty,
-                  num_pcs: (fgItem as any).num_pcs,
-                  order_id: (fgItem as any).order_id,
-                  status: 'active',
-                } as any);
-              }
+            const procRecId = (fgItem as any).processing_record_id;
+            let batchId: string | null = null;
+
+            if (procRecId) {
+              // Get the source batch from the processing record
+              const { data: procRec } = await supabase
+                .from('processing_records')
+                .select('batch_id')
+                .eq('id', procRecId)
+                .maybeSingle();
+              batchId = procRec ? (procRec as any).batch_id : null;
             }
 
-            const procRecId = (fgItem as any).processing_record_id;
+            // If we found the batch, reverse ALL impacts on it
+            if (batchId) {
+              // 1. Find ALL processing records for this batch
+              const { data: allProcs } = await supabase
+                .from('processing_records')
+                .select('id')
+                .eq('batch_id', batchId);
+              const allProcIds = (allProcs || []).map((p: any) => p.id);
 
-            // Delete the FG item FIRST to avoid race conditions
-            await supabase.from('fg_items').delete().eq('id', entityId);
+              if (allProcIds.length > 0) {
+                // 2. Delete ALL FG items tied to these processing records
+                await supabase.from('fg_items').delete().in('processing_record_id', allProcIds);
 
-            // Now check if any other FG items still reference this processing record
-            if (procRecId) {
-              const { data: remainingFGs } = await supabase.from('fg_items').select('id').eq('processing_record_id', procRecId);
-              if (!remainingFGs || remainingFGs.length === 0) {
-                // Last FG item removed — clean up processing record and output items
-                await supabase.from('processing_output_items').delete().eq('processing_record_id', procRecId);
+                // 3. Delete ALL WIP defectives for WIP items tied to these processing records
+                const { data: wipItemsForBatch } = await supabase
+                  .from('wip_items')
+                  .select('id')
+                  .in('processing_record_id', allProcIds);
+                const wipIds = (wipItemsForBatch || []).map((w: any) => w.id);
+                if (wipIds.length > 0) {
+                  await supabase.from('wip_defectives' as any).delete().in('wip_item_id', wipIds);
+                }
 
-                // Get batch_id before deleting the processing record
-                const { data: procRec } = await supabase
-                  .from('processing_records')
-                  .select('batch_id')
-                  .eq('id', procRecId)
-                  .maybeSingle();
+                // 4. Delete ALL WIP items tied to these processing records
+                await supabase.from('wip_items').delete().in('processing_record_id', allProcIds);
 
-                await supabase.from('processing_records').delete().eq('id', procRecId);
+                // 5. Delete ALL processing output items
+                await supabase.from('processing_output_items').delete().in('processing_record_id', allProcIds);
 
-                // Reset batch_status if no other processing records reference this batch
-                if (procRec && (procRec as any).batch_id) {
-                  const batchId = (procRec as any).batch_id;
-                  const { data: otherProcs } = await supabase
-                    .from('processing_records')
-                    .select('id')
-                    .eq('batch_id', batchId);
-                  if (!otherProcs || otherProcs.length === 0) {
-                    await supabase.from('batches').update({ batch_status: null } as any).eq('id', batchId);
+                // 6. Delete ALL processing records for this batch
+                await supabase.from('processing_records').delete().in('id', allProcIds);
+              }
+
+              // 7. Delete ALL scrap, defective, and trimming inventory_actions for this batch
+              await supabase
+                .from('inventory_actions')
+                .delete()
+                .eq('batch_id', batchId)
+                .in('action_type', ['scrap', 'defective']);
+
+              // 8. Reset batch_status
+              await supabase.from('batches').update({ batch_status: null } as any).eq('id', batchId);
+
+              // 9. Also dismiss any other pending approvals for FG items from the same batch
+              if (allProcIds.length > 0) {
+                const { data: relatedApprovals } = await supabase
+                  .from('pending_approvals' as any)
+                  .select('id, metadata')
+                  .eq('status', 'pending')
+                  .eq('action_type', 'move_back')
+                  .eq('entity_type', 'fg_item');
+                if (relatedApprovals) {
+                  const idsToReject = (relatedApprovals as any[])
+                    .filter((a: any) => a.metadata?.processing_record_id && allProcIds.includes(a.metadata.processing_record_id) && a.id !== id)
+                    .map((a: any) => a.id);
+                  if (idsToReject.length > 0) {
+                    await supabase
+                      .from('pending_approvals' as any)
+                      .update({ status: 'approved', reviewed_by: user.id, reviewed_at: new Date().toISOString() } as any)
+                      .in('id', idsToReject);
                   }
                 }
               }
+            } else {
+              // Fallback: no batch found, just delete the single FG item
+              await supabase.from('fg_items').delete().eq('id', entityId);
             }
           }
         } else if (actionType === 'move_back' && entityType === 'wip_item') {
