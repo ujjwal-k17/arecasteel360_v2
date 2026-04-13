@@ -238,8 +238,9 @@ export default function FGInventoryTab() {
     });
   }, [items, filterMaterial, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
 
-  const grandTotalQty = useMemo(() => filteredItems.reduce((s, i) => s + getAvailableQty(i), 0), [filteredItems, soldByItem, defectiveByItem]);
-  const grandTotalPcs = useMemo(() => filteredItems.reduce((s, i) => s + (i.num_pcs || 0), 0), [filteredItems]);
+  const displayedTotalQty = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalQty, 0), [displayedSkuGroups]);
+  const displayedTotalPcs = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.totalPcs, 0), [displayedSkuGroups]);
+  const displayedItemCount = useMemo(() => displayedSkuGroups.reduce((s, g) => s + g.items.length, 0), [displayedSkuGroups]);
 
   const [materialTab, setMaterialTab] = useState('all');
 
@@ -440,7 +441,7 @@ export default function FGInventoryTab() {
             </Button>
           )}
           <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-semibold font-mono-num">
-            Total: {fmtNum(grandTotalQty)} Kg · {fmtInt(grandTotalPcs)} Pcs ({filteredItems.length} items)
+            Total: {fmtNum(displayedTotalQty)} Kg · {fmtInt(displayedTotalPcs)} Pcs ({displayedItemCount} items)
           </div>
         </div>
       </div>
