@@ -257,15 +257,16 @@ export default function FGInventoryTab() {
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, items: [] });
       }
       const g = map.get(key)!;
       g.totalQty += getAvailableQty(item);
       g.totalPcs += item.num_pcs || 0;
+      g.totalPallets += palletsByProcId.get(item.processing_record_id) || 0;
       g.items.push(item);
     }
     return Array.from(map.values());
-  }, [filteredItems, soldByItem, defectiveByItem]);
+  }, [filteredItems, soldByItem, defectiveByItem, palletsByProcId]);
 
   const displayedSkuGroups = useMemo(() => {
     if (materialTab === 'all') return skuGroups;
