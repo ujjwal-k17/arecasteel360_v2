@@ -472,6 +472,7 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap"># Pcs</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap"># Pallets</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
             </TableRow>
             <TableRow className="bg-muted/20">
@@ -485,11 +486,12 @@ export default function FGInventoryTab() {
               <TableHead />
               <TableHead />
               <TableHead />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -505,6 +507,7 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtInt(g.totalPcs)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalPallets > 0 ? fmtInt(g.totalPallets) : '-'}</TableCell>
                     <TableCell />
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {
