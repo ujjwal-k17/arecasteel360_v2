@@ -244,6 +244,38 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
             ))}
           </div>
 
+          {/* Wooden Pallet Consumption */}
+          <div className="border rounded-md p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox id="wip-pallet-check" checked={palletEnabled} onCheckedChange={(v) => setPalletEnabled(!!v)} />
+              <Label htmlFor="wip-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
+            </div>
+            {palletEnabled && (
+              <div className="grid grid-cols-2 gap-3 pl-6">
+                <div>
+                  <Label className="text-xs">Pallet Size</Label>
+                  <Select value={palletSkuId} onValueChange={setPalletSkuId}>
+                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                    <SelectContent>
+                      {(palletSkus || []).map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs"># of Pcs</Label>
+                  <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
+                </div>
+              </div>
+            )}
+            {palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0 && (
+              <p className="text-xs text-muted-foreground pl-6">
+                Est. weight: {((latestWtPerPc.get(palletSkuId) || 0) * Number(palletPcs)).toFixed(2)} Kg
+              </p>
+            )}
+          </div>
+
           {/* Validation warning */}
           {exceedsAvailable && (
             <div className="bg-destructive/10 text-destructive text-xs rounded-md p-2 font-medium">
