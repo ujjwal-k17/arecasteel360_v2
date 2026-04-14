@@ -62,7 +62,28 @@ export default function FGInventoryTab() {
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
+  // Fetch pallet consumptions by processing_record_id for pallet count
+  const { data: palletConsumptions } = useQuery({
+    queryKey: ['pallet_consumptions_fg'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pallet_consumptions')
+        .select('processing_record_id, num_pcs')
+        .not('processing_record_id', 'is', null);
+      if (error) throw error;
+      return data;
+    },
+  });
 
+  const palletsByProcId = useMemo(() => {
+    const map = new Map<string, number>();
+    (palletConsumptions || []).forEach((pc: any) => {
+      if (pc.processing_record_id) {
+        map.set(pc.processing_record_id, (map.get(pc.processing_record_id) || 0) + (pc.num_pcs || 0));
+      }
+    });
+    return map;
+  }, [palletConsumptions]);
 
 
   const { data: customers } = useCustomers();
