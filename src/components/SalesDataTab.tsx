@@ -17,6 +17,7 @@ interface SalesRecord {
   process_form: string | null;
   sku: string;
   qty: number;
+  pallet_wt: number;
   source: string;
 }
 
