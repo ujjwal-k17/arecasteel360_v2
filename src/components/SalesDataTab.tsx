@@ -17,6 +17,7 @@ interface SalesRecord {
   process_form: string | null;
   sku: string;
   qty: number;
+  pallet_wt: number;
   source: string;
 }
 
@@ -108,6 +109,30 @@ export default function SalesDataTab() {
     },
   });
 
+  // Fetch pallet consumptions keyed by processing_record_id
+  const { data: palletConsumptions } = useQuery({
+    queryKey: ['pallet_consumptions_for_dispatch'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pallet_consumptions')
+        .select('processing_record_id, weight_kg')
+        .not('processing_record_id', 'is', null);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Aggregate pallet weight by processing_record_id
+  const palletWtByProcId = useMemo(() => {
+    const map: Record<string, number> = {};
+    (palletConsumptions || []).forEach((pc: any) => {
+      if (pc.processing_record_id) {
+        map[pc.processing_record_id] = (map[pc.processing_record_id] || 0) + (pc.weight_kg || 0);
+      }
+    });
+    return map;
+  }, [palletConsumptions]);
+
   // Combine all sales into unified format
   const allSales: SalesRecord[] = useMemo(() => {
     const records: SalesRecord[] = [];
@@ -125,6 +150,7 @@ export default function SalesDataTab() {
         process_form: action.action_type === 'pack_coil_sale' ? 'Pack Coil' : action.action_type === 'loose_coil_sale' ? 'Loose Coil' : (batch.form || 'Coil'),
         sku: buildSku(batch),
         qty: action.net_weight || 0,
+        pallet_wt: 0,
         source: 'Coil',
       });
     });
@@ -134,6 +160,7 @@ export default function SalesDataTab() {
       const fg = sale.fg_items;
       if (!fg) return;
       const orderInfo = sale.order_id ? orderMap[sale.order_id] : null;
+      const procId = fg.processing_record_id;
       records.push({
         invoice_number: sale.invoice_number,
         invoice_date: sale.sales_date,
@@ -142,6 +169,7 @@ export default function SalesDataTab() {
         process_form: fg.process || 'FG',
         sku: buildSku(fg),
         qty: sale.quantity || 0,
+        pallet_wt: procId ? (palletWtByProcId[procId] || 0) : 0,
         source: 'FG',
       });
     });
@@ -159,6 +187,7 @@ export default function SalesDataTab() {
         process_form: 'Defective',
         sku: buildSku(batch),
         qty: sale.quantity || 0,
+        pallet_wt: 0,
         source: 'Defective',
       });
     });
@@ -171,7 +200,7 @@ export default function SalesDataTab() {
     });
 
     return records;
-  }, [inventoryActions, fgSales, defectiveSales, orderMap]);
+  }, [inventoryActions, fgSales, defectiveSales, orderMap, palletWtByProcId]);
 
   // Filter by date range + column filters
   const filteredSales = useMemo(() => {
@@ -188,6 +217,7 @@ export default function SalesDataTab() {
   }, [allSales, dateFrom, dateTo, filterInvoice, filterOrderId, filterCustomer, filterProcess]);
 
   const totalQty = useMemo(() => filteredSales.reduce((s, r) => s + r.qty, 0), [filteredSales]);
+  const totalPalletWt = useMemo(() => filteredSales.reduce((s, r) => s + r.pallet_wt, 0), [filteredSales]);
 
   // Unique filter options (derived from date-filtered data)
   const dateFilteredSales = useMemo(() => {
@@ -220,6 +250,7 @@ export default function SalesDataTab() {
       'Process / Form': s.process_form || '-',
       'SKU': s.sku,
       'Qty (Kg)': s.qty,
+      'Pallets (Kg)': s.pallet_wt,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -234,6 +265,7 @@ export default function SalesDataTab() {
     queryClient.invalidateQueries({ queryKey: ['fg_sales_all'] });
     queryClient.invalidateQueries({ queryKey: ['defective_sales_all'] });
     queryClient.invalidateQueries({ queryKey: ['orders_for_sales'] });
+    queryClient.invalidateQueries({ queryKey: ['pallet_consumptions_for_dispatch'] });
     toast.success('Refreshed');
   };
 
@@ -276,6 +308,10 @@ export default function SalesDataTab() {
           <span className="font-semibold font-mono-num">{totalQty.toFixed(2)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">Pallets:</span>{' '}
+          <span className="font-semibold font-mono-num">{totalPalletWt.toFixed(2)} Kg</span>
+        </div>
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Records:</span>{' '}
           <span className="font-semibold">{filteredSales.length}</span>
         </div>
@@ -297,6 +333,7 @@ export default function SalesDataTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process / Form</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">SKU</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Pallets (Kg)</TableHead>
             </TableRow>
             <TableRow className="bg-muted/30">
               <TableHead className="p-1">
@@ -338,12 +375,13 @@ export default function SalesDataTab() {
               </TableHead>
               <TableHead className="p-1">{/* SKU - no filter */}</TableHead>
               <TableHead className="p-1">{/* Qty - no filter */}</TableHead>
+              <TableHead className="p-1">{/* Pallets - no filter */}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSales.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   {dateFrom || dateTo ? 'No dispatches found for selected date range.' : 'No dispatch data found. Select a date range to filter.'}
                 </TableCell>
               </TableRow>
@@ -357,6 +395,7 @@ export default function SalesDataTab() {
                 <TableCell className="text-sm">{s.process_form || '-'}</TableCell>
                 <TableCell className="text-sm font-mono-num whitespace-nowrap">{s.sku}</TableCell>
                 <TableCell className="text-sm font-mono-num">{s.qty.toFixed(2)}</TableCell>
+                <TableCell className="text-sm font-mono-num">{s.pallet_wt > 0 ? s.pallet_wt.toFixed(2) : '-'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

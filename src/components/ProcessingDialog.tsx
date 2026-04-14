@@ -255,6 +255,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       }
 
       // 3. Save processing record only if process selected
+      let processingRecordId: string | null = null;
       if (hasProcess) {
         let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
 
@@ -266,7 +267,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           outputItems = [{ qty_kg: Number(profileGcQty) }];
         }
 
-        await insertProcessing.mutateAsync({
+        const procResult = await insertProcessing.mutateAsync({
           batchId: batch.id,
           processType,
           outputType: effectiveOutputType,
@@ -275,6 +276,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           outputItems,
           batch,
         });
+        processingRecordId = (procResult as any)?.id || null;
 
         if (processType === 'Slit' && trimQty > 0.01) {
           const { supabase } = await import('@/integrations/supabase/client');
@@ -304,7 +306,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             order_id: null,
             weight_kg: totalWt,
             num_pcs: Number(entry.pcs),
-          });
+            processing_record_id: processingRecordId,
+          } as any);
         }
         if (validEntries.length > 0) queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
       }
