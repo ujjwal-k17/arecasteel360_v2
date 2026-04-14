@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+
 import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useOrders, useAllDispatches, useNonDispatchSalesByOrder } from '@/hooks/useOrders';
