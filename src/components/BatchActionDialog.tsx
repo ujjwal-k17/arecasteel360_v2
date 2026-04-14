@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
 import { toast } from 'sonner';
 import { useDerivedOptions } from '@/hooks/useDropdownOptions';
 
@@ -34,10 +34,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
   const [netWeight, setNetWeight] = useState('');
   const [grossWeight, setGrossWeight] = useState('');
 
-  // Pallet consumption state
-  const [palletEnabled, setPalletEnabled] = useState(false);
-  const [palletSkuId, setPalletSkuId] = useState('');
-  const [palletPcs, setPalletPcs] = useState('');
+
 
   // Defective state
   const [defectType, setDefectType] = useState('');
@@ -48,16 +45,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
     Object.fromEntries(SCRAP_TYPES.map(t => [t, '']))
   );
 
-  // Fetch pallet SKUs
-  const { data: palletSkus } = useQuery({
-    queryKey: ['pallet_skus'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
-      if (error) throw error;
-      return data;
-    },
-    enabled: actionType === 'sales',
-  });
+
 
   const handleSubmit = async () => {
     if (actionType === 'scrap') {
@@ -78,19 +66,8 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
           scrap_type: null,
         });
 
-        // Record pallet consumption if enabled
-        if (palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0) {
-          const { error } = await supabase.from('pallet_consumptions').insert({
-            pallet_sku_id: palletSkuId,
-            consumption_date: salesDate || new Date().toISOString().slice(0, 10),
-            order_id: orderId || null,
-            weight_kg: 0,
-            num_pcs: Number(palletPcs),
-            invoice_number: invoiceNumber || null,
-          });
-          if (error) console.error('Pallet consumption error:', error);
-          queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
-        }
+
+
       } else if (actionType === 'defective') {
         await insertAction.mutateAsync({
           batch_id: batch.id,
