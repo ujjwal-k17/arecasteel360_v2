@@ -293,6 +293,20 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
+      // Record pallet consumption
+      if (palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0) {
+        const wtPerPc = latestWtPerPc.get(palletSkuId) || 0;
+        const totalWt = wtPerPc * Number(palletPcs);
+        await supabase.from('pallet_consumptions').insert({
+          pallet_sku_id: palletSkuId,
+          consumption_date: new Date().toISOString().slice(0, 10),
+          order_id: null,
+          weight_kg: totalWt,
+          num_pcs: Number(palletPcs),
+        });
+        queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+      }
+
       toast.success(`Processing recorded for batch ${batch.batch_number}`);
       onClose();
     } catch {
