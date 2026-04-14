@@ -112,18 +112,21 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
         orderId: undefined,
       });
 
-      // Record pallet consumption
-      if (palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0) {
-        const wtPerPc = latestWtPerPc.get(palletSkuId) || 0;
-        const totalWt = wtPerPc * Number(palletPcs);
-        await supabase.from('pallet_consumptions').insert({
-          pallet_sku_id: palletSkuId,
-          consumption_date: new Date().toISOString().slice(0, 10),
-          order_id: null,
-          weight_kg: totalWt,
-          num_pcs: Number(palletPcs),
-        });
-        queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+      // Record pallet consumption — multiple entries
+      if (palletEnabled) {
+        const validEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+        for (const entry of validEntries) {
+          const wtPerPc = latestWtPerPc.get(entry.skuId) || 0;
+          const totalWt = wtPerPc * Number(entry.pcs);
+          await supabase.from('pallet_consumptions').insert({
+            pallet_sku_id: entry.skuId,
+            consumption_date: new Date().toISOString().slice(0, 10),
+            order_id: null,
+            weight_kg: totalWt,
+            num_pcs: Number(entry.pcs),
+          });
+        }
+        if (validEntries.length > 0) queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
       }
 
       toast.success('WIP processed to FG successfully');
@@ -243,17 +246,24 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
             ))}
           </div>
 
-          {/* Wooden Pallet Consumption */}
+          {/* Wooden Pallet Consumption — Multiple Sizes */}
           <div className="border rounded-md p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Checkbox id="wip-pallet-check" checked={palletEnabled} onCheckedChange={(v) => setPalletEnabled(!!v)} />
-              <Label htmlFor="wip-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Checkbox id="wip-pallet-check" checked={palletEnabled} onCheckedChange={(v) => setPalletEnabled(!!v)} />
+                <Label htmlFor="wip-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
+              </div>
+              {palletEnabled && (
+                <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setPalletEntries(prev => [...prev, { skuId: '', pcs: '' }])}>
+                  <Plus className="h-3 w-3" /> Add Size
+                </Button>
+              )}
             </div>
-            {palletEnabled && (
-              <div className="grid grid-cols-2 gap-3 pl-6">
+            {palletEnabled && palletEntries.map((entry, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 pl-6">
                 <div>
                   <Label className="text-xs">Pallet Size</Label>
-                  <Select value={palletSkuId} onValueChange={setPalletSkuId}>
+                  <Select value={entry.skuId} onValueChange={v => { const arr = [...palletEntries]; arr[i] = { ...arr[i], skuId: v }; setPalletEntries(arr); }}>
                     <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
                     <SelectContent>
                       {(palletSkus || []).map((s: any) => (
@@ -264,13 +274,18 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
                 </div>
                 <div>
                   <Label className="text-xs"># of Pcs</Label>
-                  <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
+                  <Input type="number" value={entry.pcs} onChange={e => { const arr = [...palletEntries]; arr[i] = { ...arr[i], pcs: e.target.value }; setPalletEntries(arr); }} placeholder="0" />
                 </div>
+                {palletEntries.length > 1 && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => setPalletEntries(prev => prev.filter((_, idx) => idx !== i))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
-            )}
-            {palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0 && (
+            ))}
+            {palletEnabled && palletEntries.some(e => e.skuId && Number(e.pcs) > 0) && (
               <p className="text-xs text-muted-foreground pl-6">
-                Est. weight: {((latestWtPerPc.get(palletSkuId) || 0) * Number(palletPcs)).toFixed(2)} Kg
+                Est. total weight: {palletEntries.reduce((sum, e) => sum + ((latestWtPerPc.get(e.skuId) || 0) * (Number(e.pcs) || 0)), 0).toFixed(2)} Kg
               </p>
             )}
           </div>
