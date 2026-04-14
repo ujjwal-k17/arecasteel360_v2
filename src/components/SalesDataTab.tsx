@@ -217,6 +217,7 @@ export default function SalesDataTab() {
   }, [allSales, dateFrom, dateTo, filterInvoice, filterOrderId, filterCustomer, filterProcess]);
 
   const totalQty = useMemo(() => filteredSales.reduce((s, r) => s + r.qty, 0), [filteredSales]);
+  const totalPalletWt = useMemo(() => filteredSales.reduce((s, r) => s + r.pallet_wt, 0), [filteredSales]);
 
   // Unique filter options (derived from date-filtered data)
   const dateFilteredSales = useMemo(() => {
