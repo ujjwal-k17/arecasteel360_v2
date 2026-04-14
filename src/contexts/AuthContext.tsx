@@ -75,17 +75,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (admin) {
       setDeviceApproved(true);
     } else {
-      // Check device approval
+      // Register device if not already registered, then check approval
       const fingerprint = getDeviceFingerprint();
       const { data: device } = await supabase
         .from('user_devices')
-        .select('is_approved')
+        .select('id, is_approved')
         .eq('user_id', userId)
         .eq('device_fingerprint', fingerprint)
         .maybeSingle();
 
-      // If no device record yet, it will be created by useDeviceTracking as pending
-      setDeviceApproved(device?.is_approved === true);
+      if (!device) {
+        // Auto-register the device as pending so admin can see it
+        const ua = navigator.userAgent;
+        let browser = 'Unknown';
+        let os = 'Unknown';
+        if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
+        else if (ua.includes('Edg')) browser = 'Edge';
+        else if (ua.includes('Firefox')) browser = 'Firefox';
+        else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+        if (ua.includes('Windows')) os = 'Windows';
+        else if (ua.includes('Mac OS')) os = 'macOS';
+        else if (ua.includes('Linux')) os = 'Linux';
+        else if (ua.includes('Android')) os = 'Android';
+        else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+        await supabase.from('user_devices').insert({
+          user_id: userId,
+          device_fingerprint: fingerprint,
+          device_name: `${browser} on ${os}`,
+          browser,
+          os,
+          is_approved: false,
+        });
+        setDeviceApproved(false);
+      } else {
+        // Update last_seen
+        await supabase.from('user_devices')
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq('id', device.id);
+        setDeviceApproved(device.is_approved === true);
+      }
     }
 
     // Fetch permissions
