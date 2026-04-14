@@ -30,6 +30,7 @@ interface SKUGroup {
   grade: string;
   totalQty: number;
   totalPcs: number;
+  totalPallets: number;
   items: any[];
 }
 
