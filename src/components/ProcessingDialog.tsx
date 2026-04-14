@@ -39,8 +39,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
   const coilWidth = batch.width || 0;
 
-  // Pallet consumption state — multiple sizes
-  const [palletEnabled, setPalletEnabled] = useState(false);
+  // Pallet consumption state — multiple sizes (default: consumption expected)
+  const [noPalletConsumption, setNoPalletConsumption] = useState(false);
   const [palletEntries, setPalletEntries] = useState<{ skuId: string; pcs: string }[]>([{ skuId: '', pcs: '' }]);
 
   const { data: palletSkus } = useQuery({
@@ -294,8 +294,18 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
+      // Validate pallet: must have entries or be explicitly opted out
+      if (!noPalletConsumption) {
+        const validPalletEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+        if (validPalletEntries.length === 0) {
+          toast.error('Please add wooden pallet consumption or check "No Wooden Pallet Consumption"');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Record pallet consumption — multiple entries
-      if (palletEnabled) {
+      if (!noPalletConsumption) {
         const validEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
         for (const entry of validEntries) {
           const wtPerPc = latestWtPerPc.get(entry.skuId) || 0;
@@ -557,18 +567,15 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
           {/* Wooden Pallet Consumption — Multiple Sizes */}
           <div className="border rounded-md p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox id="proc-pallet-check" checked={palletEnabled} onCheckedChange={(v) => setPalletEnabled(!!v)} />
-                <Label htmlFor="proc-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
-              </div>
-              {palletEnabled && (
+              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Wooden Pallet Consumption</p>
+              {!noPalletConsumption && (
                 <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setPalletEntries(prev => [...prev, { skuId: '', pcs: '' }])}>
                   <Plus className="h-3 w-3" /> Add Size
                 </Button>
               )}
             </div>
-            {palletEnabled && palletEntries.map((entry, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 pl-6">
+            {!noPalletConsumption && palletEntries.map((entry, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
                 <div>
                   <Label className="text-xs">Pallet Size</Label>
                   <Select value={entry.skuId} onValueChange={v => { const arr = [...palletEntries]; arr[i] = { ...arr[i], skuId: v }; setPalletEntries(arr); }}>
@@ -591,11 +598,15 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 )}
               </div>
             ))}
-            {palletEnabled && palletEntries.some(e => e.skuId && Number(e.pcs) > 0) && (
-              <p className="text-xs text-muted-foreground pl-6">
+            {!noPalletConsumption && palletEntries.some(e => e.skuId && Number(e.pcs) > 0) && (
+              <p className="text-xs text-muted-foreground">
                 Est. total weight: {palletEntries.reduce((sum, e) => sum + ((latestWtPerPc.get(e.skuId) || 0) * (Number(e.pcs) || 0)), 0).toFixed(2)} Kg
               </p>
             )}
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox id="proc-no-pallet-check" checked={noPalletConsumption} onCheckedChange={(v) => setNoPalletConsumption(!!v)} />
+              <Label htmlFor="proc-no-pallet-check" className="text-xs font-medium cursor-pointer">No Wooden Pallet Consumption</Label>
+            </div>
           </div>
 
           {exceedsUsable && (
