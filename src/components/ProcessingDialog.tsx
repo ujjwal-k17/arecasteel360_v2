@@ -39,10 +39,9 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
   const coilWidth = batch.width || 0;
 
-  // Pallet consumption state
+  // Pallet consumption state — multiple sizes
   const [palletEnabled, setPalletEnabled] = useState(false);
-  const [palletSkuId, setPalletSkuId] = useState('');
-  const [palletPcs, setPalletPcs] = useState('');
+  const [palletEntries, setPalletEntries] = useState<{ skuId: string; pcs: string }[]>([{ skuId: '', pcs: '' }]);
 
   const { data: palletSkus } = useQuery({
     queryKey: ['pallet_skus'],

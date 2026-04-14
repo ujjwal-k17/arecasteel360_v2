@@ -31,10 +31,9 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
   const [defectEntries, setDefectEntries] = useState<DefectEntry[]>([{ type: '', weight: '' }]);
 
-  // Pallet consumption state
+  // Pallet consumption state — multiple sizes
   const [palletEnabled, setPalletEnabled] = useState(false);
-  const [palletSkuId, setPalletSkuId] = useState('');
-  const [palletPcs, setPalletPcs] = useState('');
+  const [palletEntries, setPalletEntries] = useState<{ skuId: string; pcs: string }[]>([{ skuId: '', pcs: '' }]);
 
   const { data: palletSkus } = useQuery({
     queryKey: ['pallet_skus'],
