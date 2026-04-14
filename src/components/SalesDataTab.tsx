@@ -250,6 +250,7 @@ export default function SalesDataTab() {
       'Process / Form': s.process_form || '-',
       'SKU': s.sku,
       'Qty (Kg)': s.qty,
+      'Pallets (Kg)': s.pallet_wt,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -264,6 +265,7 @@ export default function SalesDataTab() {
     queryClient.invalidateQueries({ queryKey: ['fg_sales_all'] });
     queryClient.invalidateQueries({ queryKey: ['defective_sales_all'] });
     queryClient.invalidateQueries({ queryKey: ['orders_for_sales'] });
+    queryClient.invalidateQueries({ queryKey: ['pallet_consumptions_for_dispatch'] });
     toast.success('Refreshed');
   };
 
@@ -327,6 +329,7 @@ export default function SalesDataTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process / Form</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">SKU</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Pallets (Kg)</TableHead>
             </TableRow>
             <TableRow className="bg-muted/30">
               <TableHead className="p-1">
@@ -368,6 +371,7 @@ export default function SalesDataTab() {
               </TableHead>
               <TableHead className="p-1">{/* SKU - no filter */}</TableHead>
               <TableHead className="p-1">{/* Qty - no filter */}</TableHead>
+              <TableHead className="p-1">{/* Pallets - no filter */}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
