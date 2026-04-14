@@ -84,8 +84,9 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
             pallet_sku_id: palletSkuId,
             consumption_date: salesDate || new Date().toISOString().slice(0, 10),
             order_id: orderId || null,
-            weight_kg: 0, // weight will be calculated from avg
+            weight_kg: 0,
             num_pcs: Number(palletPcs),
+            invoice_number: invoiceNumber || null,
           });
           if (error) console.error('Pallet consumption error:', error);
           queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
