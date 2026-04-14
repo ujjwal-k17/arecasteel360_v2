@@ -4,12 +4,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useInsertProcessing } from '@/hooks/useProcessing';
 import { useInsertAction } from '@/hooks/useBatches';
 import type { Batch, InventoryAction } from '@/hooks/useBatches';
 import { calcUsableBalanceQty } from '@/hooks/useBatches';
 import { Plus, Trash2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const PROCESSES = ['Slit', 'CTL', 'Profile', 'GC'];
 const OUTPUT_TYPES = ['WIP', 'FG'];
@@ -32,8 +35,42 @@ interface Props {
 export default function ProcessingDialog({ batch, allActions, processingRecords, open, onClose }: Props) {
   const insertProcessing = useInsertProcessing();
   const insertAction = useInsertAction();
+  const queryClient = useQueryClient();
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
   const coilWidth = batch.width || 0;
+
+  // Pallet consumption state
+  const [palletEnabled, setPalletEnabled] = useState(false);
+  const [palletSkuId, setPalletSkuId] = useState('');
+  const [palletPcs, setPalletPcs] = useState('');
+
+  const { data: palletSkus } = useQuery({
+    queryKey: ['pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: palletPurchases } = useQuery({
+    queryKey: ['pallet_purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_purchases').select('*').order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const latestWtPerPc = useMemo(() => {
+    const map = new Map<string, number>();
+    (palletPurchases || []).forEach((p: any) => {
+      if (!map.has(p.pallet_sku_id) && p.num_pcs > 0) {
+        map.set(p.pallet_sku_id, p.weight_kg / p.num_pcs);
+      }
+    });
+    return map;
+  }, [palletPurchases]);
 
   const [processType, setProcessType] = useState('');
   const [outputType, setOutputType] = useState('');
