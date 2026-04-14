@@ -115,8 +115,6 @@ export default function FGInventoryTab() {
 
 
 
-  });
-
   const insertFGSale = useMutation({
     mutationFn: async (sale: any) => {
       const { error } = await supabase.from('fg_sales' as any).insert(sale);
