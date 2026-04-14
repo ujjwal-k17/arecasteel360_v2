@@ -60,15 +60,8 @@ export default function FGInventoryTab() {
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
-  // Pallet consumption state (individual sale)
-  const [palletEnabled, setPalletEnabled] = useState(false);
-  const [palletSkuId, setPalletSkuId] = useState('');
-  const [palletPcs, setPalletPcs] = useState('');
 
-  // Pallet consumption state (bulk sale)
-  const [bulkPalletEnabled, setBulkPalletEnabled] = useState(false);
-  const [bulkPalletSkuId, setBulkPalletSkuId] = useState('');
-  const [bulkPalletPcs, setBulkPalletPcs] = useState('');
+
 
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
@@ -120,14 +113,8 @@ export default function FGInventoryTab() {
     },
   });
 
-  // Fetch pallet SKUs for consumption
-  const { data: palletSkus } = useQuery({
-    queryKey: ['pallet_skus'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
-      if (error) throw error;
-      return data;
-    },
+
+
   });
 
   const insertFGSale = useMutation({
@@ -309,17 +296,13 @@ export default function FGInventoryTab() {
           sales_date: bulkSaleForm.sales_date || null,
         });
       }
-      // Record pallet consumption for bulk sale
-      if (bulkPalletEnabled && bulkPalletSkuId && Number(bulkPalletPcs) > 0) {
-        await insertPalletConsumption(bulkPalletSkuId, Number(bulkPalletPcs), bulkSaleForm.order_id || null, bulkSaleForm.sales_date || null);
-      }
       toast.success(`Sale recorded for ${itemsToSell.length} items`);
       setBulkSaleOpen(false);
       setSelectedItems(new Set());
       setBulkSaleCustomerId('');
       setBulkSaleForm({ invoice_number: '', order_id: '', sales_date: '' });
       setBulkQuantities({});
-      setBulkPalletEnabled(false); setBulkPalletSkuId(''); setBulkPalletPcs('');
+      
     } catch { toast.error('Failed to record bulk sale'); }
   };
 
@@ -333,18 +316,8 @@ export default function FGInventoryTab() {
     return batchMap.get(item.source_id) || '-';
   };
 
-  const insertPalletConsumption = async (skuId: string, pcs: number, orderId: string | null, date: string | null) => {
-    if (!skuId || pcs <= 0) return;
-    const { error } = await supabase.from('pallet_consumptions').insert({
-      pallet_sku_id: skuId,
-      consumption_date: date || new Date().toISOString().slice(0, 10),
-      order_id: orderId || null,
-      weight_kg: 0,
-      num_pcs: pcs,
-    });
-    if (error) console.error('Pallet consumption error:', error);
-    queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
-  };
+
+
 
   const handleSaleSubmit = async () => {
     if (!saleDialog) return;
@@ -358,15 +331,10 @@ export default function FGInventoryTab() {
         quantity: qty,
         sales_date: saleForm.sales_date || null,
       });
-      // Record pallet consumption
-      if (palletEnabled && palletSkuId && Number(palletPcs) > 0) {
-        await insertPalletConsumption(palletSkuId, Number(palletPcs), saleForm.order_id || null, saleForm.sales_date || null);
-      }
       toast.success('Sale recorded');
       setSaleDialog(null);
       setSaleCustomerId('');
       setSaleForm({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
-      setPalletEnabled(false); setPalletSkuId(''); setPalletPcs('');
     } catch { toast.error('Failed to record sale'); }
   };
 
