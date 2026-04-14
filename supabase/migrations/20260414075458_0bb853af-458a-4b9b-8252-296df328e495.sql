@@ -1,0 +1,1 @@
+ALTER TABLE public.pallet_consumptions ADD COLUMN invoice_number text;
