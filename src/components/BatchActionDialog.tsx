@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { toast } from 'sonner';
 import { useDerivedOptions } from '@/hooks/useDropdownOptions';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
@@ -128,36 +127,8 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
             <div><Label className="text-xs">Net Weight (Kg)</Label><Input type="number" value={netWeight} onChange={e => setNetWeight(e.target.value)} /></div>
             <div><Label className="text-xs">Gross Weight (Kg)</Label><Input type="number" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} /></div>
 
-            {/* Wooden Pallet Consumption */}
-            <div className="border-t pt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="pallet-check"
-                  checked={palletEnabled}
-                  onCheckedChange={(v) => setPalletEnabled(!!v)}
-                />
-                <Label htmlFor="pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
-              </div>
-              {palletEnabled && (
-                <div className="grid grid-cols-2 gap-3 pl-6">
-                  <div>
-                    <Label className="text-xs">Pallet Size</Label>
-                    <Select value={palletSkuId} onValueChange={setPalletSkuId}>
-                      <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                      <SelectContent>
-                        {(palletSkus || []).map((s: any) => (
-                          <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs"># of Pcs</Label>
-                    <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
-                  </div>
-                </div>
-              )}
-            </div>
+
+
           </div>
         )}
 
