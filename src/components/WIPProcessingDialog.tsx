@@ -4,9 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useWIPProcessing } from '@/hooks/useProcessing';
 import { Plus, Trash2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
@@ -23,9 +26,43 @@ interface Props {
 
 export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
   const wipProcessing = useWIPProcessing();
+  const queryClient = useQueryClient();
   const [numSizes, setNumSizes] = useState('');
   const [ctlLengths, setCtlLengths] = useState<{ length: string; qty: string; pcs: string }[]>([]);
   const [defectEntries, setDefectEntries] = useState<DefectEntry[]>([{ type: '', weight: '' }]);
+
+  // Pallet consumption state
+  const [palletEnabled, setPalletEnabled] = useState(false);
+  const [palletSkuId, setPalletSkuId] = useState('');
+  const [palletPcs, setPalletPcs] = useState('');
+
+  const { data: palletSkus } = useQuery({
+    queryKey: ['pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: palletPurchases } = useQuery({
+    queryKey: ['pallet_purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_purchases').select('*').order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const latestWtPerPc = useMemo(() => {
+    const map = new Map<string, number>();
+    (palletPurchases || []).forEach((p: any) => {
+      if (!map.has(p.pallet_sku_id) && p.num_pcs > 0) {
+        map.set(p.pallet_sku_id, p.weight_kg / p.num_pcs);
+      }
+    });
+    return map;
+  }, [palletPurchases]);
 
   const addDefectEntry = () => setDefectEntries(prev => [...prev, { type: '', weight: '' }]);
   const removeDefectEntry = (i: number) => setDefectEntries(prev => prev.filter((_, idx) => idx !== i));
@@ -75,6 +112,21 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
         defectives: validDefects.map(d => ({ type: d.type, weight: Number(d.weight) })),
         orderId: undefined,
       });
+
+      // Record pallet consumption
+      if (palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0) {
+        const wtPerPc = latestWtPerPc.get(palletSkuId) || 0;
+        const totalWt = wtPerPc * Number(palletPcs);
+        await supabase.from('pallet_consumptions').insert({
+          pallet_sku_id: palletSkuId,
+          consumption_date: new Date().toISOString().slice(0, 10),
+          order_id: null,
+          weight_kg: totalWt,
+          num_pcs: Number(palletPcs),
+        });
+        queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+      }
+
       toast.success('WIP processed to FG successfully');
       onClose();
     } catch {
@@ -190,6 +242,38 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Wooden Pallet Consumption */}
+          <div className="border rounded-md p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox id="wip-pallet-check" checked={palletEnabled} onCheckedChange={(v) => setPalletEnabled(!!v)} />
+              <Label htmlFor="wip-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
+            </div>
+            {palletEnabled && (
+              <div className="grid grid-cols-2 gap-3 pl-6">
+                <div>
+                  <Label className="text-xs">Pallet Size</Label>
+                  <Select value={palletSkuId} onValueChange={setPalletSkuId}>
+                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                    <SelectContent>
+                      {(palletSkus || []).map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs"># of Pcs</Label>
+                  <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
+                </div>
+              </div>
+            )}
+            {palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0 && (
+              <p className="text-xs text-muted-foreground pl-6">
+                Est. weight: {((latestWtPerPc.get(palletSkuId) || 0) * Number(palletPcs)).toFixed(2)} Kg
+              </p>
+            )}
           </div>
 
           {/* Validation warning */}

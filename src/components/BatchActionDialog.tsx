@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { useInsertAction, type Batch } from '@/hooks/useBatches';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useDerivedOptions } from '@/hooks/useDropdownOptions';
 
@@ -34,10 +32,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
   const [netWeight, setNetWeight] = useState('');
   const [grossWeight, setGrossWeight] = useState('');
 
-  // Pallet consumption state
-  const [palletEnabled, setPalletEnabled] = useState(false);
-  const [palletSkuId, setPalletSkuId] = useState('');
-  const [palletPcs, setPalletPcs] = useState('');
+
 
   // Defective state
   const [defectType, setDefectType] = useState('');
@@ -48,16 +43,7 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
     Object.fromEntries(SCRAP_TYPES.map(t => [t, '']))
   );
 
-  // Fetch pallet SKUs
-  const { data: palletSkus } = useQuery({
-    queryKey: ['pallet_skus'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
-      if (error) throw error;
-      return data;
-    },
-    enabled: actionType === 'sales',
-  });
+
 
   const handleSubmit = async () => {
     if (actionType === 'scrap') {
@@ -78,19 +64,8 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
           scrap_type: null,
         });
 
-        // Record pallet consumption if enabled
-        if (palletEnabled && palletSkuId && palletPcs && Number(palletPcs) > 0) {
-          const { error } = await supabase.from('pallet_consumptions').insert({
-            pallet_sku_id: palletSkuId,
-            consumption_date: salesDate || new Date().toISOString().slice(0, 10),
-            order_id: orderId || null,
-            weight_kg: 0,
-            num_pcs: Number(palletPcs),
-            invoice_number: invoiceNumber || null,
-          });
-          if (error) console.error('Pallet consumption error:', error);
-          queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
-        }
+
+
       } else if (actionType === 'defective') {
         await insertAction.mutateAsync({
           batch_id: batch.id,
@@ -151,36 +126,8 @@ export default function BatchActionDialog({ batch, actionType, open, onClose }: 
             <div><Label className="text-xs">Net Weight (Kg)</Label><Input type="number" value={netWeight} onChange={e => setNetWeight(e.target.value)} /></div>
             <div><Label className="text-xs">Gross Weight (Kg)</Label><Input type="number" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} /></div>
 
-            {/* Wooden Pallet Consumption */}
-            <div className="border-t pt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="pallet-check"
-                  checked={palletEnabled}
-                  onCheckedChange={(v) => setPalletEnabled(!!v)}
-                />
-                <Label htmlFor="pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
-              </div>
-              {palletEnabled && (
-                <div className="grid grid-cols-2 gap-3 pl-6">
-                  <div>
-                    <Label className="text-xs">Pallet Size</Label>
-                    <Select value={palletSkuId} onValueChange={setPalletSkuId}>
-                      <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                      <SelectContent>
-                        {(palletSkus || []).map((s: any) => (
-                          <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs"># of Pcs</Label>
-                    <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
-                  </div>
-                </div>
-              )}
-            </div>
+
+
           </div>
         )}
 

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+
 import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useOrders, useAllDispatches, useNonDispatchSalesByOrder } from '@/hooks/useOrders';
@@ -60,15 +61,8 @@ export default function FGInventoryTab() {
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
-  // Pallet consumption state (individual sale)
-  const [palletEnabled, setPalletEnabled] = useState(false);
-  const [palletSkuId, setPalletSkuId] = useState('');
-  const [palletPcs, setPalletPcs] = useState('');
 
-  // Pallet consumption state (bulk sale)
-  const [bulkPalletEnabled, setBulkPalletEnabled] = useState(false);
-  const [bulkPalletSkuId, setBulkPalletSkuId] = useState('');
-  const [bulkPalletPcs, setBulkPalletPcs] = useState('');
+
 
   const { data: customers } = useCustomers();
   const { data: allOrders } = useOrders();
@@ -120,15 +114,7 @@ export default function FGInventoryTab() {
     },
   });
 
-  // Fetch pallet SKUs for consumption
-  const { data: palletSkus } = useQuery({
-    queryKey: ['pallet_skus'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
-      if (error) throw error;
-      return data;
-    },
-  });
+
 
   const insertFGSale = useMutation({
     mutationFn: async (sale: any) => {
@@ -309,17 +295,13 @@ export default function FGInventoryTab() {
           sales_date: bulkSaleForm.sales_date || null,
         });
       }
-      // Record pallet consumption for bulk sale
-      if (bulkPalletEnabled && bulkPalletSkuId && Number(bulkPalletPcs) > 0) {
-        await insertPalletConsumption(bulkPalletSkuId, Number(bulkPalletPcs), bulkSaleForm.order_id || null, bulkSaleForm.sales_date || null);
-      }
       toast.success(`Sale recorded for ${itemsToSell.length} items`);
       setBulkSaleOpen(false);
       setSelectedItems(new Set());
       setBulkSaleCustomerId('');
       setBulkSaleForm({ invoice_number: '', order_id: '', sales_date: '' });
       setBulkQuantities({});
-      setBulkPalletEnabled(false); setBulkPalletSkuId(''); setBulkPalletPcs('');
+      
     } catch { toast.error('Failed to record bulk sale'); }
   };
 
@@ -333,18 +315,8 @@ export default function FGInventoryTab() {
     return batchMap.get(item.source_id) || '-';
   };
 
-  const insertPalletConsumption = async (skuId: string, pcs: number, orderId: string | null, date: string | null) => {
-    if (!skuId || pcs <= 0) return;
-    const { error } = await supabase.from('pallet_consumptions').insert({
-      pallet_sku_id: skuId,
-      consumption_date: date || new Date().toISOString().slice(0, 10),
-      order_id: orderId || null,
-      weight_kg: 0,
-      num_pcs: pcs,
-    });
-    if (error) console.error('Pallet consumption error:', error);
-    queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
-  };
+
+
 
   const handleSaleSubmit = async () => {
     if (!saleDialog) return;
@@ -358,15 +330,10 @@ export default function FGInventoryTab() {
         quantity: qty,
         sales_date: saleForm.sales_date || null,
       });
-      // Record pallet consumption
-      if (palletEnabled && palletSkuId && Number(palletPcs) > 0) {
-        await insertPalletConsumption(palletSkuId, Number(palletPcs), saleForm.order_id || null, saleForm.sales_date || null);
-      }
       toast.success('Sale recorded');
       setSaleDialog(null);
       setSaleCustomerId('');
       setSaleForm({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
-      setPalletEnabled(false); setPalletSkuId(''); setPalletPcs('');
     } catch { toast.error('Failed to record sale'); }
   };
 
@@ -687,32 +654,8 @@ export default function FGInventoryTab() {
             <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={saleForm.quantity} onChange={e => setSaleForm(v => ({ ...v, quantity: e.target.value }))} /></div>
              <div><Label className="text-xs">Invoice Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
 
-            {/* Wooden Pallet Consumption */}
-            <div className="border-t pt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Checkbox id="fg-pallet-check" checked={palletEnabled} onCheckedChange={(v) => setPalletEnabled(!!v)} />
-                <Label htmlFor="fg-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
-              </div>
-              {palletEnabled && (
-                <div className="grid grid-cols-2 gap-3 pl-6">
-                  <div>
-                    <Label className="text-xs">Pallet Size</Label>
-                    <Select value={palletSkuId} onValueChange={setPalletSkuId}>
-                      <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                      <SelectContent>
-                        {(palletSkus || []).map((s: any) => (
-                          <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs"># of Pcs</Label>
-                    <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
-                  </div>
-                </div>
-              )}
-            </div>
+
+
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSaleDialog(null)}>Cancel</Button>
@@ -847,32 +790,8 @@ export default function FGInventoryTab() {
             </Table>
           </div>
 
-          {/* Wooden Pallet Consumption */}
-          <div className="border-t pt-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Checkbox id="bulk-pallet-check" checked={bulkPalletEnabled} onCheckedChange={(v) => setBulkPalletEnabled(!!v)} />
-              <Label htmlFor="bulk-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
-            </div>
-            {bulkPalletEnabled && (
-              <div className="grid grid-cols-2 gap-3 pl-6">
-                <div>
-                  <Label className="text-xs">Pallet Size</Label>
-                  <Select value={bulkPalletSkuId} onValueChange={setBulkPalletSkuId}>
-                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                    <SelectContent>
-                      {(palletSkus || []).map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs"># of Pcs</Label>
-                  <Input type="number" value={bulkPalletPcs} onChange={e => setBulkPalletPcs(e.target.value)} placeholder="0" />
-                </div>
-              </div>
-            )}
-          </div>
+
+
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setBulkSaleOpen(false)}>Cancel</Button>
