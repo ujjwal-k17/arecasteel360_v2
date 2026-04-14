@@ -104,13 +104,14 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
 
     setIsSubmitting(true);
     try {
-      await wipProcessing.mutateAsync({
+      const procResult = await wipProcessing.mutateAsync({
         wipItemId: wipItem.id,
         wipItem,
         outputItems: ctlLengths.map(s => ({ length: Number(s.length), qty_kg: Number(s.qty), num_pcs: Number(s.pcs) })),
         defectives: validDefects.map(d => ({ type: d.type, weight: Number(d.weight) })),
         orderId: undefined,
       });
+      const processingRecordId = (procResult as any)?.id || null;
 
       // Record pallet consumption — multiple entries
       if (palletEnabled) {
@@ -124,7 +125,8 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
             order_id: null,
             weight_kg: totalWt,
             num_pcs: Number(entry.pcs),
-          });
+            processing_record_id: processingRecordId,
+          } as any);
         }
         if (validEntries.length > 0) queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
       }
