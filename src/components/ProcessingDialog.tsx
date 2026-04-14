@@ -158,6 +158,9 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     }
   };
 
+  // Determine if output goes to FG (pallet consumption only applies to FG)
+  const isOutputFG = processType === 'Slit' ? outputType === 'FG' : !!processType;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -294,8 +297,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         }
       }
 
-      // Validate pallet: must have entries or be explicitly opted out
-      if (!noPalletConsumption) {
+      // Validate pallet: must have entries or be explicitly opted out (only for FG output)
+      if (isOutputFG && !noPalletConsumption) {
         const validPalletEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
         if (validPalletEntries.length === 0) {
           toast.error('Please add wooden pallet consumption or check "No Wooden Pallet Consumption"');
@@ -305,7 +308,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       }
 
       // Record pallet consumption — multiple entries
-      if (!noPalletConsumption) {
+      if (isOutputFG && !noPalletConsumption) {
         const validEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
         for (const entry of validEntries) {
           const wtPerPc = latestWtPerPc.get(entry.skuId) || 0;
@@ -564,7 +567,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             )}
           </div>
 
-          {/* Wooden Pallet Consumption — Multiple Sizes */}
+          {/* Wooden Pallet Consumption — only for FG output */}
+          {isOutputFG && (
           <div className="border rounded-md p-3 space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Wooden Pallet Consumption</p>
@@ -608,6 +612,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               <Label htmlFor="proc-no-pallet-check" className="text-xs font-medium cursor-pointer">No Wooden Pallet Consumption</Label>
             </div>
           </div>
+          )}
 
           {exceedsUsable && (
             <div className="bg-destructive/10 text-destructive text-xs rounded-md p-2 font-medium">
