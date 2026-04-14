@@ -308,6 +308,10 @@ export default function SalesDataTab() {
           <span className="font-semibold font-mono-num">{totalQty.toFixed(2)} Kg</span>
         </div>
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
+          <span className="text-muted-foreground">Pallets:</span>{' '}
+          <span className="font-semibold font-mono-num">{totalPalletWt.toFixed(2)} Kg</span>
+        </div>
+        <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Records:</span>{' '}
           <span className="font-semibold">{filteredSales.length}</span>
         </div>
