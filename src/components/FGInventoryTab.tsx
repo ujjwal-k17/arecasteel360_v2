@@ -653,32 +653,8 @@ export default function FGInventoryTab() {
             <div><Label className="text-xs">Quantity (Kg)</Label><Input type="number" value={saleForm.quantity} onChange={e => setSaleForm(v => ({ ...v, quantity: e.target.value }))} /></div>
              <div><Label className="text-xs">Invoice Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
 
-            {/* Wooden Pallet Consumption */}
-            <div className="border-t pt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Checkbox id="fg-pallet-check" checked={palletEnabled} onCheckedChange={(v) => setPalletEnabled(!!v)} />
-                <Label htmlFor="fg-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
-              </div>
-              {palletEnabled && (
-                <div className="grid grid-cols-2 gap-3 pl-6">
-                  <div>
-                    <Label className="text-xs">Pallet Size</Label>
-                    <Select value={palletSkuId} onValueChange={setPalletSkuId}>
-                      <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                      <SelectContent>
-                        {(palletSkus || []).map((s: any) => (
-                          <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs"># of Pcs</Label>
-                    <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
-                  </div>
-                </div>
-              )}
-            </div>
+
+
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSaleDialog(null)}>Cancel</Button>
@@ -813,32 +789,8 @@ export default function FGInventoryTab() {
             </Table>
           </div>
 
-          {/* Wooden Pallet Consumption */}
-          <div className="border-t pt-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Checkbox id="bulk-pallet-check" checked={bulkPalletEnabled} onCheckedChange={(v) => setBulkPalletEnabled(!!v)} />
-              <Label htmlFor="bulk-pallet-check" className="text-xs font-medium cursor-pointer">Wooden Pallet Consumption</Label>
-            </div>
-            {bulkPalletEnabled && (
-              <div className="grid grid-cols-2 gap-3 pl-6">
-                <div>
-                  <Label className="text-xs">Pallet Size</Label>
-                  <Select value={bulkPalletSkuId} onValueChange={setBulkPalletSkuId}>
-                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                    <SelectContent>
-                      {(palletSkus || []).map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs"># of Pcs</Label>
-                  <Input type="number" value={bulkPalletPcs} onChange={e => setBulkPalletPcs(e.target.value)} placeholder="0" />
-                </div>
-              </div>
-            )}
-          </div>
+
+
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setBulkSaleOpen(false)}>Cancel</Button>
