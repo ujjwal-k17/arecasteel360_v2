@@ -664,6 +664,7 @@ export type Database = {
           num_pcs: number
           order_id: string | null
           pallet_sku_id: string
+          processing_record_id: string | null
           weight_kg: number
         }
         Insert: {
@@ -674,6 +675,7 @@ export type Database = {
           num_pcs?: number
           order_id?: string | null
           pallet_sku_id: string
+          processing_record_id?: string | null
           weight_kg?: number
         }
         Update: {
@@ -684,6 +686,7 @@ export type Database = {
           num_pcs?: number
           order_id?: string | null
           pallet_sku_id?: string
+          processing_record_id?: string | null
           weight_kg?: number
         }
         Relationships: [
@@ -692,6 +695,13 @@ export type Database = {
             columns: ["pallet_sku_id"]
             isOneToOne: false
             referencedRelation: "pallet_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pallet_consumptions_processing_record_id_fkey"
+            columns: ["processing_record_id"]
+            isOneToOne: false
+            referencedRelation: "processing_records"
             referencedColumns: ["id"]
           },
         ]

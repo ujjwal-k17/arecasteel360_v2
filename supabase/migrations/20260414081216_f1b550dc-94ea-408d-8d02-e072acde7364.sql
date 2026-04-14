@@ -1,0 +1,1 @@
+ALTER TABLE public.pallet_consumptions ADD COLUMN processing_record_id uuid REFERENCES public.processing_records(id) ON DELETE SET NULL;
