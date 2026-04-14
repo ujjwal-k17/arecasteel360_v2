@@ -527,6 +527,7 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                         <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs font-mono-num">{item.num_pcs ?? '-'}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           <div className="flex gap-1">
                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }}>
