@@ -377,7 +377,7 @@ export default function SalesDataTab() {
           <TableBody>
             {filteredSales.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   {dateFrom || dateTo ? 'No dispatches found for selected date range.' : 'No dispatch data found. Select a date range to filter.'}
                 </TableCell>
               </TableRow>
@@ -391,6 +391,7 @@ export default function SalesDataTab() {
                 <TableCell className="text-sm">{s.process_form || '-'}</TableCell>
                 <TableCell className="text-sm font-mono-num whitespace-nowrap">{s.sku}</TableCell>
                 <TableCell className="text-sm font-mono-num">{s.qty.toFixed(2)}</TableCell>
+                <TableCell className="text-sm font-mono-num">{s.pallet_wt > 0 ? s.pallet_wt.toFixed(2) : '-'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
