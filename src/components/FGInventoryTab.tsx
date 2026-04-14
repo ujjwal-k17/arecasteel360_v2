@@ -30,6 +30,7 @@ interface SKUGroup {
   grade: string;
   totalQty: number;
   totalPcs: number;
+  totalPallets: number;
   items: any[];
 }
 
@@ -61,7 +62,28 @@ export default function FGInventoryTab() {
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
+  // Fetch pallet consumptions by processing_record_id for pallet count
+  const { data: palletConsumptions } = useQuery({
+    queryKey: ['pallet_consumptions_fg'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pallet_consumptions')
+        .select('processing_record_id, num_pcs')
+        .not('processing_record_id', 'is', null);
+      if (error) throw error;
+      return data;
+    },
+  });
 
+  const palletsByProcId = useMemo(() => {
+    const map = new Map<string, number>();
+    (palletConsumptions || []).forEach((pc: any) => {
+      if (pc.processing_record_id) {
+        map.set(pc.processing_record_id, (map.get(pc.processing_record_id) || 0) + (pc.num_pcs || 0));
+      }
+    });
+    return map;
+  }, [palletConsumptions]);
 
 
   const { data: customers } = useCustomers();
@@ -235,15 +257,16 @@ export default function FGInventoryTab() {
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, items: [] });
       }
       const g = map.get(key)!;
       g.totalQty += getAvailableQty(item);
       g.totalPcs += item.num_pcs || 0;
+      g.totalPallets += palletsByProcId.get(item.processing_record_id) || 0;
       g.items.push(item);
     }
     return Array.from(map.values());
-  }, [filteredItems, soldByItem, defectiveByItem]);
+  }, [filteredItems, soldByItem, defectiveByItem, palletsByProcId]);
 
   const displayedSkuGroups = useMemo(() => {
     if (materialTab === 'all') return skuGroups;
@@ -449,6 +472,7 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap"># Pcs</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap"># Pallets</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
             </TableRow>
             <TableRow className="bg-muted/20">
@@ -462,11 +486,12 @@ export default function FGInventoryTab() {
               <TableHead />
               <TableHead />
               <TableHead />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -482,6 +507,7 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtInt(g.totalPcs)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalPallets > 0 ? fmtInt(g.totalPallets) : '-'}</TableCell>
                     <TableCell />
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {
@@ -501,6 +527,7 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                         <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs font-mono-num">{item.num_pcs ?? '-'}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           <div className="flex gap-1">
                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }}>
