@@ -1,0 +1,1 @@
+DELETE FROM user_devices WHERE user_id = '8fc2e71e-e2aa-4339-ab44-7b55f9611e9c';

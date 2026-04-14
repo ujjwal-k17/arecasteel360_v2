@@ -35,8 +35,11 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 function getDeviceFingerprint(): string {
+  // Use stable parts only – strip browser version from UA to survive auto-updates
+  const ua = navigator.userAgent;
+  const stableUA = ua.replace(/Chrome\/[\d.]+/g, 'Chrome').replace(/Edg\/[\d.]+/g, 'Edg').replace(/Firefox\/[\d.]+/g, 'Firefox').replace(/Safari\/[\d.]+/g, 'Safari').replace(/Version\/[\d.]+/g, 'Version');
   const parts = [
-    navigator.userAgent,
+    stableUA,
     `${screen.width}x${screen.height}`,
     Intl.DateTimeFormat().resolvedOptions().timeZone,
     navigator.language,
