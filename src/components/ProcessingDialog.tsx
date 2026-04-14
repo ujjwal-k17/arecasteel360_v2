@@ -255,6 +255,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       }
 
       // 3. Save processing record only if process selected
+      let processingRecordId: string | null = null;
       if (hasProcess) {
         let outputItems: { width?: number; length?: number; qty_kg: number; num_pcs?: number }[] = [];
 
@@ -305,7 +306,8 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             order_id: null,
             weight_kg: totalWt,
             num_pcs: Number(entry.pcs),
-          });
+            processing_record_id: processingRecordId,
+          } as any);
         }
         if (validEntries.length > 0) queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
       }
