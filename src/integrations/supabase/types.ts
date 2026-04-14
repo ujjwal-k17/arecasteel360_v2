@@ -660,6 +660,7 @@ export type Database = {
           consumption_date: string
           created_at: string
           id: string
+          invoice_number: string | null
           num_pcs: number
           order_id: string | null
           pallet_sku_id: string
@@ -669,6 +670,7 @@ export type Database = {
           consumption_date: string
           created_at?: string
           id?: string
+          invoice_number?: string | null
           num_pcs?: number
           order_id?: string | null
           pallet_sku_id: string
@@ -678,6 +680,7 @@ export type Database = {
           consumption_date?: string
           created_at?: string
           id?: string
+          invoice_number?: string | null
           num_pcs?: number
           order_id?: string | null
           pallet_sku_id?: string
