@@ -222,6 +222,7 @@ export default function SalesDataTab() {
         sku: buildSku(batch),
         qty: action.net_weight || 0,
         pallet_wt: 0,
+        processing_record_id: null,
         source: 'Coil',
       });
     });
@@ -241,6 +242,7 @@ export default function SalesDataTab() {
         sku: buildSku(fg),
         qty: sale.quantity || 0,
         pallet_wt: procId ? (palletWtByProcId[procId] || 0) : 0,
+        processing_record_id: procId || null,
         source: 'FG',
       });
     });
@@ -259,6 +261,7 @@ export default function SalesDataTab() {
         sku: buildSku(batch),
         qty: sale.quantity || 0,
         pallet_wt: 0,
+        processing_record_id: null,
         source: 'Defective',
       });
     });
