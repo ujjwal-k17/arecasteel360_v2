@@ -3,8 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 function getDeviceFingerprint(): string {
+  const ua = navigator.userAgent;
+  const stableUA = ua.replace(/Chrome\/[\d.]+/g, 'Chrome').replace(/Edg\/[\d.]+/g, 'Edg').replace(/Firefox\/[\d.]+/g, 'Firefox').replace(/Safari\/[\d.]+/g, 'Safari').replace(/Version\/[\d.]+/g, 'Version');
   const parts = [
-    navigator.userAgent,
+    stableUA,
     `${screen.width}x${screen.height}`,
     Intl.DateTimeFormat().resolvedOptions().timeZone,
     navigator.language,
