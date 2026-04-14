@@ -1,13 +1,11 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { RefreshCw, Download, X, Plus } from 'lucide-react';
+import { RefreshCw, Download, X } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -20,9 +18,6 @@ interface SalesRecord {
   sku: string;
   qty: number;
   source: string;
-  // internal ids for linking
-  _action_id?: string;
-  _source_type?: string;
 }
 
 function buildSku(item: { material?: string | null; thickness?: number | null; width?: number | null; length?: number | string | null; coating?: string | null; grade?: string | null }) {
@@ -45,84 +40,6 @@ export default function SalesDataTab() {
   const [filterOrderId, setFilterOrderId] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterProcess, setFilterProcess] = useState('');
-
-  // Pallet dialog state
-  const [palletDialogOpen, setPalletDialogOpen] = useState(false);
-  const [palletDialogRow, setPalletDialogRow] = useState<SalesRecord | null>(null);
-  const [palletSkuId, setPalletSkuId] = useState('');
-  const [palletPcs, setPalletPcs] = useState('');
-
-  // Fetch pallet SKUs
-  const { data: palletSkus } = useQuery({
-    queryKey: ['pallet_skus'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Fetch pallet consumptions
-  const { data: palletConsumptions } = useQuery({
-    queryKey: ['pallet_consumptions'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('pallet_consumptions').select('*');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Pallet consumption by invoice_number
-  const palletByInvoice = useMemo(() => {
-    const map = new Map<string, number>();
-    (palletConsumptions || []).forEach((pc: any) => {
-      if (pc.invoice_number) {
-        map.set(pc.invoice_number, (map.get(pc.invoice_number) || 0) + (Number(pc.weight_kg) || 0));
-      }
-    });
-    return map;
-  }, [palletConsumptions]);
-
-  // Also compute pallet pcs by invoice for display
-  const palletPcsByInvoice = useMemo(() => {
-    const map = new Map<string, number>();
-    (palletConsumptions || []).forEach((pc: any) => {
-      if (pc.invoice_number) {
-        map.set(pc.invoice_number, (map.get(pc.invoice_number) || 0) + (Number(pc.num_pcs) || 0));
-      }
-    });
-    return map;
-  }, [palletConsumptions]);
-
-  // Fetch latest purchase weight-per-piece for each pallet SKU
-  const { data: palletPurchases } = useQuery({
-    queryKey: ['pallet_purchases'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('pallet_purchases').select('*').order('purchase_date', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const latestWtPerPc = useMemo(() => {
-    const map = new Map<string, number>();
-    (palletPurchases || []).forEach((p: any) => {
-      if (!map.has(p.pallet_sku_id) && p.num_pcs > 0) {
-        map.set(p.pallet_sku_id, p.weight_kg / p.num_pcs);
-      }
-    });
-    return map;
-  }, [palletPurchases]);
-
-  const insertPalletConsumption = useMutation({
-    mutationFn: async (row: { pallet_sku_id: string; consumption_date: string; order_id: string | null; weight_kg: number; num_pcs: number; invoice_number: string | null }) => {
-      const { error } = await supabase.from('pallet_consumptions').insert(row);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
-    },
-  });
 
   // Fetch orders with customers for mapping order_id → customer_name
   const { data: orders } = useQuery({
@@ -209,8 +126,6 @@ export default function SalesDataTab() {
         sku: buildSku(batch),
         qty: action.net_weight || 0,
         source: 'Coil',
-        _action_id: action.id,
-        _source_type: 'coil',
       });
     });
 
@@ -228,8 +143,6 @@ export default function SalesDataTab() {
         sku: buildSku(fg),
         qty: sale.quantity || 0,
         source: 'FG',
-        _action_id: sale.id,
-        _source_type: 'fg',
       });
     });
 
@@ -247,8 +160,6 @@ export default function SalesDataTab() {
         sku: buildSku(batch),
         qty: sale.quantity || 0,
         source: 'Defective',
-        _action_id: sale.id,
-        _source_type: 'defective',
       });
     });
 
@@ -309,8 +220,6 @@ export default function SalesDataTab() {
       'Process / Form': s.process_form || '-',
       'SKU': s.sku,
       'Qty (Kg)': s.qty,
-      'Pallets (Kg)': s.invoice_number ? (palletByInvoice.get(s.invoice_number) || 0) : 0,
-      'Pallet Pcs': s.invoice_number ? (palletPcsByInvoice.get(s.invoice_number) || 0) : 0,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -325,39 +234,7 @@ export default function SalesDataTab() {
     queryClient.invalidateQueries({ queryKey: ['fg_sales_all'] });
     queryClient.invalidateQueries({ queryKey: ['defective_sales_all'] });
     queryClient.invalidateQueries({ queryKey: ['orders_for_sales'] });
-    queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
-    queryClient.invalidateQueries({ queryKey: ['pallet_purchases'] });
     toast.success('Refreshed');
-  };
-
-  const openPalletDialog = (row: SalesRecord) => {
-    setPalletDialogRow(row);
-    setPalletSkuId('');
-    setPalletPcs('');
-    setPalletDialogOpen(true);
-  };
-
-  const handlePalletSubmit = async () => {
-    if (!palletDialogRow || !palletSkuId || !palletPcs || Number(palletPcs) <= 0) {
-      toast.error('Select pallet size and enter number of pieces');
-      return;
-    }
-    const wtPerPc = latestWtPerPc.get(palletSkuId) || 0;
-    const totalWt = wtPerPc * Number(palletPcs);
-    try {
-      await insertPalletConsumption.mutateAsync({
-        pallet_sku_id: palletSkuId,
-        consumption_date: palletDialogRow.invoice_date || new Date().toISOString().slice(0, 10),
-        order_id: palletDialogRow.order_id || null,
-        weight_kg: totalWt,
-        num_pcs: Number(palletPcs),
-        invoice_number: palletDialogRow.invoice_number || null,
-      });
-      toast.success('Pallet consumption recorded');
-      setPalletDialogOpen(false);
-    } catch {
-      toast.error('Failed to record pallet consumption');
-    }
   };
 
   return (
@@ -420,8 +297,6 @@ export default function SalesDataTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Process / Form</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">SKU</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Pallets (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap w-[80px]">Action</TableHead>
             </TableRow>
             <TableRow className="bg-muted/30">
               <TableHead className="p-1">
@@ -461,95 +336,32 @@ export default function SalesDataTab() {
                   </SelectContent>
                 </Select>
               </TableHead>
-              <TableHead className="p-1">{/* SKU */}</TableHead>
-              <TableHead className="p-1">{/* Qty */}</TableHead>
-              <TableHead className="p-1">{/* Pallets */}</TableHead>
-              <TableHead className="p-1">{/* Action */}</TableHead>
+              <TableHead className="p-1">{/* SKU - no filter */}</TableHead>
+              <TableHead className="p-1">{/* Qty - no filter */}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSales.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   {dateFrom || dateTo ? 'No dispatches found for selected date range.' : 'No dispatch data found. Select a date range to filter.'}
                 </TableCell>
               </TableRow>
             )}
-            {filteredSales.map((s, idx) => {
-              const palletKg = s.invoice_number ? (palletByInvoice.get(s.invoice_number) || 0) : 0;
-              const pPcs = s.invoice_number ? (palletPcsByInvoice.get(s.invoice_number) || 0) : 0;
-              return (
-                <TableRow key={idx}>
-                  <TableCell className="text-sm">{s.invoice_number || '-'}</TableCell>
-                  <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
-                  <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
-                  <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
-                  <TableCell className="text-sm">{s.process_form || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num whitespace-nowrap">{s.sku}</TableCell>
-                  <TableCell className="text-sm font-mono-num">{s.qty.toFixed(2)}</TableCell>
-                  <TableCell className="text-sm font-mono-num">
-                    {palletKg > 0 ? (
-                      <span title={`${pPcs} pcs`}>{palletKg.toFixed(2)}</span>
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {s.invoice_number && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => openPalletDialog(s)}
-                      >
-                        <Plus className="h-3 w-3" /> Pallet
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {filteredSales.map((s, idx) => (
+              <TableRow key={idx}>
+                <TableCell className="text-sm">{s.invoice_number || '-'}</TableCell>
+                <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                <TableCell className="text-sm">{s.order_id || '-'}</TableCell>
+                <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
+                <TableCell className="text-sm">{s.process_form || '-'}</TableCell>
+                <TableCell className="text-sm font-mono-num whitespace-nowrap">{s.sku}</TableCell>
+                <TableCell className="text-sm font-mono-num">{s.qty.toFixed(2)}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
-
-      {/* Add Pallet Consumption Dialog */}
-      <Dialog open={palletDialogOpen} onOpenChange={setPalletDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base">Add Pallet Consumption</DialogTitle>
-            {palletDialogRow && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Invoice: {palletDialogRow.invoice_number} | Order: {palletDialogRow.order_id || '-'}
-              </p>
-            )}
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Pallet Size</Label>
-              <Select value={palletSkuId} onValueChange={setPalletSkuId}>
-                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                <SelectContent>
-                  {(palletSkus || []).map((s: any) => (
-                    <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs"># of Pieces</Label>
-              <Input type="number" value={palletPcs} onChange={e => setPalletPcs(e.target.value)} placeholder="0" />
-            </div>
-            {palletSkuId && palletPcs && Number(palletPcs) > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Estimated weight: {((latestWtPerPc.get(palletSkuId) || 0) * Number(palletPcs)).toFixed(2)} Kg
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPalletDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handlePalletSubmit}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
