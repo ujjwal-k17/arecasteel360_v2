@@ -4,8 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, Download, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { RefreshCw, Download, X, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -18,6 +20,7 @@ interface SalesRecord {
   sku: string;
   qty: number;
   pallet_wt: number;
+  processing_record_id: string | null;
   source: string;
 }
 
@@ -41,6 +44,74 @@ export default function SalesDataTab() {
   const [filterOrderId, setFilterOrderId] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterProcess, setFilterProcess] = useState('');
+
+  // Pallet dialog state
+  const [palletDialogRecord, setPalletDialogRecord] = useState<SalesRecord | null>(null);
+  const [palletEntries, setPalletEntries] = useState<{ skuId: string; pcs: string }[]>([{ skuId: '', pcs: '' }]);
+  const [palletSubmitting, setPalletSubmitting] = useState(false);
+
+  const { data: palletSkus } = useQuery({
+    queryKey: ['pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: palletPurchases } = useQuery({
+    queryKey: ['pallet_purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_purchases').select('*').order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const latestWtPerPc = useMemo(() => {
+    const map = new Map<string, number>();
+    (palletPurchases || []).forEach((p: any) => {
+      if (!map.has(p.pallet_sku_id) && p.num_pcs > 0) {
+        map.set(p.pallet_sku_id, p.weight_kg / p.num_pcs);
+      }
+    });
+    return map;
+  }, [palletPurchases]);
+
+  const openPalletDialog = (record: SalesRecord) => {
+    setPalletEntries([{ skuId: '', pcs: '' }]);
+    setPalletDialogRecord(record);
+  };
+
+  const handlePalletSubmit = async () => {
+    if (!palletDialogRecord) return;
+    const validEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+    if (validEntries.length === 0) { toast.error('Add at least one pallet entry'); return; }
+    setPalletSubmitting(true);
+    try {
+      for (const entry of validEntries) {
+        const wtPerPc = latestWtPerPc.get(entry.skuId) || 0;
+        const totalWt = wtPerPc * Number(entry.pcs);
+        await supabase.from('pallet_consumptions').insert({
+          pallet_sku_id: entry.skuId,
+          consumption_date: new Date().toISOString().slice(0, 10),
+          order_id: null,
+          weight_kg: totalWt,
+          num_pcs: Number(entry.pcs),
+          processing_record_id: palletDialogRecord.processing_record_id,
+        } as any);
+      }
+      queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+      queryClient.invalidateQueries({ queryKey: ['pallet_consumptions_for_dispatch'] });
+      queryClient.invalidateQueries({ queryKey: ['pallet_consumptions_fg'] });
+      toast.success('Pallet consumption recorded');
+      setPalletDialogRecord(null);
+    } catch {
+      toast.error('Failed to record pallet consumption');
+    } finally {
+      setPalletSubmitting(false);
+    }
+  };
 
   // Fetch orders with customers for mapping order_id → customer_name
   const { data: orders } = useQuery({
@@ -151,6 +222,7 @@ export default function SalesDataTab() {
         sku: buildSku(batch),
         qty: action.net_weight || 0,
         pallet_wt: 0,
+        processing_record_id: null,
         source: 'Coil',
       });
     });
@@ -170,6 +242,7 @@ export default function SalesDataTab() {
         sku: buildSku(fg),
         qty: sale.quantity || 0,
         pallet_wt: procId ? (palletWtByProcId[procId] || 0) : 0,
+        processing_record_id: procId || null,
         source: 'FG',
       });
     });
@@ -188,6 +261,7 @@ export default function SalesDataTab() {
         sku: buildSku(batch),
         qty: sale.quantity || 0,
         pallet_wt: 0,
+        processing_record_id: null,
         source: 'Defective',
       });
     });
@@ -334,6 +408,7 @@ export default function SalesDataTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">SKU</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Pallets (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
             </TableRow>
             <TableRow className="bg-muted/30">
               <TableHead className="p-1">
@@ -373,15 +448,16 @@ export default function SalesDataTab() {
                   </SelectContent>
                 </Select>
               </TableHead>
-              <TableHead className="p-1">{/* SKU - no filter */}</TableHead>
-              <TableHead className="p-1">{/* Qty - no filter */}</TableHead>
-              <TableHead className="p-1">{/* Pallets - no filter */}</TableHead>
+              <TableHead className="p-1" />
+              <TableHead className="p-1" />
+              <TableHead className="p-1" />
+              <TableHead className="p-1" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSales.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   {dateFrom || dateTo ? 'No dispatches found for selected date range.' : 'No dispatch data found. Select a date range to filter.'}
                 </TableCell>
               </TableRow>
@@ -396,11 +472,72 @@ export default function SalesDataTab() {
                 <TableCell className="text-sm font-mono-num whitespace-nowrap">{s.sku}</TableCell>
                 <TableCell className="text-sm font-mono-num">{s.qty.toFixed(2)}</TableCell>
                 <TableCell className="text-sm font-mono-num">{s.pallet_wt > 0 ? s.pallet_wt.toFixed(2) : '-'}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={() => openPalletDialog(s)}>
+                    <Plus className="h-3 w-3" /> Pallet
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      {/* Pallet Consumption Dialog */}
+      <Dialog open={!!palletDialogRecord} onOpenChange={() => setPalletDialogRecord(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Add Pallet Consumption</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="bg-muted/50 rounded-md p-2 text-xs space-y-1">
+              <p><span className="text-muted-foreground">SKU:</span> {palletDialogRecord?.sku}</p>
+              <p><span className="text-muted-foreground">Invoice:</span> {palletDialogRecord?.invoice_number || '-'}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium">Pallet Sizes</Label>
+              <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setPalletEntries(prev => [...prev, { skuId: '', pcs: '' }])}>
+                <Plus className="h-3 w-3" /> Add Size
+              </Button>
+            </div>
+            {palletEntries.map((entry, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                <div>
+                  <Label className="text-xs">Pallet Size</Label>
+                  <Select value={entry.skuId} onValueChange={v => { const arr = [...palletEntries]; arr[i] = { ...arr[i], skuId: v }; setPalletEntries(arr); }}>
+                    <SelectTrigger className="h-8"><SelectValue placeholder="Select size" /></SelectTrigger>
+                    <SelectContent>
+                      {(palletSkus || []).map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs"># of Pcs</Label>
+                  <Input type="number" className="h-8" value={entry.pcs} onChange={e => { const arr = [...palletEntries]; arr[i] = { ...arr[i], pcs: e.target.value }; setPalletEntries(arr); }} placeholder="0" />
+                </div>
+                {palletEntries.length > 1 && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => setPalletEntries(prev => prev.filter((_, idx) => idx !== i))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {palletEntries.some(e => e.skuId && Number(e.pcs) > 0) && (
+              <p className="text-xs text-muted-foreground">
+                Est. total weight: {palletEntries.reduce((sum, e) => sum + ((latestWtPerPc.get(e.skuId) || 0) * (Number(e.pcs) || 0)), 0).toFixed(2)} Kg
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPalletDialogRecord(null)}>Cancel</Button>
+            <Button onClick={handlePalletSubmit} disabled={palletSubmitting}>
+              {palletSubmitting ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
