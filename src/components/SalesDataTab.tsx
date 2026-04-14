@@ -45,6 +45,74 @@ export default function SalesDataTab() {
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterProcess, setFilterProcess] = useState('');
 
+  // Pallet dialog state
+  const [palletDialogRecord, setPalletDialogRecord] = useState<SalesRecord | null>(null);
+  const [palletEntries, setPalletEntries] = useState<{ skuId: string; pcs: string }[]>([{ skuId: '', pcs: '' }]);
+  const [palletSubmitting, setPalletSubmitting] = useState(false);
+
+  const { data: palletSkus } = useQuery({
+    queryKey: ['pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: palletPurchases } = useQuery({
+    queryKey: ['pallet_purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('pallet_purchases').select('*').order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const latestWtPerPc = useMemo(() => {
+    const map = new Map<string, number>();
+    (palletPurchases || []).forEach((p: any) => {
+      if (!map.has(p.pallet_sku_id) && p.num_pcs > 0) {
+        map.set(p.pallet_sku_id, p.weight_kg / p.num_pcs);
+      }
+    });
+    return map;
+  }, [palletPurchases]);
+
+  const openPalletDialog = (record: SalesRecord) => {
+    setPalletEntries([{ skuId: '', pcs: '' }]);
+    setPalletDialogRecord(record);
+  };
+
+  const handlePalletSubmit = async () => {
+    if (!palletDialogRecord) return;
+    const validEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+    if (validEntries.length === 0) { toast.error('Add at least one pallet entry'); return; }
+    setPalletSubmitting(true);
+    try {
+      for (const entry of validEntries) {
+        const wtPerPc = latestWtPerPc.get(entry.skuId) || 0;
+        const totalWt = wtPerPc * Number(entry.pcs);
+        await supabase.from('pallet_consumptions').insert({
+          pallet_sku_id: entry.skuId,
+          consumption_date: new Date().toISOString().slice(0, 10),
+          order_id: null,
+          weight_kg: totalWt,
+          num_pcs: Number(entry.pcs),
+          processing_record_id: palletDialogRecord.processing_record_id,
+        } as any);
+      }
+      queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+      queryClient.invalidateQueries({ queryKey: ['pallet_consumptions_for_dispatch'] });
+      queryClient.invalidateQueries({ queryKey: ['pallet_consumptions_fg'] });
+      toast.success('Pallet consumption recorded');
+      setPalletDialogRecord(null);
+    } catch {
+      toast.error('Failed to record pallet consumption');
+    } finally {
+      setPalletSubmitting(false);
+    }
+  };
+
   // Fetch orders with customers for mapping order_id → customer_name
   const { data: orders } = useQuery({
     queryKey: ['orders_for_sales'],
