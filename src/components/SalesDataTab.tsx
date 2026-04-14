@@ -109,6 +109,30 @@ export default function SalesDataTab() {
     },
   });
 
+  // Fetch pallet consumptions keyed by processing_record_id
+  const { data: palletConsumptions } = useQuery({
+    queryKey: ['pallet_consumptions_for_dispatch'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pallet_consumptions')
+        .select('processing_record_id, weight_kg')
+        .not('processing_record_id', 'is', null);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Aggregate pallet weight by processing_record_id
+  const palletWtByProcId = useMemo(() => {
+    const map: Record<string, number> = {};
+    (palletConsumptions || []).forEach((pc: any) => {
+      if (pc.processing_record_id) {
+        map[pc.processing_record_id] = (map[pc.processing_record_id] || 0) + (pc.weight_kg || 0);
+      }
+    });
+    return map;
+  }, [palletConsumptions]);
+
   // Combine all sales into unified format
   const allSales: SalesRecord[] = useMemo(() => {
     const records: SalesRecord[] = [];
@@ -126,6 +150,7 @@ export default function SalesDataTab() {
         process_form: action.action_type === 'pack_coil_sale' ? 'Pack Coil' : action.action_type === 'loose_coil_sale' ? 'Loose Coil' : (batch.form || 'Coil'),
         sku: buildSku(batch),
         qty: action.net_weight || 0,
+        pallet_wt: 0,
         source: 'Coil',
       });
     });
@@ -135,6 +160,7 @@ export default function SalesDataTab() {
       const fg = sale.fg_items;
       if (!fg) return;
       const orderInfo = sale.order_id ? orderMap[sale.order_id] : null;
+      const procId = fg.processing_record_id;
       records.push({
         invoice_number: sale.invoice_number,
         invoice_date: sale.sales_date,
@@ -143,6 +169,7 @@ export default function SalesDataTab() {
         process_form: fg.process || 'FG',
         sku: buildSku(fg),
         qty: sale.quantity || 0,
+        pallet_wt: procId ? (palletWtByProcId[procId] || 0) : 0,
         source: 'FG',
       });
     });
@@ -160,6 +187,7 @@ export default function SalesDataTab() {
         process_form: 'Defective',
         sku: buildSku(batch),
         qty: sale.quantity || 0,
+        pallet_wt: 0,
         source: 'Defective',
       });
     });
@@ -172,7 +200,7 @@ export default function SalesDataTab() {
     });
 
     return records;
-  }, [inventoryActions, fgSales, defectiveSales, orderMap]);
+  }, [inventoryActions, fgSales, defectiveSales, orderMap, palletWtByProcId]);
 
   // Filter by date range + column filters
   const filteredSales = useMemo(() => {
