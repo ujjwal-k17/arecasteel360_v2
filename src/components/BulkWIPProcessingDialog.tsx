@@ -58,6 +58,7 @@ export default function BulkWIPProcessingDialog({ wipItems, open, onClose, batch
     if (!allValid) { toast.error('Please fill all CTL size entries'); return; }
     if (anyExceeds) { toast.error('Some items exceed available quantity'); return; }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       for (const bd of itemBreakdowns) {
