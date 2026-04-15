@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -162,9 +162,10 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const isOutputFG = processType === 'Slit' ? outputType === 'FG' : !!processType;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
+    if (submittingRef.current) return;
     const hasProcess = !!processType;
     const effectiveOutputType = processType === 'Slit' ? outputType : 'FG';
 
@@ -221,6 +222,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       // 1. Save inline scrap entries
@@ -330,6 +332,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     } catch {
       toast.error('Failed to record processing');
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
