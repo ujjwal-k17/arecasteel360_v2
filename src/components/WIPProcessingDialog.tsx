@@ -87,9 +87,10 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
   const exceedsAvailable = totalCommitted > (wipItem.qty || 0) + 0.01;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
+    if (submittingRef.current) return;
     if (ctlLengths.length === 0 || ctlLengths.some(s => !s.length || !s.qty || !s.pcs)) {
       toast.error('Please fill all CTL length entries');
       return;
@@ -99,9 +100,19 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
       return;
     }
 
+    // Validate pallet BEFORE mutation
+    if (!noPalletConsumption) {
+      const validPalletEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+      if (validPalletEntries.length === 0) {
+        toast.error('Please add wooden pallet consumption or check "No Wooden Pallet Consumption"');
+        return;
+      }
+    }
+
     // Collect valid defect entries
     const validDefects = defectEntries.filter(d => d.type && Number(d.weight) > 0);
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       const procResult = await wipProcessing.mutateAsync({
@@ -112,16 +123,6 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
         orderId: undefined,
       });
       const processingRecordId = (procResult as any)?.id || null;
-
-      // Validate pallet: must have entries or be explicitly opted out
-      if (!noPalletConsumption) {
-        const validPalletEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
-        if (validPalletEntries.length === 0) {
-          toast.error('Please add wooden pallet consumption or check "No Wooden Pallet Consumption"');
-          setIsSubmitting(false);
-          return;
-        }
-      }
 
       // Record pallet consumption — multiple entries
       if (!noPalletConsumption) {
@@ -146,6 +147,7 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
     } catch {
       toast.error('Failed to process WIP item');
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
