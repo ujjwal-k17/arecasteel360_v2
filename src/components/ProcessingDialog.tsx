@@ -222,6 +222,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       // 1. Save inline scrap entries
@@ -331,6 +332,7 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     } catch {
       toast.error('Failed to record processing');
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
