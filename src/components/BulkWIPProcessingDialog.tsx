@@ -77,6 +77,7 @@ export default function BulkWIPProcessingDialog({ wipItems, open, onClose, batch
     } catch {
       toast.error('Failed to process WIP items');
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
