@@ -112,9 +112,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const effectiveSlitProcessQty = slitProcessQty ? Number(slitProcessQty) : processingQty;
 
   // Auto-calculate slit quantities when widths change
+  // For Slit: effective coil width = coilWidth + 5mm (trim allowance)
   const autoCalcSlitWidths = useMemo(() => {
     if (processType !== 'Slit' || coilWidth <= 0) return slitWidths;
     const sumWidths = slitWidths.reduce((s, w) => s + (Number(w.width) || 0), 0);
+    const effectiveCoilWidth = coilWidth + 5;
     return slitWidths.map(s => {
       const w = Number(s.width) || 0;
       if (w <= 0) return s;
@@ -122,16 +124,17 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
         const autoQty = (effectiveSlitProcessQty * w) / sumWidths;
         return { ...s, qty: autoQty.toFixed(2) };
       }
-      const autoQty = (effectiveSlitProcessQty * w) / coilWidth;
+      const autoQty = (effectiveSlitProcessQty * w) / effectiveCoilWidth;
       return { ...s, qty: autoQty.toFixed(2) };
     });
   }, [slitWidths.map(s => s.width).join(','), effectiveSlitProcessQty, coilWidth, processType, trimOption]);
 
-  // Trim qty for slit
+  // Trim qty for slit (uses effective coil width = coilWidth + 5mm)
   const trimQty = useMemo(() => {
     if (processType !== 'Slit' || coilWidth <= 0 || trimOption === 'no') return 0;
     const sumWidths = slitWidths.reduce((s, w) => s + (Number(w.width) || 0), 0);
-    return (effectiveSlitProcessQty * (coilWidth + 5 - sumWidths)) / coilWidth;
+    const effectiveCoilWidth = coilWidth + 5;
+    return (effectiveSlitProcessQty * (effectiveCoilWidth - sumWidths)) / effectiveCoilWidth;
   }, [slitWidths.map(s => s.width).join(','), effectiveSlitProcessQty, coilWidth, processType, trimOption]);
 
   const totalOutputQty = useMemo(() => {
