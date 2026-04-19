@@ -6,6 +6,7 @@ import DeviceManagementTab from '@/components/admin/DeviceManagementTab';
 import MasterDataTab from '@/components/admin/MasterDataTab';
 import DropdownManagementTab from '@/components/admin/DropdownManagementTab';
 import BackupsTab from '@/components/admin/BackupsTab';
+import ConnectionsTab from '@/components/admin/ConnectionsTab';
 import { usePendingApprovals } from '@/hooks/useActionLog';
 import { Badge } from '@/components/ui/badge';
 
@@ -30,6 +31,7 @@ export default function AdminPage() {
           <TabsTrigger value="master">Master Data</TabsTrigger>
           <TabsTrigger value="dropdowns">Dropdowns</TabsTrigger>
           <TabsTrigger value="backups">Backups</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
         </TabsList>
         <TabsContent value="users"><UserManagementTab /></TabsContent>
         <TabsContent value="devices"><DeviceManagementTab /></TabsContent>
@@ -38,6 +40,7 @@ export default function AdminPage() {
         <TabsContent value="master"><MasterDataTab /></TabsContent>
         <TabsContent value="dropdowns"><DropdownManagementTab /></TabsContent>
         <TabsContent value="backups"><BackupsTab /></TabsContent>
+        <TabsContent value="connections"><ConnectionsTab /></TabsContent>
       </Tabs>
     </div>
   );
