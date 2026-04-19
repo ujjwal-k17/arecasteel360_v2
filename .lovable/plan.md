@@ -1,2 +1,2 @@
 
-The user is asking a question about how the system calculates processed quantity based on slit widths in the Coils → WIP slit processing flow. This is a research/explanation question, not an implementation request. Let me find the actual formula in ProcessingDialog.tsx.
+User confirmed they want to link Outlook (and likely OneDrive) to identify the connected email and unblock the email-import features discussed earlier. This is an implementation step requiring the connect tool, which is unavailable in plan mode. Present a tight plan.
