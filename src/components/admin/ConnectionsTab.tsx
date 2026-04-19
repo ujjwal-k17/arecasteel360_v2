@@ -22,7 +22,7 @@ type WhoAmIResponse = {
 function StatusBadge({ status }: { status: AccountInfo['status'] }) {
   if (status === 'connected') {
     return (
-      <Badge className="bg-green-600 hover:bg-green-600 gap-1">
+      <Badge className="gap-1">
         <CheckCircle2 className="h-3 w-3" /> Connected
       </Badge>
     );
