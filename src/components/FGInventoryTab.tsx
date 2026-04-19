@@ -833,6 +833,77 @@ export default function FGInventoryTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sales History Dialog */}
+      <Dialog open={!!salesHistoryGroup} onOpenChange={() => setSalesHistoryGroup(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              Sales History — {salesHistoryGroup?.material} · {salesHistoryGroup && formatDimensions(salesHistoryGroup.thickness, salesHistoryGroup.width, salesHistoryGroup.length, salesHistoryGroup.process)} · {salesHistoryGroup?.coating} · {salesHistoryGroup?.grade}
+            </DialogTitle>
+          </DialogHeader>
+          {salesHistoryGroup && (() => {
+            const itemIds = new Set(salesHistoryGroup.items.map(i => i.id));
+            const customerByOrder = new Map<string, string>();
+            (allOrders || []).forEach((o: any) => {
+              if (o.order_number) customerByOrder.set(o.order_number, o.customers?.customer_name || '-');
+            });
+            const sales = (fgSales || [])
+              .filter((s: any) => itemIds.has(s.fg_item_id))
+              .sort((a: any, b: any) => (b.sales_date || '').localeCompare(a.sales_date || ''));
+            const totalQty = sales.reduce((s: number, r: any) => s + (r.quantity || 0), 0);
+            return (
+              <div className="space-y-3">
+                <div className="flex gap-3 text-sm">
+                  <div className="bg-muted/50 rounded-md px-3 py-1.5">
+                    <span className="text-muted-foreground">Records:</span>{' '}
+                    <span className="font-semibold">{sales.length}</span>
+                  </div>
+                  <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 font-mono-num">
+                    <span className="text-muted-foreground">Total Sold:</span>{' '}
+                    <span className="font-semibold">{fmtNum(totalQty)} Kg</span>
+                  </div>
+                </div>
+                <div className="overflow-x-auto rounded-md border max-h-[60vh]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs font-semibold">Sales Date</TableHead>
+                        <TableHead className="text-xs font-semibold">Invoice #</TableHead>
+                        <TableHead className="text-xs font-semibold">Customer</TableHead>
+                        <TableHead className="text-xs font-semibold">Order ID</TableHead>
+                        <TableHead className="text-xs font-semibold">Batch</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Qty (Kg)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sales.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No sales recorded for this SKU yet.</TableCell></TableRow>
+                      )}
+                      {sales.map((s: any) => {
+                        const item = salesHistoryGroup.items.find((i: any) => i.id === s.fg_item_id);
+                        return (
+                          <TableRow key={s.id}>
+                            <TableCell className="text-xs">{s.sales_date ? new Date(s.sales_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                            <TableCell className="text-xs">{s.invoice_number || '-'}</TableCell>
+                            <TableCell className="text-xs">{s.order_id ? (customerByOrder.get(s.order_id) || '-') : '-'}</TableCell>
+                            <TableCell className="text-xs">{s.order_id || '-'}</TableCell>
+                            <TableCell className="text-xs">{item ? getBatchNumber(item) : '-'}</TableCell>
+                            <TableCell className="text-xs font-mono-num text-right">{fmtNum(s.quantity || 0)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSalesHistoryGroup(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
