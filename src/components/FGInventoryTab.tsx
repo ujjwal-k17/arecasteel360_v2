@@ -509,7 +509,11 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtInt(g.totalPcs)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{g.totalPallets > 0 ? fmtInt(g.totalPallets) : '-'}</TableCell>
-                    <TableCell />
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={() => setSalesHistoryGroup(g)}>
+                        <History className="h-3 w-3" /> Sales
+                      </Button>
+                    </TableCell>
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {
                     const availQty = getAvailableQty(item);
