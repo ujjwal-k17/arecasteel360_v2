@@ -36,6 +36,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   const { data: expenses = [] } = useTruckExpenses();
   const insertTrip = useInsertTruckTrip();
   const insertExpense = useInsertTruckExpense();
+  const deleteTrip = useDeleteTruckTrip();
 
   const [tripDialog, setTripDialog] = useState(false);
   const [tripForm, setTripForm] = useState({ trip_type: 'Sales', trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
