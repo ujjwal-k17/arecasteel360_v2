@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useAllActions } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { useScrapSales, useInsertScrapSale } from '@/hooks/useScrapSales';
+import { useInsertCashEntry } from '@/hooks/useCashBook';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
