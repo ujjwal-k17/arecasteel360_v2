@@ -200,6 +200,21 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                           ← Move Back
                         </Button>
                       )}
+                      {t.source === 'manual' && t.manual_id && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-destructive hover:text-destructive"
+                          disabled={deleteTrip.isPending}
+                          onClick={() => {
+                            if (confirm(`Delete trip ${t.trip_id}? Any linked expenses and cash entries will also be removed.`)) {
+                              deleteTrip.mutate(t.manual_id!, { onSuccess: () => toast.success('Trip deleted') });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
