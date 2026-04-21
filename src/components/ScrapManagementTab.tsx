@@ -321,7 +321,7 @@ export default function ScrapManagementTab() {
         {/* Sell Dialog */}
         <Dialog open={!!sellDialog} onOpenChange={() => setSellDialog(null)}>
           <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>Sell Scrap — {sellDialog?.scrapType}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Sell Scrap — {sellDialog?.scrapType} ({sellDialog?.material})</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label className="text-xs">Qty Sold (Net Weight Kg)</Label><Input type="number" value={saleForm.qty_sold} onChange={e => setSaleForm(v => ({ ...v, qty_sold: e.target.value }))} /></div>
               <div><Label className="text-xs">Sales Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
