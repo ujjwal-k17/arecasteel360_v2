@@ -262,6 +262,61 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Expense Details Dialog */}
+      <Dialog open={detailsDialog.open} onOpenChange={o => setDetailsDialog(p => ({ ...p, open: o }))}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Expense Details — {detailsDialog.trip?.trip_id || detailsDialog.trip?.document_number}</DialogTitle></DialogHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow className="bg-muted/50">
+                <TableHead className="text-xs">Date</TableHead>
+                <TableHead className="text-xs text-right">Driver</TableHead>
+                <TableHead className="text-xs text-right">CNG</TableHead>
+                <TableHead className="text-xs text-right">Toll/Parking</TableHead>
+                <TableHead className="text-xs text-right">Truck</TableHead>
+                <TableHead className="text-xs text-right">Other</TableHead>
+                <TableHead className="text-xs text-right">Total</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {(() => {
+                  const list = (detailsDialog.trip ? expensesByKey[detailsDialog.trip.key] : []) || [];
+                  if ((list as any[]).length === 0) return <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-4">No expenses recorded.</TableCell></TableRow>;
+                  const rows: JSX.Element[] = [];
+                  (list as any[]).forEach((e: any) => {
+                    rows.push(
+                      <TableRow key={e.id}>
+                        <TableCell className="text-xs">{new Date(e.expense_date).toLocaleDateString('en-IN')}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.driver_expense || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.cng_amount || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.toll_parking || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.truck_expense || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.other_expense || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num font-semibold">₹{Number(e.total_amount || 0).toFixed(2)}</TableCell>
+                      </TableRow>
+                    );
+                    if (e.truck_expense_desc || e.other_expense_desc) {
+                      rows.push(
+                        <TableRow key={`${e.id}-desc`}>
+                          <TableCell colSpan={7} className="text-[11px] text-muted-foreground italic">
+                            {e.truck_expense_desc && <span>Truck: {e.truck_expense_desc}</span>}
+                            {e.truck_expense_desc && e.other_expense_desc && <span> · </span>}
+                            {e.other_expense_desc && <span>Other: {e.other_expense_desc}</span>}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  });
+                  return rows;
+                })()}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDetailsDialog({ open: false, trip: null })}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
