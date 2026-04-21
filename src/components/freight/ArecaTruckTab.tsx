@@ -182,7 +182,13 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                   <TableCell className="text-xs">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted">{t.trip_type}</span>
                   </TableCell>
-                  <TableCell className="text-xs font-mono-num">{exp > 0 ? `₹${exp.toFixed(2)}` : '-'}</TableCell>
+                  <TableCell className="text-xs font-mono-num">
+                    {exp > 0 ? (
+                      <button className="text-primary hover:underline" onClick={() => setDetailsDialog({ open: true, trip: t })}>
+                        ₹{exp.toFixed(2)}
+                      </button>
+                    ) : '-'}
+                  </TableCell>
                   <TableCell className="text-xs">
                     <div className="flex gap-1">
                       <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setExpDialog({ open: true, trip: t })}>
