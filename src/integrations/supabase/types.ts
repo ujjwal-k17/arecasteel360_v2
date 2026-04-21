@@ -964,31 +964,40 @@ export type Database = {
       scrap_sales: {
         Row: {
           amount_received: number | null
+          buyer_name: string | null
           created_at: string
           id: string
+          invoice_number: string | null
           material: string | null
           qty_sold: number | null
           sales_date: string | null
+          sales_type: string | null
           scrap_type: string
           weight_slip_url: string | null
         }
         Insert: {
           amount_received?: number | null
+          buyer_name?: string | null
           created_at?: string
           id?: string
+          invoice_number?: string | null
           material?: string | null
           qty_sold?: number | null
           sales_date?: string | null
+          sales_type?: string | null
           scrap_type: string
           weight_slip_url?: string | null
         }
         Update: {
           amount_received?: number | null
+          buyer_name?: string | null
           created_at?: string
           id?: string
+          invoice_number?: string | null
           material?: string | null
           qty_sold?: number | null
           sales_date?: string | null
+          sales_type?: string | null
           scrap_type?: string
           weight_slip_url?: string | null
         }
