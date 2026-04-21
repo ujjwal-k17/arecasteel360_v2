@@ -79,10 +79,10 @@ export default function DefectiveManagementTab() {
 
   // Group all defective entries by SKU
   const skuGroups = useMemo(() => {
-    const map = new Map<string, SKUDefectiveGroup>();
+    const map = new Map<string, SKUDefectiveGroup & { material: string }>();
 
-    const addToGroup = (skuKey: string, detail: DefectiveDetail) => {
-      if (!map.has(skuKey)) map.set(skuKey, { skuKey, totalWeight: 0, details: [] });
+    const addToGroup = (skuKey: string, material: string, detail: DefectiveDetail) => {
+      if (!map.has(skuKey)) map.set(skuKey, { skuKey, material, totalWeight: 0, details: [] });
       const g = map.get(skuKey)!;
       g.totalWeight += detail.netWeight;
       g.details.push(detail);
@@ -92,11 +92,13 @@ export default function DefectiveManagementTab() {
     defectiveActions.forEach(a => {
       const batch = (batches || []).find(b => b.id === a.batch_id);
       if (!batch) return;
-      const skuKey = `${batch.material || '-'} | ${batch.thickness ?? '-'}x${batch.width ?? '-'} | ${batch.coating || '-'} | ${batch.grade || '-'}`;
-      addToGroup(skuKey, {
+      const material = batch.material || '-';
+      const skuKey = `${material} | ${batch.thickness ?? '-'}x${batch.width ?? '-'} | ${batch.coating || '-'} | ${batch.grade || '-'}`;
+      addToGroup(skuKey, material, {
         id: a.id,
         source: 'coil',
         sourceLabel: `Coil: ${batch.batch_number}`,
+        material,
         skuKey,
         defectType: a.defect_type || 'Unknown',
         netWeight: a.net_weight || 0,
@@ -108,13 +110,15 @@ export default function DefectiveManagementTab() {
     // FG defectives
     (fgDefectives || []).forEach((d: any) => {
       const fgItem = d.fg_items;
+      const material = fgItem?.material || '-';
       const skuKey = fgItem
-        ? `${fgItem.material || '-'} | ${fgItem.thickness ?? '-'}x${fgItem.width ?? '-'}${fgItem.length ? `x${fgItem.length}` : ''} | ${fgItem.coating || '-'} | ${fgItem.grade || '-'}`
+        ? `${material} | ${fgItem.thickness ?? '-'}x${fgItem.width ?? '-'}${fgItem.length ? `x${fgItem.length}` : ''} | ${fgItem.coating || '-'} | ${fgItem.grade || '-'}`
         : '-';
-      addToGroup(skuKey, {
+      addToGroup(skuKey, material, {
         id: d.id,
         source: 'fg',
         sourceLabel: fgItem ? `FG: ${fgItem.process || '-'}` : 'FG Item',
+        material,
         skuKey,
         defectType: d.defect_type || 'Unknown',
         netWeight: d.quantity || 0,
@@ -126,13 +130,15 @@ export default function DefectiveManagementTab() {
     // WIP defectives
     (wipDefectives || []).forEach((d: any) => {
       const wipItem = d.wip_items;
+      const material = wipItem?.material || '-';
       const skuKey = wipItem
-        ? `${wipItem.material || '-'} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'}${wipItem.length ? `x${wipItem.length}` : ''} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
+        ? `${material} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'}${wipItem.length ? `x${wipItem.length}` : ''} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
         : '-';
-      addToGroup(skuKey, {
+      addToGroup(skuKey, material, {
         id: d.id,
         source: 'wip',
         sourceLabel: wipItem ? `WIP: ${wipItem.process || '-'}` : 'WIP Item',
+        material,
         skuKey,
         defectType: d.defect_type || 'Unknown',
         netWeight: d.quantity || 0,
@@ -157,7 +163,19 @@ export default function DefectiveManagementTab() {
       .sort((a, b) => b.totalWeight - a.totalWeight);
   }, [defectiveActions, batches, fgDefectives, wipDefectives, defSales]);
 
-  const grandTotal = useMemo(() => skuGroups.reduce((s, g) => s + g.totalWeight, 0), [skuGroups]);
+  // Group SKUs by Material
+  const materialGroups = useMemo<MaterialDefectiveGroup[]>(() => {
+    const map = new Map<string, MaterialDefectiveGroup>();
+    skuGroups.forEach(sg => {
+      if (!map.has(sg.material)) map.set(sg.material, { material: sg.material, totalWeight: 0, skus: [] });
+      const m = map.get(sg.material)!;
+      m.totalWeight += sg.totalWeight;
+      m.skus.push(sg);
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalWeight - a.totalWeight);
+  }, [skuGroups]);
+
+  const grandTotal = useMemo(() => materialGroups.reduce((s, g) => s + g.totalWeight, 0), [materialGroups]);
 
   const handleSell = async () => {
     if (!sellDialog) return;
