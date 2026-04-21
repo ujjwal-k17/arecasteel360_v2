@@ -209,10 +209,22 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs text-destructive hover:text-destructive"
-                          disabled={deleteTrip.isPending}
+                          disabled={deleteTrip.isPending || submitApproval.isPending}
                           onClick={() => {
-                            if (confirm(`Delete trip ${t.trip_id}? Any linked expenses and cash entries will also be removed.`)) {
-                              deleteTrip.mutate(t.manual_id!, { onSuccess: () => toast.success('Trip deleted') });
+                            if (isAdmin) {
+                              if (confirm(`Delete trip ${t.trip_id}? Any linked expenses and cash entries will also be removed.`)) {
+                                deleteTrip.mutate(t.manual_id!, { onSuccess: () => toast.success('Trip deleted') });
+                              }
+                            } else {
+                              if (confirm(`Submit deletion of trip ${t.trip_id} for admin approval?`)) {
+                                submitApproval.mutate({
+                                  action_type: 'delete',
+                                  entity_type: 'truck_trip',
+                                  entity_id: t.manual_id!,
+                                  description: `Delete truck trip ${t.trip_id} (${truckNumber})`,
+                                  metadata: { trip_id: t.trip_id, truck_number: truckNumber, document_number: t.document_number },
+                                }, { onSuccess: () => toast.success('Delete request sent for admin approval') });
+                              }
                             }
                           }}
                         >
