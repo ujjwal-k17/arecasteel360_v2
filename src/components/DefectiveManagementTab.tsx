@@ -21,6 +21,7 @@ interface DefectiveDetail {
   id: string;
   source: 'coil' | 'fg' | 'wip';
   sourceLabel: string;
+  material: string;
   skuKey: string;
   defectType: string;
   netWeight: number;
@@ -32,6 +33,12 @@ interface SKUDefectiveGroup {
   skuKey: string;
   totalWeight: number;
   details: DefectiveDetail[];
+}
+
+interface MaterialDefectiveGroup {
+  material: string;
+  totalWeight: number;
+  skus: SKUDefectiveGroup[];
 }
 
 export default function DefectiveManagementTab() {
