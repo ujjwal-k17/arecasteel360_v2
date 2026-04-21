@@ -106,7 +106,6 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
         truck_expense_desc: expForm.truck_expense_desc || null,
         other_expense: Number(expForm.other_expense) || 0,
         other_expense_desc: expForm.other_expense_desc || null,
-        total_amount: total,
       } as any,
       trip_label: `${trip.trip_id || trip.document_number} · ${trip.trip_type}`,
     });
