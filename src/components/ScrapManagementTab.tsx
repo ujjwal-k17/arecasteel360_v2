@@ -28,8 +28,9 @@ export default function ScrapManagementTab() {
   const queryClient = useQueryClient();
   const { data: scrapSales } = useScrapSales();
   const insertScrapSale = useInsertScrapSale();
+  const insertCash = useInsertCashEntry();
   const [sellDialog, setSellDialog] = useState<{ scrapType: string; material: string } | null>(null);
-  const [saleForm, setSaleForm] = useState({ qty_sold: '', sales_date: '', amount_received: '' });
+  const [saleForm, setSaleForm] = useState<{ qty_sold: string; sales_date: string; amount_received: string; sales_type: 'Cash' | 'Invoice'; invoice_number: string; buyer_name: string }>({ qty_sold: '', sales_date: '', amount_received: '', sales_type: 'Invoice', invoice_number: '', buyer_name: '' });
   const [expandedScrapKey, setExpandedScrapKey] = useState<string | null>(null);
   const [expandedMaterialKey, setExpandedMaterialKey] = useState<string | null>(null);
   const [expandedSoldKey, setExpandedSoldKey] = useState<string | null>(null);
