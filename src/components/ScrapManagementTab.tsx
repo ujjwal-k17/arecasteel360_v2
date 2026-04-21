@@ -94,7 +94,7 @@ export default function ScrapManagementTab() {
         sales_date: saleForm.sales_date || null,
         amount_received: saleForm.amount_received ? Number(saleForm.amount_received) : 0,
         weight_slip_url: null,
-      });
+      } as any);
       toast.success('Scrap sale recorded');
       setSellDialog(null);
       setSaleForm({ qty_sold: '', sales_date: '', amount_received: '' });

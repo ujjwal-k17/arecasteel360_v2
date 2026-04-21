@@ -152,6 +152,60 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_entries: {
+        Row: {
+          amount: number
+          buyer_name: string | null
+          category: string | null
+          comments: string | null
+          created_at: string
+          debtor_name: string | null
+          direction: string
+          entry_date: string
+          id: string
+          received_date: string | null
+          source_id: string | null
+          source_type: string | null
+          status: string
+          sub_category: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          buyer_name?: string | null
+          category?: string | null
+          comments?: string | null
+          created_at?: string
+          debtor_name?: string | null
+          direction: string
+          entry_date?: string
+          id?: string
+          received_date?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          status?: string
+          sub_category?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          buyer_name?: string | null
+          category?: string | null
+          comments?: string | null
+          created_at?: string
+          debtor_name?: string | null
+          direction?: string
+          entry_date?: string
+          id?: string
+          received_date?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          status?: string
+          sub_category?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -910,31 +964,40 @@ export type Database = {
       scrap_sales: {
         Row: {
           amount_received: number | null
+          buyer_name: string | null
           created_at: string
           id: string
+          invoice_number: string | null
           material: string | null
           qty_sold: number | null
           sales_date: string | null
+          sales_type: string | null
           scrap_type: string
           weight_slip_url: string | null
         }
         Insert: {
           amount_received?: number | null
+          buyer_name?: string | null
           created_at?: string
           id?: string
+          invoice_number?: string | null
           material?: string | null
           qty_sold?: number | null
           sales_date?: string | null
+          sales_type?: string | null
           scrap_type: string
           weight_slip_url?: string | null
         }
         Update: {
           amount_received?: number | null
+          buyer_name?: string | null
           created_at?: string
           id?: string
+          invoice_number?: string | null
           material?: string | null
           qty_sold?: number | null
           sales_date?: string | null
+          sales_type?: string | null
           scrap_type?: string
           weight_slip_url?: string | null
         }
@@ -1196,6 +1259,107 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      truck_trip_expenses: {
+        Row: {
+          cng_amount: number | null
+          created_at: string
+          driver_expense: number | null
+          expense_date: string
+          id: string
+          other_expense: number | null
+          other_expense_desc: string | null
+          source_kind: string
+          source_ref: string | null
+          toll_parking: number | null
+          total_amount: number | null
+          truck_expense: number | null
+          truck_expense_desc: string | null
+          truck_number: string
+          truck_trip_id: string | null
+        }
+        Insert: {
+          cng_amount?: number | null
+          created_at?: string
+          driver_expense?: number | null
+          expense_date?: string
+          id?: string
+          other_expense?: number | null
+          other_expense_desc?: string | null
+          source_kind?: string
+          source_ref?: string | null
+          toll_parking?: number | null
+          total_amount?: number | null
+          truck_expense?: number | null
+          truck_expense_desc?: string | null
+          truck_number: string
+          truck_trip_id?: string | null
+        }
+        Update: {
+          cng_amount?: number | null
+          created_at?: string
+          driver_expense?: number | null
+          expense_date?: string
+          id?: string
+          other_expense?: number | null
+          other_expense_desc?: string | null
+          source_kind?: string
+          source_ref?: string | null
+          toll_parking?: number | null
+          total_amount?: number | null
+          truck_expense?: number | null
+          truck_expense_desc?: string | null
+          truck_number?: string
+          truck_trip_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "truck_trip_expenses_truck_trip_id_fkey"
+            columns: ["truck_trip_id"]
+            isOneToOne: false
+            referencedRelation: "truck_trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      truck_trips: {
+        Row: {
+          created_at: string
+          document_number: string | null
+          id: string
+          quantity: number | null
+          source_destination: string | null
+          trip_date: string
+          trip_id: string
+          trip_type: string
+          truck_number: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_number?: string | null
+          id?: string
+          quantity?: number | null
+          source_destination?: string | null
+          trip_date: string
+          trip_id: string
+          trip_type: string
+          truck_number: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_number?: string | null
+          id?: string
+          quantity?: number | null
+          source_destination?: string | null
+          trip_date?: string
+          trip_id?: string
+          trip_type?: string
+          truck_number?: string
+          updated_at?: string
         }
         Relationships: []
       }
