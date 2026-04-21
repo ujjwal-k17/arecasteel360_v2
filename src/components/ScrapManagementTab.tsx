@@ -169,54 +169,75 @@ export default function ScrapManagementTab() {
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-8"></TableHead>
                   <TableHead className="text-xs font-semibold">Scrap Type</TableHead>
-                  <TableHead className="text-xs font-semibold">Material</TableHead>
-                  <TableHead className="text-xs font-semibold">Qty (Kg)</TableHead>
-                  <TableHead className="text-xs font-semibold">Action</TableHead>
+                  <TableHead className="text-xs font-semibold">Materials</TableHead>
+                  <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scrapRows.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No scrap data yet.</TableCell></TableRow>
+                {scrapTypeRows.length === 0 && (
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No scrap data yet.</TableCell></TableRow>
                 )}
-                {scrapRows.map(r => {
-                  const key = `${r.scrapType}|${r.material}`;
+                {scrapTypeRows.map(t => {
+                  const key = t.scrapType;
                   const isExpanded = expandedScrapKey === key;
                   return (
                     <>
                       <TableRow key={key} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedScrapKey(isExpanded ? null : key)}>
                         <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
-                        <TableCell className="text-sm">{r.scrapType}</TableCell>
-                        <TableCell className="text-sm">{r.material}</TableCell>
-                        <TableCell className="text-sm font-mono-num font-semibold">{r.totalWeight.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog({ scrapType: r.scrapType, material: r.material }); }}>Sell</Button>
-                        </TableCell>
+                        <TableCell className="text-sm font-semibold">{t.scrapType}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{t.materialList.length} material{t.materialList.length !== 1 ? 's' : ''}</TableCell>
+                        <TableCell className="text-sm font-mono-num font-semibold">{t.totalWeight.toFixed(2)}</TableCell>
                       </TableRow>
                       {isExpanded && (
                         <TableRow key={`${key}-detail`}>
-                          <TableCell colSpan={5} className="p-0">
-                            <div className="bg-muted/10 border-t px-6 py-2">
-                              <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs">Batch No</TableHead>
-                                    <TableHead className="text-xs">Material</TableHead>
-                                    <TableHead className="text-xs">Net Wt (Kg)</TableHead>
-                                    <TableHead className="text-xs">Date</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {r.batches.map((bd, i) => (
-                                    <TableRow key={i}>
-                                      <TableCell className="text-xs">{bd.batchNumber}</TableCell>
-                                      <TableCell className="text-xs">{bd.material}</TableCell>
-                                      <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
-                                      <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
+                          <TableCell colSpan={4} className="p-0">
+                            <div className="bg-muted/10 border-t px-6 py-3 space-y-4">
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">Material-wise breakdown</p>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">Material</TableHead>
+                                      <TableHead className="text-xs">Qty (Kg)</TableHead>
+                                      <TableHead className="text-xs">Action</TableHead>
                                     </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {t.materialList.map(m => (
+                                      <TableRow key={m.material}>
+                                        <TableCell className="text-xs">{m.material}</TableCell>
+                                        <TableCell className="text-xs font-mono-num font-semibold">{m.totalWeight.toFixed(2)}</TableCell>
+                                        <TableCell>
+                                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog({ scrapType: t.scrapType, material: m.material }); }}>Sell</Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">Batch No</TableHead>
+                                      <TableHead className="text-xs">Material</TableHead>
+                                      <TableHead className="text-xs">Net Wt (Kg)</TableHead>
+                                      <TableHead className="text-xs">Date</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {t.materialList.flatMap(m => m.batches).map((bd, i) => (
+                                      <TableRow key={i}>
+                                        <TableCell className="text-xs">{bd.batchNumber}</TableCell>
+                                        <TableCell className="text-xs">{bd.material}</TableCell>
+                                        <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
+                                        <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
