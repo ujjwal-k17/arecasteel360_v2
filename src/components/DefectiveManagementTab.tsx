@@ -50,6 +50,7 @@ export default function DefectiveManagementTab() {
   const insertDefSale = useInsertDefectiveSale();
   const [sellDialog, setSellDialog] = useState<DefectiveDetail | null>(null);
   const [saleForm, setSaleForm] = useState({ order_id: '', invoice_number: '', sales_date: '', quantity: '' });
+  const [expandedMaterial, setExpandedMaterial] = useState<string | null>(null);
   const [expandedSku, setExpandedSku] = useState<string | null>(null);
   const [moveBackDialog, setMoveBackDialog] = useState<DefectiveDetail | null>(null);
 
