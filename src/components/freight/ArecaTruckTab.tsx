@@ -42,6 +42,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
 
   const [expDialog, setExpDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
   const [expForm, setExpForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), driver_expense: '', cng_amount: '', toll_parking: '', truck_expense: '', truck_expense_desc: '', other_expense: '', other_expense_desc: '' });
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
 
   const manualTrips: UnifiedTrip[] = useMemo(() =>
     trips.filter(t => t.truck_number === truckNumber).map(t => ({
@@ -57,19 +58,47 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
       manual_id: t.id,
     })), [trips, truckNumber]);
 
+  const truckSuffix = truckNumber.slice(-4); // last 4 chars of truck plate as ref
+
   const allTrips = useMemo(() => {
     const combined = [...manualTrips, ...externalDispatches, ...externalPurchases];
-    return combined.sort((a, b) => (b.trip_date || '').localeCompare(a.trip_date || ''));
-  }, [manualTrips, externalDispatches, externalPurchases]);
+    // Sort ascending by date first to assign deterministic per-day counters
+    const asc = [...combined].sort((a, b) => (a.trip_date || '').localeCompare(b.trip_date || ''));
+    const counters: Record<string, number> = {};
+    const withIds = asc.map(t => {
+      const dateKey = t.trip_date || '';
+      counters[dateKey] = (counters[dateKey] || 0) + 1;
+      if (t.trip_id) return t; // manual trips already have trip_id
+      const d = dateKey ? new Date(dateKey) : null;
+      const datePrefix = d
+        ? `${String(d.getDate()).padStart(2,'0')}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getFullYear()).slice(-2)}`
+        : '------';
+      const seq = String(counters[dateKey]).padStart(2, '0');
+      return { ...t, trip_id: `${datePrefix}/${truckSuffix}/${seq}` };
+    });
+    return withIds.sort((a, b) => (b.trip_date || '').localeCompare(a.trip_date || ''));
+  }, [manualTrips, externalDispatches, externalPurchases, truckSuffix]);
 
-  const expenseByKey = useMemo(() => {
-    const map: Record<string, number> = {};
+  const expensesByKey = useMemo(() => {
+    const map: Record<string, typeof expenses> = {};
     expenses.forEach(e => {
-      if (e.truck_trip_id) map[`manual:${e.truck_trip_id}`] = (map[`manual:${e.truck_trip_id}`] || 0) + Number(e.total_amount || 0);
-      else if (e.source_ref) map[`${e.source_kind}:${e.source_ref}`] = (map[`${e.source_kind}:${e.source_ref}`] || 0) + Number(e.total_amount || 0);
+      const key = e.truck_trip_id
+        ? `manual:${e.truck_trip_id}`
+        : (e.source_ref ? `${e.source_kind}:${e.source_ref}` : null);
+      if (!key) return;
+      if (!map[key]) map[key] = [] as any;
+      (map[key] as any).push(e);
     });
     return map;
   }, [expenses]);
+
+  const expenseByKey = useMemo(() => {
+    const map: Record<string, number> = {};
+    Object.entries(expensesByKey).forEach(([k, list]) => {
+      map[k] = (list as any[]).reduce((s, e) => s + Number(e.total_amount || 0), 0);
+    });
+    return map;
+  }, [expensesByKey]);
 
   const handleAddTrip = async () => {
     if (!tripForm.document_number.trim()) { toast.error('Document number required'); return; }
@@ -153,7 +182,13 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                   <TableCell className="text-xs">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted">{t.trip_type}</span>
                   </TableCell>
-                  <TableCell className="text-xs font-mono-num">{exp > 0 ? `₹${exp.toFixed(2)}` : '-'}</TableCell>
+                  <TableCell className="text-xs font-mono-num">
+                    {exp > 0 ? (
+                      <button className="text-primary hover:underline" onClick={() => setDetailsDialog({ open: true, trip: t })}>
+                        ₹{exp.toFixed(2)}
+                      </button>
+                    ) : '-'}
+                  </TableCell>
                   <TableCell className="text-xs">
                     <div className="flex gap-1">
                       <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setExpDialog({ open: true, trip: t })}>
@@ -224,6 +259,61 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
           <DialogFooter>
             <Button variant="ghost" onClick={() => setExpDialog({ open: false, trip: null })}>Cancel</Button>
             <Button onClick={handleAddExpense} disabled={insertExpense.isPending}>Submit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Expense Details Dialog */}
+      <Dialog open={detailsDialog.open} onOpenChange={o => setDetailsDialog(p => ({ ...p, open: o }))}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Expense Details — {detailsDialog.trip?.trip_id || detailsDialog.trip?.document_number}</DialogTitle></DialogHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow className="bg-muted/50">
+                <TableHead className="text-xs">Date</TableHead>
+                <TableHead className="text-xs text-right">Driver</TableHead>
+                <TableHead className="text-xs text-right">CNG</TableHead>
+                <TableHead className="text-xs text-right">Toll/Parking</TableHead>
+                <TableHead className="text-xs text-right">Truck</TableHead>
+                <TableHead className="text-xs text-right">Other</TableHead>
+                <TableHead className="text-xs text-right">Total</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {(() => {
+                  const list = (detailsDialog.trip ? expensesByKey[detailsDialog.trip.key] : []) || [];
+                  if ((list as any[]).length === 0) return <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-4">No expenses recorded.</TableCell></TableRow>;
+                  const rows: JSX.Element[] = [];
+                  (list as any[]).forEach((e: any) => {
+                    rows.push(
+                      <TableRow key={e.id}>
+                        <TableCell className="text-xs">{new Date(e.expense_date).toLocaleDateString('en-IN')}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.driver_expense || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.cng_amount || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.toll_parking || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.truck_expense || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num">{Number(e.other_expense || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono-num font-semibold">₹{Number(e.total_amount || 0).toFixed(2)}</TableCell>
+                      </TableRow>
+                    );
+                    if (e.truck_expense_desc || e.other_expense_desc) {
+                      rows.push(
+                        <TableRow key={`${e.id}-desc`}>
+                          <TableCell colSpan={7} className="text-[11px] text-muted-foreground italic">
+                            {e.truck_expense_desc && <span>Truck: {e.truck_expense_desc}</span>}
+                            {e.truck_expense_desc && e.other_expense_desc && <span> · </span>}
+                            {e.other_expense_desc && <span>Other: {e.other_expense_desc}</span>}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  });
+                  return rows;
+                })()}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDetailsDialog({ open: false, trip: null })}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
