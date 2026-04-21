@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useAllActions } from '@/hooks/useBatches';
 import { useQueryClient } from '@tanstack/react-query';
 import { useScrapSales, useInsertScrapSale } from '@/hooks/useScrapSales';
+import { useInsertCashEntry } from '@/hooks/useCashBook';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -26,8 +28,9 @@ export default function ScrapManagementTab() {
   const queryClient = useQueryClient();
   const { data: scrapSales } = useScrapSales();
   const insertScrapSale = useInsertScrapSale();
+  const insertCash = useInsertCashEntry();
   const [sellDialog, setSellDialog] = useState<{ scrapType: string; material: string } | null>(null);
-  const [saleForm, setSaleForm] = useState({ qty_sold: '', sales_date: '', amount_received: '' });
+  const [saleForm, setSaleForm] = useState<{ qty_sold: string; sales_date: string; amount_received: string; sales_type: 'Cash' | 'Invoice'; invoice_number: string; buyer_name: string }>({ qty_sold: '', sales_date: '', amount_received: '', sales_type: 'Invoice', invoice_number: '', buyer_name: '' });
   const [expandedScrapKey, setExpandedScrapKey] = useState<string | null>(null);
   const [expandedMaterialKey, setExpandedMaterialKey] = useState<string | null>(null);
   const [expandedSoldKey, setExpandedSoldKey] = useState<string | null>(null);
@@ -86,18 +89,38 @@ export default function ScrapManagementTab() {
 
   const handleSell = async () => {
     if (!sellDialog) return;
+    if (saleForm.sales_type === 'Cash' && !saleForm.buyer_name.trim()) { toast.error('Buyer name is required for Cash sale'); return; }
+    if (saleForm.sales_type === 'Invoice' && !saleForm.invoice_number.trim()) { toast.error('Invoice number is required'); return; }
     try {
-      await insertScrapSale.mutateAsync({
+      const sale = await insertScrapSale.mutateAsync({
         scrap_type: sellDialog.scrapType,
         material: sellDialog.material,
         qty_sold: saleForm.qty_sold ? Number(saleForm.qty_sold) : 0,
         sales_date: saleForm.sales_date || null,
         amount_received: saleForm.amount_received ? Number(saleForm.amount_received) : 0,
+        sales_type: saleForm.sales_type,
+        invoice_number: saleForm.sales_type === 'Invoice' ? saleForm.invoice_number : null,
+        buyer_name: saleForm.sales_type === 'Cash' ? saleForm.buyer_name : null,
         weight_slip_url: null,
       } as any);
+      // If Cash, push to Cash In > Receivable
+      if (saleForm.sales_type === 'Cash' && Number(saleForm.amount_received) > 0) {
+        await insertCash.mutateAsync({
+          direction: 'in',
+          status: 'receivable',
+          entry_date: saleForm.sales_date || new Date().toISOString().slice(0, 10),
+          amount: Number(saleForm.amount_received),
+          debtor_name: saleForm.buyer_name,
+          category: 'Scrap Sales',
+          sub_category: sellDialog.scrapType,
+          comments: `${sellDialog.material} · ${saleForm.qty_sold} Kg`,
+          source_type: 'scrap_sale',
+          source_id: (sale as any)?.id || null,
+        } as any);
+      }
       toast.success('Scrap sale recorded');
       setSellDialog(null);
-      setSaleForm({ qty_sold: '', sales_date: '', amount_received: '' });
+      setSaleForm({ qty_sold: '', sales_date: '', amount_received: '', sales_type: 'Invoice', invoice_number: '', buyer_name: '' });
     } catch { toast.error('Failed'); }
   };
 
@@ -337,6 +360,21 @@ export default function ScrapManagementTab() {
               <div><Label className="text-xs">Qty Sold (Net Weight Kg)</Label><Input type="number" value={saleForm.qty_sold} onChange={e => setSaleForm(v => ({ ...v, qty_sold: e.target.value }))} /></div>
               <div><Label className="text-xs">Sales Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
               <div><Label className="text-xs">Amount Received (₹)</Label><Input type="number" value={saleForm.amount_received} onChange={e => setSaleForm(v => ({ ...v, amount_received: e.target.value }))} /></div>
+              <div>
+                <Label className="text-xs">Sales Type</Label>
+                <Select value={saleForm.sales_type} onValueChange={(v: 'Cash' | 'Invoice') => setSaleForm(s => ({ ...s, sales_type: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Invoice">Invoice</SelectItem>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {saleForm.sales_type === 'Invoice' ? (
+                <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
+              ) : (
+                <div><Label className="text-xs">Buyer Name <span className="text-destructive">*</span></Label><Input value={saleForm.buyer_name} onChange={e => setSaleForm(v => ({ ...v, buyer_name: e.target.value }))} placeholder="Required" /></div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setSellDialog(null)}>Cancel</Button>

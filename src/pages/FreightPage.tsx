@@ -14,6 +14,7 @@ import { RefreshCw, Download, Truck, ChevronDown, ChevronUp, Plus, IndianRupee }
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { FreightDetailsDialog } from '@/components/freight/FreightDetailsDialog';
+import { ArecaTruckTab, type UnifiedTrip } from '@/components/freight/ArecaTruckTab';
 
 const DISPATCH_TYPES = [
   { value: 'Ex-Sales', label: 'Ex-Sales' },
@@ -598,42 +599,72 @@ function FreightPage() {
 
         {/* Areca Trucks */}
         <TabsContent value="areca-trucks">
-          <Tabs defaultValue="areca-0720" className="mt-2">
-            <TabsList>
-              <TabsTrigger value="areca-0720">UP14KT0750</TabsTrigger>
-              <TabsTrigger value="areca-2720">UP14QT2750</TabsTrigger>
-            </TabsList>
-            <TabsContent value="areca-0720">
-              <DispatchTable
-                data={filteredMappedItems.filter(s => s.dispatch_type === 'Areca 0720')}
-                showMoveBack
-                showSourceColumn
-                onMoveBack={(inv, item) => {
-                  if (item?.purchaseBatches) {
-                    item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
-                  } else {
-                    updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
-                  }
-                }}
-                onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Areca 0720'), 'UP14KT0750')}
-              />
-            </TabsContent>
-            <TabsContent value="areca-2720">
-              <DispatchTable
-                data={filteredMappedItems.filter(s => s.dispatch_type === 'Areca 2720')}
-                showMoveBack
-                showSourceColumn
-                onMoveBack={(inv, item) => {
-                  if (item?.purchaseBatches) {
-                    item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
-                  } else {
-                    updateDispatchType.mutate({ invoice_number: inv, dispatch_type: null });
-                  }
-                }}
-                onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Areca 2720'), 'UP14QT2750')}
-              />
-            </TabsContent>
-          </Tabs>
+          {(() => {
+            const buildTrips = (dispatchKey: 'Areca 0720' | 'Areca 2720', truckLabel: string) => {
+              const items = filteredMappedItems.filter(s => s.dispatch_type === dispatchKey);
+              const dispatches: UnifiedTrip[] = items.filter(i => i.source_type !== 'purchase').map(i => ({
+                key: `dispatch:${i.invoice_number}`,
+                source: 'dispatch',
+                trip_id: null,
+                document_number: i.invoice_number,
+                trip_date: i.invoice_date || '',
+                source_destination: i.customer_name || '-',
+                total_qty: i.total_qty,
+                trip_type: 'Sales',
+                truck_number: truckLabel,
+                source_ref: i.invoice_number,
+              }));
+              const purchases: UnifiedTrip[] = items.filter(i => i.source_type === 'purchase').map(i => ({
+                key: `purchase:${i.invoice_number}`,
+                source: 'purchase',
+                trip_id: null,
+                document_number: i.invoice_number,
+                trip_date: i.invoice_date || '',
+                source_destination: i.customer_name || '-',
+                total_qty: i.total_qty,
+                trip_type: 'Purchase',
+                truck_number: truckLabel,
+                source_ref: i.invoice_number,
+              }));
+              return { dispatches, purchases, items };
+            };
+            const moveBack = (dispatchKey: 'Areca 0720' | 'Areca 2720') => (t: UnifiedTrip) => {
+              const item = filteredMappedItems.find(i => i.invoice_number === t.document_number && i.dispatch_type === dispatchKey);
+              if (item?.purchaseBatches) {
+                item.purchaseBatches.forEach(b => updateDispatchType.mutate({ invoice_number: b.batch_number, dispatch_type: null }));
+              } else {
+                updateDispatchType.mutate({ invoice_number: t.document_number, dispatch_type: null });
+              }
+            };
+            const k = buildTrips('Areca 0720', 'UP14KT0750');
+            const q = buildTrips('Areca 2720', 'UP14QT2750');
+            return (
+              <Tabs defaultValue="areca-0720" className="mt-2">
+                <TabsList>
+                  <TabsTrigger value="areca-0720">UP14KT0750</TabsTrigger>
+                  <TabsTrigger value="areca-2720">UP14QT2750</TabsTrigger>
+                </TabsList>
+                <TabsContent value="areca-0720" className="mt-3">
+                  <ArecaTruckTab
+                    truckNumber="UP14KT0750"
+                    internalKey="Areca 0720"
+                    externalDispatches={k.dispatches}
+                    externalPurchases={k.purchases}
+                    onMoveBack={moveBack('Areca 0720')}
+                  />
+                </TabsContent>
+                <TabsContent value="areca-2720" className="mt-3">
+                  <ArecaTruckTab
+                    truckNumber="UP14QT2750"
+                    internalKey="Areca 2720"
+                    externalDispatches={q.dispatches}
+                    externalPurchases={q.purchases}
+                    onMoveBack={moveBack('Areca 2720')}
+                  />
+                </TabsContent>
+              </Tabs>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
