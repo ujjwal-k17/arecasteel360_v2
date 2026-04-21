@@ -33,30 +33,44 @@ export default function ScrapManagementTab() {
 
   const scrapActions = (actions as any[] || []).filter((a: any) => a.action_type === 'scrap');
 
-  const scrapMap = new Map<string, { scrapType: string; material: string; totalWeight: number; batches: ScrapBatchDetail[] }>();
+  // Group by scrap_type → material → batches
+  const typeMap = new Map<string, { scrapType: string; totalWeight: number; materials: Map<string, { material: string; totalWeight: number; batches: ScrapBatchDetail[] }> }>();
   scrapActions.forEach((a: any) => {
     const material = a.batches?.material || 'Unknown';
-    const key = `${a.scrap_type}|${material}`;
-    if (!scrapMap.has(key)) scrapMap.set(key, { scrapType: a.scrap_type, material, totalWeight: 0, batches: [] });
-    const entry = scrapMap.get(key)!;
-    entry.totalWeight += a.net_weight || 0;
-    entry.batches.push({
+    const scrapType = a.scrap_type;
+    if (!typeMap.has(scrapType)) typeMap.set(scrapType, { scrapType, totalWeight: 0, materials: new Map() });
+    const t = typeMap.get(scrapType)!;
+    if (!t.materials.has(material)) t.materials.set(material, { material, totalWeight: 0, batches: [] });
+    const m = t.materials.get(material)!;
+    const wt = a.net_weight || 0;
+    m.totalWeight += wt;
+    t.totalWeight += wt;
+    m.batches.push({
       batchNumber: a.batches?.batch_number || 'N/A',
       material,
-      scrapType: a.scrap_type,
-      netWeight: a.net_weight || 0,
+      scrapType,
+      netWeight: wt,
       createdAt: a.created_at,
     });
   });
 
+  // Subtract sold quantities from material totals
   (scrapSales || []).forEach(s => {
-    const key = `${s.scrap_type}|${s.material || 'Unknown'}`;
-    if (scrapMap.has(key)) {
-      scrapMap.get(key)!.totalWeight -= s.qty_sold || 0;
-    }
+    const t = typeMap.get(s.scrap_type);
+    if (!t) return;
+    const m = t.materials.get(s.material || 'Unknown');
+    if (!m) return;
+    const sold = s.qty_sold || 0;
+    m.totalWeight -= sold;
+    t.totalWeight -= sold;
   });
 
-  const scrapRows = Array.from(scrapMap.values()).filter(r => r.totalWeight > 0);
+  const scrapTypeRows = Array.from(typeMap.values())
+    .map(t => ({
+      ...t,
+      materialList: Array.from(t.materials.values()).filter(m => m.totalWeight > 0),
+    }))
+    .filter(t => t.materialList.length > 0);
 
   const soldGroupMap = new Map<string, { scrapType: string; material: string; totalQty: number; totalAmount: number; sales: typeof scrapSales }>();
   (scrapSales || []).forEach(s => {
