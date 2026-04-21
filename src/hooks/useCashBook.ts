@@ -1,20 +1,37 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 
-export type CashEntry = Tables<'cash_entries'>;
+export interface CashEntry {
+  id: string;
+  direction: 'in' | 'out';
+  status: 'receivable' | 'received';
+  entry_date: string;
+  amount: number;
+  category: string | null;
+  sub_category: string | null;
+  comments: string | null;
+  debtor_name: string | null;
+  buyer_name: string | null;
+  source_type: string | null;
+  source_id: string | null;
+  received_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const sb = supabase as any;
 
 export function useCashEntries() {
   return useQuery({
     queryKey: ['cash_entries'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('cash_entries')
         .select('*')
         .order('entry_date', { ascending: false });
       if (error) throw error;
-      return data as CashEntry[];
+      return (data || []) as CashEntry[];
     },
   });
 }
@@ -23,7 +40,7 @@ export function useInsertCashEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (entry: Partial<CashEntry>) => {
-      const { data, error } = await supabase.from('cash_entries').insert(entry as any).select().single();
+      const { data, error } = await sb.from('cash_entries').insert(entry).select().single();
       if (error) throw error;
       return data as CashEntry;
     },
@@ -36,7 +53,7 @@ export function useUpdateCashEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...rest }: Partial<CashEntry> & { id: string }) => {
-      const { error } = await supabase.from('cash_entries').update(rest as any).eq('id', id);
+      const { error } = await sb.from('cash_entries').update(rest).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cash_entries'] }),

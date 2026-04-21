@@ -1,10 +1,39 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 
-export type TruckTrip = Tables<'truck_trips'>;
-export type TruckTripExpense = Tables<'truck_trip_expenses'>;
+export interface TruckTrip {
+  id: string;
+  truck_number: string;
+  trip_id: string;
+  trip_type: 'Purchase' | 'Sales' | 'Job Work Out' | 'Job Work Return';
+  trip_date: string;
+  document_number: string | null;
+  source_destination: string | null;
+  quantity: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TruckTripExpense {
+  id: string;
+  truck_trip_id: string | null;
+  source_kind: 'manual_trip' | 'purchase' | 'dispatch';
+  source_ref: string | null;
+  truck_number: string;
+  expense_date: string;
+  driver_expense: number | null;
+  cng_amount: number | null;
+  toll_parking: number | null;
+  truck_expense: number | null;
+  truck_expense_desc: string | null;
+  other_expense: number | null;
+  other_expense_desc: string | null;
+  total_amount: number | null;
+  created_at: string;
+}
+
+const sb = supabase as any;
 
 export function useTruckTrips() {
   return useQuery({
