@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+
 import { ChevronDown, ChevronRight, RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -32,30 +33,44 @@ export default function ScrapManagementTab() {
 
   const scrapActions = (actions as any[] || []).filter((a: any) => a.action_type === 'scrap');
 
-  const scrapMap = new Map<string, { scrapType: string; material: string; totalWeight: number; batches: ScrapBatchDetail[] }>();
+  // Group by scrap_type → material → batches
+  const typeMap = new Map<string, { scrapType: string; totalWeight: number; materials: Map<string, { material: string; totalWeight: number; batches: ScrapBatchDetail[] }> }>();
   scrapActions.forEach((a: any) => {
     const material = a.batches?.material || 'Unknown';
-    const key = `${a.scrap_type}|${material}`;
-    if (!scrapMap.has(key)) scrapMap.set(key, { scrapType: a.scrap_type, material, totalWeight: 0, batches: [] });
-    const entry = scrapMap.get(key)!;
-    entry.totalWeight += a.net_weight || 0;
-    entry.batches.push({
+    const scrapType = a.scrap_type;
+    if (!typeMap.has(scrapType)) typeMap.set(scrapType, { scrapType, totalWeight: 0, materials: new Map() });
+    const t = typeMap.get(scrapType)!;
+    if (!t.materials.has(material)) t.materials.set(material, { material, totalWeight: 0, batches: [] });
+    const m = t.materials.get(material)!;
+    const wt = a.net_weight || 0;
+    m.totalWeight += wt;
+    t.totalWeight += wt;
+    m.batches.push({
       batchNumber: a.batches?.batch_number || 'N/A',
       material,
-      scrapType: a.scrap_type,
-      netWeight: a.net_weight || 0,
+      scrapType,
+      netWeight: wt,
       createdAt: a.created_at,
     });
   });
 
+  // Subtract sold quantities from material totals
   (scrapSales || []).forEach(s => {
-    const key = `${s.scrap_type}|${s.material || 'Unknown'}`;
-    if (scrapMap.has(key)) {
-      scrapMap.get(key)!.totalWeight -= s.qty_sold || 0;
-    }
+    const t = typeMap.get(s.scrap_type);
+    if (!t) return;
+    const m = t.materials.get(s.material || 'Unknown');
+    if (!m) return;
+    const sold = s.qty_sold || 0;
+    m.totalWeight -= sold;
+    t.totalWeight -= sold;
   });
 
-  const scrapRows = Array.from(scrapMap.values()).filter(r => r.totalWeight > 0);
+  const scrapTypeRows = Array.from(typeMap.values())
+    .map(t => ({
+      ...t,
+      materialList: Array.from(t.materials.values()).filter(m => m.totalWeight > 0),
+    }))
+    .filter(t => t.materialList.length > 0);
 
   const soldGroupMap = new Map<string, { scrapType: string; material: string; totalQty: number; totalAmount: number; sales: typeof scrapSales }>();
   (scrapSales || []).forEach(s => {
@@ -87,14 +102,16 @@ export default function ScrapManagementTab() {
 
   const handleDownloadScrapInventory = () => {
     const allBatchDetails: { 'Scrap Type': string; 'Batch Number': string; 'Material': string; 'Net Weight (Kg)': string; 'Date': string }[] = [];
-    scrapRows.forEach(r => {
-      r.batches.forEach(bd => {
-        allBatchDetails.push({
-          'Scrap Type': bd.scrapType,
-          'Batch Number': bd.batchNumber,
-          'Material': bd.material,
-          'Net Weight (Kg)': bd.netWeight.toFixed(2),
-          'Date': bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '',
+    scrapTypeRows.forEach(t => {
+      t.materialList.forEach(m => {
+        m.batches.forEach(bd => {
+          allBatchDetails.push({
+            'Scrap Type': bd.scrapType,
+            'Batch Number': bd.batchNumber,
+            'Material': bd.material,
+            'Net Weight (Kg)': bd.netWeight.toFixed(2),
+            'Date': bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '',
+          });
         });
       });
     });
@@ -152,54 +169,75 @@ export default function ScrapManagementTab() {
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-8"></TableHead>
                   <TableHead className="text-xs font-semibold">Scrap Type</TableHead>
-                  <TableHead className="text-xs font-semibold">Material</TableHead>
-                  <TableHead className="text-xs font-semibold">Qty (Kg)</TableHead>
-                  <TableHead className="text-xs font-semibold">Action</TableHead>
+                  <TableHead className="text-xs font-semibold">Materials</TableHead>
+                  <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scrapRows.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No scrap data yet.</TableCell></TableRow>
+                {scrapTypeRows.length === 0 && (
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No scrap data yet.</TableCell></TableRow>
                 )}
-                {scrapRows.map(r => {
-                  const key = `${r.scrapType}|${r.material}`;
+                {scrapTypeRows.map(t => {
+                  const key = t.scrapType;
                   const isExpanded = expandedScrapKey === key;
                   return (
                     <>
                       <TableRow key={key} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedScrapKey(isExpanded ? null : key)}>
                         <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
-                        <TableCell className="text-sm">{r.scrapType}</TableCell>
-                        <TableCell className="text-sm">{r.material}</TableCell>
-                        <TableCell className="text-sm font-mono-num font-semibold">{r.totalWeight.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog({ scrapType: r.scrapType, material: r.material }); }}>Sell</Button>
-                        </TableCell>
+                        <TableCell className="text-sm font-semibold">{t.scrapType}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{t.materialList.length} material{t.materialList.length !== 1 ? 's' : ''}</TableCell>
+                        <TableCell className="text-sm font-mono-num font-semibold">{t.totalWeight.toFixed(2)}</TableCell>
                       </TableRow>
                       {isExpanded && (
                         <TableRow key={`${key}-detail`}>
-                          <TableCell colSpan={5} className="p-0">
-                            <div className="bg-muted/10 border-t px-6 py-2">
-                              <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs">Batch No</TableHead>
-                                    <TableHead className="text-xs">Material</TableHead>
-                                    <TableHead className="text-xs">Net Wt (Kg)</TableHead>
-                                    <TableHead className="text-xs">Date</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {r.batches.map((bd, i) => (
-                                    <TableRow key={i}>
-                                      <TableCell className="text-xs">{bd.batchNumber}</TableCell>
-                                      <TableCell className="text-xs">{bd.material}</TableCell>
-                                      <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
-                                      <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
+                          <TableCell colSpan={4} className="p-0">
+                            <div className="bg-muted/10 border-t px-6 py-3 space-y-4">
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">Material-wise breakdown</p>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">Material</TableHead>
+                                      <TableHead className="text-xs">Qty (Kg)</TableHead>
+                                      <TableHead className="text-xs">Action</TableHead>
                                     </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {t.materialList.map(m => (
+                                      <TableRow key={m.material}>
+                                        <TableCell className="text-xs">{m.material}</TableCell>
+                                        <TableCell className="text-xs font-mono-num font-semibold">{m.totalWeight.toFixed(2)}</TableCell>
+                                        <TableCell>
+                                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog({ scrapType: t.scrapType, material: m.material }); }}>Sell</Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">Batch No</TableHead>
+                                      <TableHead className="text-xs">Material</TableHead>
+                                      <TableHead className="text-xs">Net Wt (Kg)</TableHead>
+                                      <TableHead className="text-xs">Date</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {t.materialList.flatMap(m => m.batches).map((bd, i) => (
+                                      <TableRow key={i}>
+                                        <TableCell className="text-xs">{bd.batchNumber}</TableCell>
+                                        <TableCell className="text-xs">{bd.material}</TableCell>
+                                        <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
+                                        <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -283,7 +321,7 @@ export default function ScrapManagementTab() {
         {/* Sell Dialog */}
         <Dialog open={!!sellDialog} onOpenChange={() => setSellDialog(null)}>
           <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>Sell Scrap — {sellDialog?.scrapType}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Sell Scrap — {sellDialog?.scrapType} ({sellDialog?.material})</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label className="text-xs">Qty Sold (Net Weight Kg)</Label><Input type="number" value={saleForm.qty_sold} onChange={e => setSaleForm(v => ({ ...v, qty_sold: e.target.value }))} /></div>
               <div><Label className="text-xs">Sales Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
