@@ -126,3 +126,43 @@ export function useInsertTruckExpense() {
     onError: (e: any) => toast.error(e.message || 'Failed to record expense'),
   });
 }
+
+export function useDeleteTruckTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (trip_id: string) => {
+      // Find linked expenses (to remove their cash_entries too)
+      const { data: exps, error: expErr } = await sb
+        .from('truck_trip_expenses')
+        .select('id')
+        .eq('truck_trip_id', trip_id);
+      if (expErr) throw expErr;
+      const expIds = (exps || []).map((e: any) => e.id);
+
+      if (expIds.length > 0) {
+        const { error: cashErr } = await sb
+          .from('cash_entries')
+          .delete()
+          .eq('source_type', 'truck_expense')
+          .in('source_id', expIds);
+        if (cashErr) throw cashErr;
+
+        const { error: delExpErr } = await sb
+          .from('truck_trip_expenses')
+          .delete()
+          .eq('truck_trip_id', trip_id);
+        if (delExpErr) throw delExpErr;
+      }
+
+      const { error } = await sb.from('truck_trips').delete().eq('id', trip_id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['truck_trips'] });
+      qc.invalidateQueries({ queryKey: ['truck_trip_expenses'] });
+      qc.invalidateQueries({ queryKey: ['cash_entries'] });
+    },
+    onError: (e: any) => toast.error(e.message || 'Failed to delete trip'),
+  });
+}
