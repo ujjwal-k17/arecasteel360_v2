@@ -102,14 +102,16 @@ export default function ScrapManagementTab() {
 
   const handleDownloadScrapInventory = () => {
     const allBatchDetails: { 'Scrap Type': string; 'Batch Number': string; 'Material': string; 'Net Weight (Kg)': string; 'Date': string }[] = [];
-    scrapRows.forEach(r => {
-      r.batches.forEach(bd => {
-        allBatchDetails.push({
-          'Scrap Type': bd.scrapType,
-          'Batch Number': bd.batchNumber,
-          'Material': bd.material,
-          'Net Weight (Kg)': bd.netWeight.toFixed(2),
-          'Date': bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '',
+    scrapTypeRows.forEach(t => {
+      t.materialList.forEach(m => {
+        m.batches.forEach(bd => {
+          allBatchDetails.push({
+            'Scrap Type': bd.scrapType,
+            'Batch Number': bd.batchNumber,
+            'Material': bd.material,
+            'Net Weight (Kg)': bd.netWeight.toFixed(2),
+            'Date': bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '',
+          });
         });
       });
     });
