@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, IndianRupee, Truck } from 'lucide-react';
+import { Plus, IndianRupee, Truck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense } from '@/hooks/useTruckTrips';
+import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense, useDeleteTruckTrip } from '@/hooks/useTruckTrips';
 
 export interface UnifiedTrip {
   key: string;
