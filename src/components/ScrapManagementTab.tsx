@@ -98,7 +98,7 @@ export default function ScrapManagementTab() {
         qty_sold: saleForm.qty_sold ? Number(saleForm.qty_sold) : 0,
         sales_date: saleForm.sales_date || null,
         amount_received: saleForm.amount_received ? Number(saleForm.amount_received) : 0,
-        sales_type: saleForm.sales_type,
+        sales_type: saleForm.sales_type.toLowerCase(),
         invoice_number: saleForm.sales_type === 'Invoice' ? saleForm.invoice_number : null,
         buyer_name: saleForm.sales_type === 'Cash' ? saleForm.buyer_name : null,
         weight_slip_url: null,
