@@ -14,6 +14,7 @@ import { RefreshCw, Download, Truck, ChevronDown, ChevronUp, Plus, IndianRupee }
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { FreightDetailsDialog } from '@/components/freight/FreightDetailsDialog';
+import { ArecaTruckTab, type UnifiedTrip } from '@/components/freight/ArecaTruckTab';
 
 const DISPATCH_TYPES = [
   { value: 'Ex-Sales', label: 'Ex-Sales' },
