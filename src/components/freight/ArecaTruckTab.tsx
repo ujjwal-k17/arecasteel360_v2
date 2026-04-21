@@ -79,14 +79,26 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
     return withIds.sort((a, b) => (b.trip_date || '').localeCompare(a.trip_date || ''));
   }, [manualTrips, externalDispatches, externalPurchases, truckSuffix]);
 
-  const expenseByKey = useMemo(() => {
-    const map: Record<string, number> = {};
+  const expensesByKey = useMemo(() => {
+    const map: Record<string, typeof expenses> = {};
     expenses.forEach(e => {
-      if (e.truck_trip_id) map[`manual:${e.truck_trip_id}`] = (map[`manual:${e.truck_trip_id}`] || 0) + Number(e.total_amount || 0);
-      else if (e.source_ref) map[`${e.source_kind}:${e.source_ref}`] = (map[`${e.source_kind}:${e.source_ref}`] || 0) + Number(e.total_amount || 0);
+      const key = e.truck_trip_id
+        ? `manual:${e.truck_trip_id}`
+        : (e.source_ref ? `${e.source_kind}:${e.source_ref}` : null);
+      if (!key) return;
+      if (!map[key]) map[key] = [] as any;
+      (map[key] as any).push(e);
     });
     return map;
   }, [expenses]);
+
+  const expenseByKey = useMemo(() => {
+    const map: Record<string, number> = {};
+    Object.entries(expensesByKey).forEach(([k, list]) => {
+      map[k] = (list as any[]).reduce((s, e) => s + Number(e.total_amount || 0), 0);
+    });
+    return map;
+  }, [expensesByKey]);
 
   const handleAddTrip = async () => {
     if (!tripForm.document_number.trim()) { toast.error('Document number required'); return; }
