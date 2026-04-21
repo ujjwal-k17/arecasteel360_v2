@@ -39,12 +39,9 @@ export function useTruckTrips() {
   return useQuery({
     queryKey: ['truck_trips'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('truck_trips')
-        .select('*')
-        .order('trip_date', { ascending: false });
+      const { data, error } = await sb.from('truck_trips').select('*').order('trip_date', { ascending: false });
       if (error) throw error;
-      return data as TruckTrip[];
+      return (data || []) as TruckTrip[];
     },
   });
 }
@@ -53,12 +50,9 @@ export function useTruckExpenses() {
   return useQuery({
     queryKey: ['truck_trip_expenses'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('truck_trip_expenses')
-        .select('*')
-        .order('expense_date', { ascending: false });
+      const { data, error } = await sb.from('truck_trip_expenses').select('*').order('expense_date', { ascending: false });
       if (error) throw error;
-      return data as TruckTripExpense[];
+      return (data || []) as TruckTripExpense[];
     },
   });
 }
@@ -67,24 +61,22 @@ export function useInsertTruckTrip() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (trip: Partial<TruckTrip>) => {
-      // Generate unique trip ID for the day per truck
       const dateObj = new Date(trip.trip_date as string);
       const dd = String(dateObj.getDate()).padStart(2, '0');
       const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
       const yy = String(dateObj.getFullYear()).slice(-2);
       const datePrefix = `${dd}${mm}${yy}`;
 
-      // Count existing trips for this truck on this date
-      const { data: existing, error: countErr } = await supabase
+      const { data: existing, error: countErr } = await sb
         .from('truck_trips')
         .select('trip_id')
         .eq('truck_number', trip.truck_number as string)
         .eq('trip_date', trip.trip_date as string);
       if (countErr) throw countErr;
-      const next = String((existing?.length || 0) + 1).padStart(2, '0');
+      const next = String(((existing as any[])?.length || 0) + 1).padStart(2, '0');
       const trip_id = `${datePrefix}/${next}`;
 
-      const { data, error } = await supabase.from('truck_trips').insert({ ...trip, trip_id } as any).select().single();
+      const { data, error } = await sb.from('truck_trips').insert({ ...trip, trip_id }).select().single();
       if (error) throw error;
       return data as TruckTrip;
     },
@@ -96,16 +88,12 @@ export function useInsertTruckTrip() {
 export function useInsertTruckExpense() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: {
-      expense: Partial<TruckTripExpense>;
-      trip_label: string; // "Trip ID / Doc number" for cash entry comments
-    }) => {
+    mutationFn: async (payload: { expense: Partial<TruckTripExpense>; trip_label: string }) => {
       const { expense, trip_label } = payload;
-      const { data, error } = await supabase.from('truck_trip_expenses').insert(expense as any).select().single();
+      const { data, error } = await sb.from('truck_trip_expenses').insert(expense).select().single();
       if (error) throw error;
       const exp = data as TruckTripExpense;
 
-      // Auto-create Cash Out entries for each non-zero expense line
       const lines: Array<{ subCat: string; amount: number; desc?: string | null }> = [
         { subCat: 'Driver', amount: exp.driver_expense || 0 },
         { subCat: 'CNG', amount: exp.cng_amount || 0 },
@@ -126,7 +114,7 @@ export function useInsertTruckExpense() {
           source_type: 'truck_expense',
           source_id: exp.id,
         }));
-        const { error: cashErr } = await supabase.from('cash_entries').insert(cashRows as any);
+        const { error: cashErr } = await sb.from('cash_entries').insert(cashRows);
         if (cashErr) throw cashErr;
       }
       return exp;
