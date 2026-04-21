@@ -29,6 +29,7 @@ export default function ScrapManagementTab() {
   const [sellDialog, setSellDialog] = useState<{ scrapType: string; material: string } | null>(null);
   const [saleForm, setSaleForm] = useState({ qty_sold: '', sales_date: '', amount_received: '' });
   const [expandedScrapKey, setExpandedScrapKey] = useState<string | null>(null);
+  const [expandedMaterialKey, setExpandedMaterialKey] = useState<string | null>(null);
   const [expandedSoldKey, setExpandedSoldKey] = useState<string | null>(null);
 
   const scrapActions = (actions as any[] || []).filter((a: any) => a.action_type === 'scrap');
