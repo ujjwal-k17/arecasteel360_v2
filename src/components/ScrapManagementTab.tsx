@@ -29,6 +29,7 @@ export default function ScrapManagementTab() {
   const [sellDialog, setSellDialog] = useState<{ scrapType: string; material: string } | null>(null);
   const [saleForm, setSaleForm] = useState({ qty_sold: '', sales_date: '', amount_received: '' });
   const [expandedScrapKey, setExpandedScrapKey] = useState<string | null>(null);
+  const [expandedMaterialKey, setExpandedMaterialKey] = useState<string | null>(null);
   const [expandedSoldKey, setExpandedSoldKey] = useState<string | null>(null);
 
   const scrapActions = (actions as any[] || []).filter((a: any) => a.action_type === 'scrap');
@@ -191,53 +192,63 @@ export default function ScrapManagementTab() {
                       {isExpanded && (
                         <TableRow key={`${key}-detail`}>
                           <TableCell colSpan={4} className="p-0">
-                            <div className="bg-muted/10 border-t px-6 py-3 space-y-4">
-                              <div>
-                                <p className="text-xs font-semibold text-muted-foreground mb-1">Material-wise breakdown</p>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead className="text-xs">Material</TableHead>
-                                      <TableHead className="text-xs">Qty (Kg)</TableHead>
-                                      <TableHead className="text-xs">Action</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {t.materialList.map(m => (
-                                      <TableRow key={m.material}>
-                                        <TableCell className="text-xs">{m.material}</TableCell>
-                                        <TableCell className="text-xs font-mono-num font-semibold">{m.totalWeight.toFixed(2)}</TableCell>
-                                        <TableCell>
-                                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog({ scrapType: t.scrapType, material: m.material }); }}>Sell</Button>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead className="text-xs">Batch No</TableHead>
-                                      <TableHead className="text-xs">Material</TableHead>
-                                      <TableHead className="text-xs">Net Wt (Kg)</TableHead>
-                                      <TableHead className="text-xs">Date</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {t.materialList.flatMap(m => m.batches).map((bd, i) => (
-                                      <TableRow key={i}>
-                                        <TableCell className="text-xs">{bd.batchNumber}</TableCell>
-                                        <TableCell className="text-xs">{bd.material}</TableCell>
-                                        <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
-                                        <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
+                            <div className="bg-muted/10 border-t px-6 py-3">
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">Material-wise breakdown</p>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-8"></TableHead>
+                                    <TableHead className="text-xs">Material</TableHead>
+                                    <TableHead className="text-xs">Qty (Kg)</TableHead>
+                                    <TableHead className="text-xs">Action</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {t.materialList.map(m => {
+                                    const mKey = `${t.scrapType}|${m.material}`;
+                                    const mExpanded = expandedMaterialKey === mKey;
+                                    return (
+                                      <>
+                                        <TableRow key={mKey} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedMaterialKey(mExpanded ? null : mKey)}>
+                                          <TableCell>{mExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                                          <TableCell className="text-xs">{m.material}</TableCell>
+                                          <TableCell className="text-xs font-mono-num font-semibold">{m.totalWeight.toFixed(2)}</TableCell>
+                                          <TableCell>
+                                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog({ scrapType: t.scrapType, material: m.material }); }}>Sell</Button>
+                                          </TableCell>
+                                        </TableRow>
+                                        {mExpanded && (
+                                          <TableRow key={`${mKey}-batches`}>
+                                            <TableCell colSpan={4} className="p-0">
+                                              <div className="bg-background border-t px-6 py-2">
+                                                <p className="text-xs font-semibold text-muted-foreground mb-1">Batch-wise details</p>
+                                                <Table>
+                                                  <TableHeader>
+                                                    <TableRow>
+                                                      <TableHead className="text-xs">Batch No</TableHead>
+                                                      <TableHead className="text-xs">Net Wt (Kg)</TableHead>
+                                                      <TableHead className="text-xs">Date</TableHead>
+                                                    </TableRow>
+                                                  </TableHeader>
+                                                  <TableBody>
+                                                    {m.batches.map((bd, i) => (
+                                                      <TableRow key={i}>
+                                                        <TableCell className="text-xs">{bd.batchNumber}</TableCell>
+                                                        <TableCell className="text-xs font-mono-num">{bd.netWeight.toFixed(2)}</TableCell>
+                                                        <TableCell className="text-xs">{bd.createdAt ? new Date(bd.createdAt).toLocaleDateString() : '-'}</TableCell>
+                                                      </TableRow>
+                                                    ))}
+                                                  </TableBody>
+                                                </Table>
+                                              </div>
+                                            </TableCell>
+                                          </TableRow>
+                                        )}
+                                      </>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
                             </div>
                           </TableCell>
                         </TableRow>
