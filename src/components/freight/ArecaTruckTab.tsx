@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, IndianRupee, Truck } from 'lucide-react';
+import { Plus, IndianRupee, Truck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense } from '@/hooks/useTruckTrips';
+import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense, useDeleteTruckTrip } from '@/hooks/useTruckTrips';
 
 export interface UnifiedTrip {
   key: string;
@@ -36,6 +36,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   const { data: expenses = [] } = useTruckExpenses();
   const insertTrip = useInsertTruckTrip();
   const insertExpense = useInsertTruckExpense();
+  const deleteTrip = useDeleteTruckTrip();
 
   const [tripDialog, setTripDialog] = useState(false);
   const [tripForm, setTripForm] = useState({ trip_type: 'Sales', trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
@@ -197,6 +198,21 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                       {t.source !== 'manual' && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => onMoveBack(t)}>
                           ← Move Back
+                        </Button>
+                      )}
+                      {t.source === 'manual' && t.manual_id && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-destructive hover:text-destructive"
+                          disabled={deleteTrip.isPending}
+                          onClick={() => {
+                            if (confirm(`Delete trip ${t.trip_id}? Any linked expenses and cash entries will also be removed.`)) {
+                              deleteTrip.mutate(t.manual_id!, { onSuccess: () => toast.success('Trip deleted') });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       )}
                     </div>
