@@ -21,6 +21,7 @@ interface DefectiveDetail {
   id: string;
   source: 'coil' | 'fg' | 'wip';
   sourceLabel: string;
+  material: string;
   skuKey: string;
   defectType: string;
   netWeight: number;
@@ -34,6 +35,12 @@ interface SKUDefectiveGroup {
   details: DefectiveDetail[];
 }
 
+interface MaterialDefectiveGroup {
+  material: string;
+  totalWeight: number;
+  skus: SKUDefectiveGroup[];
+}
+
 export default function DefectiveManagementTab() {
   const { data: batches } = useAllBatches();
   const queryClient = useQueryClient();
@@ -43,6 +50,7 @@ export default function DefectiveManagementTab() {
   const insertDefSale = useInsertDefectiveSale();
   const [sellDialog, setSellDialog] = useState<DefectiveDetail | null>(null);
   const [saleForm, setSaleForm] = useState({ order_id: '', invoice_number: '', sales_date: '', quantity: '' });
+  const [expandedMaterial, setExpandedMaterial] = useState<string | null>(null);
   const [expandedSku, setExpandedSku] = useState<string | null>(null);
   const [moveBackDialog, setMoveBackDialog] = useState<DefectiveDetail | null>(null);
 
@@ -71,10 +79,10 @@ export default function DefectiveManagementTab() {
 
   // Group all defective entries by SKU
   const skuGroups = useMemo(() => {
-    const map = new Map<string, SKUDefectiveGroup>();
+    const map = new Map<string, SKUDefectiveGroup & { material: string }>();
 
-    const addToGroup = (skuKey: string, detail: DefectiveDetail) => {
-      if (!map.has(skuKey)) map.set(skuKey, { skuKey, totalWeight: 0, details: [] });
+    const addToGroup = (skuKey: string, material: string, detail: DefectiveDetail) => {
+      if (!map.has(skuKey)) map.set(skuKey, { skuKey, material, totalWeight: 0, details: [] });
       const g = map.get(skuKey)!;
       g.totalWeight += detail.netWeight;
       g.details.push(detail);
@@ -84,11 +92,13 @@ export default function DefectiveManagementTab() {
     defectiveActions.forEach(a => {
       const batch = (batches || []).find(b => b.id === a.batch_id);
       if (!batch) return;
-      const skuKey = `${batch.material || '-'} | ${batch.thickness ?? '-'}x${batch.width ?? '-'} | ${batch.coating || '-'} | ${batch.grade || '-'}`;
-      addToGroup(skuKey, {
+      const material = batch.material || '-';
+      const skuKey = `${material} | ${batch.thickness ?? '-'}x${batch.width ?? '-'} | ${batch.coating || '-'} | ${batch.grade || '-'}`;
+      addToGroup(skuKey, material, {
         id: a.id,
         source: 'coil',
         sourceLabel: `Coil: ${batch.batch_number}`,
+        material,
         skuKey,
         defectType: a.defect_type || 'Unknown',
         netWeight: a.net_weight || 0,
@@ -100,13 +110,15 @@ export default function DefectiveManagementTab() {
     // FG defectives
     (fgDefectives || []).forEach((d: any) => {
       const fgItem = d.fg_items;
+      const material = fgItem?.material || '-';
       const skuKey = fgItem
-        ? `${fgItem.material || '-'} | ${fgItem.thickness ?? '-'}x${fgItem.width ?? '-'}${fgItem.length ? `x${fgItem.length}` : ''} | ${fgItem.coating || '-'} | ${fgItem.grade || '-'}`
+        ? `${material} | ${fgItem.thickness ?? '-'}x${fgItem.width ?? '-'}${fgItem.length ? `x${fgItem.length}` : ''} | ${fgItem.coating || '-'} | ${fgItem.grade || '-'}`
         : '-';
-      addToGroup(skuKey, {
+      addToGroup(skuKey, material, {
         id: d.id,
         source: 'fg',
         sourceLabel: fgItem ? `FG: ${fgItem.process || '-'}` : 'FG Item',
+        material,
         skuKey,
         defectType: d.defect_type || 'Unknown',
         netWeight: d.quantity || 0,
@@ -118,13 +130,15 @@ export default function DefectiveManagementTab() {
     // WIP defectives
     (wipDefectives || []).forEach((d: any) => {
       const wipItem = d.wip_items;
+      const material = wipItem?.material || '-';
       const skuKey = wipItem
-        ? `${wipItem.material || '-'} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'}${wipItem.length ? `x${wipItem.length}` : ''} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
+        ? `${material} | ${wipItem.thickness ?? '-'}x${wipItem.width ?? '-'}${wipItem.length ? `x${wipItem.length}` : ''} | ${wipItem.coating || '-'} | ${wipItem.grade || '-'}`
         : '-';
-      addToGroup(skuKey, {
+      addToGroup(skuKey, material, {
         id: d.id,
         source: 'wip',
         sourceLabel: wipItem ? `WIP: ${wipItem.process || '-'}` : 'WIP Item',
+        material,
         skuKey,
         defectType: d.defect_type || 'Unknown',
         netWeight: d.quantity || 0,
@@ -149,7 +163,19 @@ export default function DefectiveManagementTab() {
       .sort((a, b) => b.totalWeight - a.totalWeight);
   }, [defectiveActions, batches, fgDefectives, wipDefectives, defSales]);
 
-  const grandTotal = useMemo(() => skuGroups.reduce((s, g) => s + g.totalWeight, 0), [skuGroups]);
+  // Group SKUs by Material
+  const materialGroups = useMemo<MaterialDefectiveGroup[]>(() => {
+    const map = new Map<string, MaterialDefectiveGroup>();
+    skuGroups.forEach(sg => {
+      if (!map.has(sg.material)) map.set(sg.material, { material: sg.material, totalWeight: 0, skus: [] });
+      const m = map.get(sg.material)!;
+      m.totalWeight += sg.totalWeight;
+      m.skus.push(sg);
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalWeight - a.totalWeight);
+  }, [skuGroups]);
+
+  const grandTotal = useMemo(() => materialGroups.reduce((s, g) => s + g.totalWeight, 0), [materialGroups]);
 
   const handleSell = async () => {
     if (!sellDialog) return;
@@ -233,56 +259,90 @@ export default function DefectiveManagementTab() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-8"></TableHead>
-              <TableHead className="text-xs font-semibold">SKU</TableHead>
-              <TableHead className="text-xs font-semibold">Items</TableHead>
+              <TableHead className="text-xs font-semibold">Material</TableHead>
+              <TableHead className="text-xs font-semibold">SKUs</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {skuGroups.length === 0 && (
+            {materialGroups.length === 0 && (
               <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No defective material recorded.</TableCell></TableRow>
             )}
-            {skuGroups.map(g => {
-              const isExpanded = expandedSku === g.skuKey;
+            {materialGroups.map(mg => {
+              const mExpanded = expandedMaterial === mg.material;
               return (
                 <>
-                  <TableRow key={g.skuKey} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedSku(isExpanded ? null : g.skuKey)}>
-                    <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
-                    <TableCell className="text-sm font-medium">{g.skuKey}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{g.details.length}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalWeight)}</TableCell>
+                  <TableRow key={mg.material} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedMaterial(mExpanded ? null : mg.material)}>
+                    <TableCell>{mExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                    <TableCell className="text-sm font-semibold">{mg.material}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{mg.skus.length}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(mg.totalWeight)}</TableCell>
                   </TableRow>
-                  {isExpanded && (
-                    <TableRow key={`${g.skuKey}-detail`}>
+                  {mExpanded && (
+                    <TableRow key={`${mg.material}-skus`}>
                       <TableCell colSpan={4} className="p-0">
-                        <div className="bg-muted/10 border-t px-6 py-2">
+                        <div className="bg-muted/10 border-t px-6 py-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">SKU-wise breakdown</p>
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="text-xs">Source</TableHead>
-                                <TableHead className="text-xs">Defect Type</TableHead>
+                                <TableHead className="w-8"></TableHead>
+                                <TableHead className="text-xs">SKU</TableHead>
+                                <TableHead className="text-xs">Items</TableHead>
                                 <TableHead className="text-xs">Qty (Kg)</TableHead>
-                                <TableHead className="text-xs">Date</TableHead>
-                                <TableHead className="text-xs">Action</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {g.details.map((d) => (
-                                <TableRow key={d.id}>
-                                  <TableCell className="text-xs">{d.sourceLabel}</TableCell>
-                                  <TableCell className="text-xs">{d.defectType}</TableCell>
-                                  <TableCell className="text-xs font-mono-num">{d.netWeight.toFixed(2)}</TableCell>
-                                  <TableCell className="text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '-'}</TableCell>
-                                  <TableCell className="flex gap-1">
-                                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(d); }}>
-                                      Sell
-                                    </Button>
-                                    <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setMoveBackDialog(d); }}>
-                                      <Undo2 className="h-3 w-3" /> Move Back
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                              {mg.skus.map(g => {
+                                const isExpanded = expandedSku === g.skuKey;
+                                return (
+                                  <>
+                                    <TableRow key={g.skuKey} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedSku(isExpanded ? null : g.skuKey)}>
+                                      <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                                      <TableCell className="text-xs font-medium">{g.skuKey}</TableCell>
+                                      <TableCell className="text-xs text-muted-foreground">{g.details.length}</TableCell>
+                                      <TableCell className="text-xs font-mono-num font-semibold">{fmtNum(g.totalWeight)}</TableCell>
+                                    </TableRow>
+                                    {isExpanded && (
+                                      <TableRow key={`${g.skuKey}-detail`}>
+                                        <TableCell colSpan={4} className="p-0">
+                                          <div className="bg-background border-t px-6 py-2">
+                                            <Table>
+                                              <TableHeader>
+                                                <TableRow>
+                                                  <TableHead className="text-xs">Source</TableHead>
+                                                  <TableHead className="text-xs">Defect Type</TableHead>
+                                                  <TableHead className="text-xs">Qty (Kg)</TableHead>
+                                                  <TableHead className="text-xs">Date</TableHead>
+                                                  <TableHead className="text-xs">Action</TableHead>
+                                                </TableRow>
+                                              </TableHeader>
+                                              <TableBody>
+                                                {g.details.map((d) => (
+                                                  <TableRow key={d.id}>
+                                                    <TableCell className="text-xs">{d.sourceLabel}</TableCell>
+                                                    <TableCell className="text-xs">{d.defectType}</TableCell>
+                                                    <TableCell className="text-xs font-mono-num">{d.netWeight.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '-'}</TableCell>
+                                                    <TableCell className="flex gap-1">
+                                                      <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(d); }}>
+                                                        Sell
+                                                      </Button>
+                                                      <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setMoveBackDialog(d); }}>
+                                                        <Undo2 className="h-3 w-3" /> Move Back
+                                                      </Button>
+                                                    </TableCell>
+                                                  </TableRow>
+                                                ))}
+                                              </TableBody>
+                                            </Table>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </div>
