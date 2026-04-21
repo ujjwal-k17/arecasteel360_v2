@@ -259,56 +259,90 @@ export default function DefectiveManagementTab() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-8"></TableHead>
-              <TableHead className="text-xs font-semibold">SKU</TableHead>
-              <TableHead className="text-xs font-semibold">Items</TableHead>
+              <TableHead className="text-xs font-semibold">Material</TableHead>
+              <TableHead className="text-xs font-semibold">SKUs</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {skuGroups.length === 0 && (
+            {materialGroups.length === 0 && (
               <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No defective material recorded.</TableCell></TableRow>
             )}
-            {skuGroups.map(g => {
-              const isExpanded = expandedSku === g.skuKey;
+            {materialGroups.map(mg => {
+              const mExpanded = expandedMaterial === mg.material;
               return (
                 <>
-                  <TableRow key={g.skuKey} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedSku(isExpanded ? null : g.skuKey)}>
-                    <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
-                    <TableCell className="text-sm font-medium">{g.skuKey}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{g.details.length}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalWeight)}</TableCell>
+                  <TableRow key={mg.material} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedMaterial(mExpanded ? null : mg.material)}>
+                    <TableCell>{mExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                    <TableCell className="text-sm font-semibold">{mg.material}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{mg.skus.length}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(mg.totalWeight)}</TableCell>
                   </TableRow>
-                  {isExpanded && (
-                    <TableRow key={`${g.skuKey}-detail`}>
+                  {mExpanded && (
+                    <TableRow key={`${mg.material}-skus`}>
                       <TableCell colSpan={4} className="p-0">
-                        <div className="bg-muted/10 border-t px-6 py-2">
+                        <div className="bg-muted/10 border-t px-6 py-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">SKU-wise breakdown</p>
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="text-xs">Source</TableHead>
-                                <TableHead className="text-xs">Defect Type</TableHead>
+                                <TableHead className="w-8"></TableHead>
+                                <TableHead className="text-xs">SKU</TableHead>
+                                <TableHead className="text-xs">Items</TableHead>
                                 <TableHead className="text-xs">Qty (Kg)</TableHead>
-                                <TableHead className="text-xs">Date</TableHead>
-                                <TableHead className="text-xs">Action</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {g.details.map((d) => (
-                                <TableRow key={d.id}>
-                                  <TableCell className="text-xs">{d.sourceLabel}</TableCell>
-                                  <TableCell className="text-xs">{d.defectType}</TableCell>
-                                  <TableCell className="text-xs font-mono-num">{d.netWeight.toFixed(2)}</TableCell>
-                                  <TableCell className="text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '-'}</TableCell>
-                                  <TableCell className="flex gap-1">
-                                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(d); }}>
-                                      Sell
-                                    </Button>
-                                    <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setMoveBackDialog(d); }}>
-                                      <Undo2 className="h-3 w-3" /> Move Back
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                              {mg.skus.map(g => {
+                                const isExpanded = expandedSku === g.skuKey;
+                                return (
+                                  <>
+                                    <TableRow key={g.skuKey} className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandedSku(isExpanded ? null : g.skuKey)}>
+                                      <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                                      <TableCell className="text-xs font-medium">{g.skuKey}</TableCell>
+                                      <TableCell className="text-xs text-muted-foreground">{g.details.length}</TableCell>
+                                      <TableCell className="text-xs font-mono-num font-semibold">{fmtNum(g.totalWeight)}</TableCell>
+                                    </TableRow>
+                                    {isExpanded && (
+                                      <TableRow key={`${g.skuKey}-detail`}>
+                                        <TableCell colSpan={4} className="p-0">
+                                          <div className="bg-background border-t px-6 py-2">
+                                            <Table>
+                                              <TableHeader>
+                                                <TableRow>
+                                                  <TableHead className="text-xs">Source</TableHead>
+                                                  <TableHead className="text-xs">Defect Type</TableHead>
+                                                  <TableHead className="text-xs">Qty (Kg)</TableHead>
+                                                  <TableHead className="text-xs">Date</TableHead>
+                                                  <TableHead className="text-xs">Action</TableHead>
+                                                </TableRow>
+                                              </TableHeader>
+                                              <TableBody>
+                                                {g.details.map((d) => (
+                                                  <TableRow key={d.id}>
+                                                    <TableCell className="text-xs">{d.sourceLabel}</TableCell>
+                                                    <TableCell className="text-xs">{d.defectType}</TableCell>
+                                                    <TableCell className="text-xs font-mono-num">{d.netWeight.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '-'}</TableCell>
+                                                    <TableCell className="flex gap-1">
+                                                      <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setSellDialog(d); }}>
+                                                        Sell
+                                                      </Button>
+                                                      <Button size="sm" variant="ghost" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setMoveBackDialog(d); }}>
+                                                        <Undo2 className="h-3 w-3" /> Move Back
+                                                      </Button>
+                                                    </TableCell>
+                                                  </TableRow>
+                                                ))}
+                                              </TableBody>
+                                            </Table>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </div>
