@@ -20,7 +20,7 @@ export function useInsertScrapSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (sale: Omit<ScrapSale, 'id' | 'created_at'>) => {
-      const { data, error } = await supabase.from('scrap_sales').insert(sale as any).select();
+      const { data, error } = await supabase.from('scrap_sales').insert(sale as any).select().single();
       if (error) throw error;
       return data;
     },
