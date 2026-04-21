@@ -121,7 +121,7 @@ export default function ScrapManagementTab() {
       toast.success('Scrap sale recorded');
       setSellDialog(null);
       setSaleForm({ qty_sold: '', sales_date: '', amount_received: '', sales_type: 'Invoice', invoice_number: '', buyer_name: '' });
-    } catch { toast.error('Failed'); }
+    } catch (e: any) { console.error('Scrap sale failed:', e); toast.error(e?.message || 'Failed to record sale'); }
   };
 
   const handleDownloadScrapInventory = () => {
