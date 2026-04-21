@@ -63,19 +63,19 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
 
   const allTrips = useMemo(() => {
     const combined = [...manualTrips, ...externalDispatches, ...externalPurchases];
-    // Sort ascending by date first to assign deterministic per-day counters
+    // Sort ascending by date for deterministic per-month counters
     const asc = [...combined].sort((a, b) => (a.trip_date || '').localeCompare(b.trip_date || ''));
     const counters: Record<string, number> = {};
     const withIds = asc.map(t => {
-      const dateKey = t.trip_date || '';
-      counters[dateKey] = (counters[dateKey] || 0) + 1;
+      const d = t.trip_date ? new Date(t.trip_date) : null;
+      const monthKey = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : '------';
+      counters[monthKey] = (counters[monthKey] || 0) + 1;
       if (t.trip_id) return t; // manual trips already have trip_id
-      const d = dateKey ? new Date(dateKey) : null;
-      const datePrefix = d
-        ? `${String(d.getDate()).padStart(2,'0')}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getFullYear()).slice(-2)}`
-        : '------';
-      const seq = String(counters[dateKey]).padStart(2, '0');
-      return { ...t, trip_id: `${datePrefix}/${truckSuffix}/${seq}` };
+      const monthPrefix = d
+        ? `${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getFullYear()).slice(-2)}`
+        : '----';
+      const seq = String(counters[monthKey]).padStart(2, '0');
+      return { ...t, trip_id: `${monthPrefix}/${truckSuffix}/${seq}` };
     });
     return withIds.sort((a, b) => (b.trip_date || '').localeCompare(a.trip_date || ''));
   }, [manualTrips, externalDispatches, externalPurchases, truckSuffix]);

@@ -62,19 +62,25 @@ export function useInsertTruckTrip() {
   return useMutation({
     mutationFn: async (trip: Partial<TruckTrip>) => {
       const dateObj = new Date(trip.trip_date as string);
-      const dd = String(dateObj.getDate()).padStart(2, '0');
       const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
       const yy = String(dateObj.getFullYear()).slice(-2);
-      const datePrefix = `${dd}${mm}${yy}`;
+      const monthPrefix = `${mm}${yy}`;
+      const truckRef = (trip.truck_number as string).slice(-4);
+
+      // Month range for counter
+      const monthStart = `${dateObj.getFullYear()}-${mm}-01`;
+      const nextMonth = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 1);
+      const nextMonthStr = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
 
       const { data: existing, error: countErr } = await sb
         .from('truck_trips')
         .select('trip_id')
         .eq('truck_number', trip.truck_number as string)
-        .eq('trip_date', trip.trip_date as string);
+        .gte('trip_date', monthStart)
+        .lt('trip_date', nextMonthStr);
       if (countErr) throw countErr;
       const next = String(((existing as any[])?.length || 0) + 1).padStart(2, '0');
-      const trip_id = `${datePrefix}/${next}`;
+      const trip_id = `${monthPrefix}/${truckRef}/${next}`;
 
       const { data, error } = await sb.from('truck_trips').insert({ ...trip, trip_id }).select().single();
       if (error) throw error;
