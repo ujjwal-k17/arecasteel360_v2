@@ -42,6 +42,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
 
   const [expDialog, setExpDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
   const [expForm, setExpForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), driver_expense: '', cng_amount: '', toll_parking: '', truck_expense: '', truck_expense_desc: '', other_expense: '', other_expense_desc: '' });
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
 
   const manualTrips: UnifiedTrip[] = useMemo(() =>
     trips.filter(t => t.truck_number === truckNumber).map(t => ({
