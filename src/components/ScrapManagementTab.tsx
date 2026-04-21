@@ -360,6 +360,21 @@ export default function ScrapManagementTab() {
               <div><Label className="text-xs">Qty Sold (Net Weight Kg)</Label><Input type="number" value={saleForm.qty_sold} onChange={e => setSaleForm(v => ({ ...v, qty_sold: e.target.value }))} /></div>
               <div><Label className="text-xs">Sales Date</Label><Input type="date" value={saleForm.sales_date} onChange={e => setSaleForm(v => ({ ...v, sales_date: e.target.value }))} /></div>
               <div><Label className="text-xs">Amount Received (₹)</Label><Input type="number" value={saleForm.amount_received} onChange={e => setSaleForm(v => ({ ...v, amount_received: e.target.value }))} /></div>
+              <div>
+                <Label className="text-xs">Sales Type</Label>
+                <Select value={saleForm.sales_type} onValueChange={(v: 'Cash' | 'Invoice') => setSaleForm(s => ({ ...s, sales_type: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Invoice">Invoice</SelectItem>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {saleForm.sales_type === 'Invoice' ? (
+                <div><Label className="text-xs">Invoice Number</Label><Input value={saleForm.invoice_number} onChange={e => setSaleForm(v => ({ ...v, invoice_number: e.target.value }))} /></div>
+              ) : (
+                <div><Label className="text-xs">Buyer Name <span className="text-destructive">*</span></Label><Input value={saleForm.buyer_name} onChange={e => setSaleForm(v => ({ ...v, buyer_name: e.target.value }))} placeholder="Required" /></div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setSellDialog(null)}>Cancel</Button>
