@@ -278,6 +278,21 @@ export function useReviewApproval() {
         } else if (entityType === 'batch') {
           await supabase.from('inventory_actions').delete().eq('batch_id', entityId);
           await supabase.from('batches').delete().eq('id', entityId);
+        } else if (actionType === 'delete' && entityType === 'truck_trip') {
+          const { data: exps } = await supabase
+            .from('truck_trip_expenses' as any)
+            .select('id')
+            .eq('truck_trip_id', entityId);
+          const expIds = (exps || []).map((e: any) => e.id);
+          if (expIds.length > 0) {
+            await supabase
+              .from('cash_entries' as any)
+              .delete()
+              .eq('source_type', 'truck_expense')
+              .in('source_id', expIds);
+            await supabase.from('truck_trip_expenses' as any).delete().eq('truck_trip_id', entityId);
+          }
+          await supabase.from('truck_trips' as any).delete().eq('id', entityId);
         }
       }
 

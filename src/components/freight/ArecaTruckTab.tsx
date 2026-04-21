@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, IndianRupee, Truck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense, useDeleteTruckTrip } from '@/hooks/useTruckTrips';
+import { useSubmitApproval } from '@/hooks/useActionLog';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface UnifiedTrip {
   key: string;
@@ -37,6 +39,8 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   const insertTrip = useInsertTruckTrip();
   const insertExpense = useInsertTruckExpense();
   const deleteTrip = useDeleteTruckTrip();
+  const submitApproval = useSubmitApproval();
+  const { isAdmin } = useAuth();
 
   const [tripDialog, setTripDialog] = useState(false);
   const [tripForm, setTripForm] = useState({ trip_type: 'Sales', trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
@@ -205,10 +209,22 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs text-destructive hover:text-destructive"
-                          disabled={deleteTrip.isPending}
+                          disabled={deleteTrip.isPending || submitApproval.isPending}
                           onClick={() => {
-                            if (confirm(`Delete trip ${t.trip_id}? Any linked expenses and cash entries will also be removed.`)) {
-                              deleteTrip.mutate(t.manual_id!, { onSuccess: () => toast.success('Trip deleted') });
+                            if (isAdmin) {
+                              if (confirm(`Delete trip ${t.trip_id}? Any linked expenses and cash entries will also be removed.`)) {
+                                deleteTrip.mutate(t.manual_id!, { onSuccess: () => toast.success('Trip deleted') });
+                              }
+                            } else {
+                              if (confirm(`Submit deletion of trip ${t.trip_id} for admin approval?`)) {
+                                submitApproval.mutate({
+                                  action_type: 'delete',
+                                  entity_type: 'truck_trip',
+                                  entity_id: t.manual_id!,
+                                  description: `Delete truck trip ${t.trip_id} (${truckNumber})`,
+                                  metadata: { trip_id: t.trip_id, truck_number: truckNumber, document_number: t.document_number },
+                                }, { onSuccess: () => toast.success('Delete request sent for admin approval') });
+                              }
                             }
                           }}
                         >
