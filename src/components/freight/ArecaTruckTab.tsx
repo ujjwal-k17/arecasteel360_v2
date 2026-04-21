@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, IndianRupee, Truck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense, useDeleteTruckTrip } from '@/hooks/useTruckTrips';
+import { useSubmitApproval } from '@/hooks/useActionLog';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface UnifiedTrip {
   key: string;
