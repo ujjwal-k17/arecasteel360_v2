@@ -159,14 +159,22 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
       toast.error(`Document # already exists in Transporter freight (${freightDup.invoice_number})`);
       return;
     }
+    const protectedDispatchTypes = ['Transporter', 'Areca 0720', 'Areca 2720'];
     const invDup = (invDetRes.data || []).find((r: any) => {
-      if (r.dispatch_type !== 'Transporter') return false;
+      if (!protectedDispatchTypes.includes(r.dispatch_type)) return false;
       const inv = (r.invoice_number || '').trim().toLowerCase();
       const pinv = (r.purchase_invoice_number || '').trim().toLowerCase();
       return inv === docNorm || pinv === docNorm;
     });
     if (invDup) {
-      toast.error(`Document # already listed under Transporter (${invDup.invoice_number})`);
+      const dispatchLabel = invDup.dispatch_type === 'Transporter'
+        ? 'Transporter'
+        : invDup.dispatch_type === 'Areca 0720'
+          ? 'UP14KT0750'
+          : invDup.dispatch_type === 'Areca 2720'
+            ? 'UP14QT2750'
+            : invDup.dispatch_type;
+      toast.error(`Document # already listed under ${dispatchLabel} (${invDup.invoice_number || invDup.purchase_invoice_number})`);
       return;
     }
 
