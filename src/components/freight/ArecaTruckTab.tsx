@@ -182,7 +182,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
       amount: amt,
       category: 'Truck Income',
       sub_category: trip.trip_type,
-      comments: `${truckNumber} · ${trip.trip_id || trip.document_number}${incomeForm.comments ? ` · ${incomeForm.comments}` : ''}`,
+      comments: `[trip:${trip.key}] ${truckNumber} · ${trip.trip_id || trip.document_number}${incomeForm.comments ? ` · ${incomeForm.comments}` : ''}`,
       source_type: 'truck_income',
       source_id: trip.manual_id || null,
     });
