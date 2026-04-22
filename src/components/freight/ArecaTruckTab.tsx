@@ -243,6 +243,8 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                   <TableCell className="text-xs font-mono-num">
                     {inc > 0 ? <span className="text-green-600 dark:text-green-400">₹{inc.toFixed(2)}</span> : '-'}
                   </TableCell>
+                  <TableCell className="text-xs">
+                    <div className="flex gap-1">
                       <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setExpDialog({ open: true, trip: t })}>
                         <IndianRupee className="h-3 w-3" /> Expense
                       </Button>
