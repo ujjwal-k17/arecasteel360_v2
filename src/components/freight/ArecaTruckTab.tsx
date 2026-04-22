@@ -224,7 +224,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
             {allTrips.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No trips yet.</TableCell></TableRow>}
             {allTrips.map(t => {
               const exp = expenseByKey[t.key] || 0;
-              const inc = t.manual_id ? (incomeByManualId[t.manual_id] || 0) : 0;
+              const inc = incomeByKey[t.key] || 0;
               return (
                 <TableRow key={t.key}>
                   <TableCell className="text-xs font-mono">{t.trip_id || '-'}</TableCell>
