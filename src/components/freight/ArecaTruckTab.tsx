@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, IndianRupee, Truck, Trash2 } from 'lucide-react';
+import { Plus, IndianRupee, Truck, Trash2, TrendingUp } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense, useDeleteTruckTrip } from '@/hooks/useTruckTrips';
 import { useSubmitApproval } from '@/hooks/useActionLog';
@@ -48,6 +51,10 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   const [expDialog, setExpDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
   const [expForm, setExpForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), driver_expense: '', cng_amount: '', toll_parking: '', truck_expense: '', truck_expense_desc: '', other_expense: '', other_expense_desc: '' });
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
+  const [incomeDialog, setIncomeDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
+  const [incomeForm, setIncomeForm] = useState({ entry_date: new Date().toISOString().slice(0, 10), amount: '', comments: '' });
+  const [savingIncome, setSavingIncome] = useState(false);
+  const qc = useQueryClient();
 
   const manualTrips: UnifiedTrip[] = useMemo(() =>
     trips.filter(t => t.truck_number === truckNumber).map(t => ({
