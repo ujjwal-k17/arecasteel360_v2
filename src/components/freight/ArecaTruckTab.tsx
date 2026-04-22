@@ -143,10 +143,11 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
       return;
     }
 
-    // Global check across both Areca trucks (truck_trips) + Transporter freight (transporter_freight.invoice_number)
-    const [tripsRes, freightRes] = await Promise.all([
+    // Global check across both Areca trucks (truck_trips) + Transporter listing (invoice_details with dispatch_type='Transporter')
+    const [tripsRes, freightRes, invDetRes] = await Promise.all([
       (supabase as any).from('truck_trips').select('document_number, truck_number, trip_id').ilike('document_number', docRaw),
       (supabase as any).from('transporter_freight').select('invoice_number').ilike('invoice_number', docRaw),
+      (supabase as any).from('invoice_details').select('invoice_number, purchase_invoice_number, dispatch_type').or(`invoice_number.ilike.${docRaw},purchase_invoice_number.ilike.${docRaw}`),
     ]);
     const tripDup = (tripsRes.data || []).find((r: any) => (r.document_number || '').trim().toLowerCase() === docNorm);
     if (tripDup) {
@@ -156,6 +157,16 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
     const freightDup = (freightRes.data || []).find((r: any) => (r.invoice_number || '').trim().toLowerCase() === docNorm);
     if (freightDup) {
       toast.error(`Document # already exists in Transporter freight (${freightDup.invoice_number})`);
+      return;
+    }
+    const invDup = (invDetRes.data || []).find((r: any) => {
+      if (r.dispatch_type !== 'Transporter') return false;
+      const inv = (r.invoice_number || '').trim().toLowerCase();
+      const pinv = (r.purchase_invoice_number || '').trim().toLowerCase();
+      return inv === docNorm || pinv === docNorm;
+    });
+    if (invDup) {
+      toast.error(`Document # already listed under Transporter (${invDup.invoice_number})`);
       return;
     }
 
