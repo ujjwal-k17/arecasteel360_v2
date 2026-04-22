@@ -474,7 +474,6 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap"># Pcs</TableHead>
               
               <TableHead className="text-xs font-semibold whitespace-nowrap"># Pallets</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
