@@ -206,6 +206,9 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                       <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setExpDialog({ open: true, trip: t })}>
                         <IndianRupee className="h-3 w-3" /> Expense
                       </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setIncomeDialog({ open: true, trip: t })}>
+                        <TrendingUp className="h-3 w-3" /> Income
+                      </Button>
                       {t.source !== 'manual' && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => onMoveBack(t)}>
                           ← Move Back
