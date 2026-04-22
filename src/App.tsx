@@ -10,7 +10,7 @@ import DashboardPage from "./pages/DashboardPage";
 import Index from "./pages/Index";
 import ConsumablesPage from "./pages/ConsumablesPage";
 import OrderBookPage from "./pages/OrderBookPage";
-import WorkingCapitalPage from "./pages/WorkingCapitalPage";
+
 import PettyCashPage from "./pages/PettyCashPage";
 import FreightPage from "./pages/FreightPage";
 import AdminPage from "./pages/AdminPage";
@@ -44,7 +44,7 @@ const App = () => (
               <Route path="/inventory" element={<ProtectedRoute page="inventory"><Index /></ProtectedRoute>} />
               <Route path="/consumables" element={<ProtectedRoute page="consumables"><ConsumablesPage /></ProtectedRoute>} />
               <Route path="/order-book" element={<ProtectedRoute page="order-book"><OrderBookPage /></ProtectedRoute>} />
-              <Route path="/working-capital" element={<ProtectedRoute page="working-capital"><WorkingCapitalPage /></ProtectedRoute>} />
+              
               <Route path="/petty-cash" element={<ProtectedRoute page="petty-cash"><PettyCashPage /></ProtectedRoute>} />
               <Route path="/freight" element={<ProtectedRoute page="freight"><FreightPage /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
