@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense, useDeleteTruckTrip } from '@/hooks/useTruckTrips';
 import { useSubmitApproval } from '@/hooks/useActionLog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCashEntries } from '@/hooks/useCashBook';
 
 export interface UnifiedTrip {
   key: string;
@@ -112,6 +113,17 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
     return map;
   }, [expensesByKey]);
 
+  const { data: cashEntries = [] } = useCashEntries();
+  const incomeByManualId = useMemo(() => {
+    const map: Record<string, number> = {};
+    (cashEntries as any[]).forEach((e: any) => {
+      if (e.source_type === 'truck_income' && e.source_id) {
+        map[e.source_id] = (map[e.source_id] || 0) + Number(e.amount || 0);
+      }
+    });
+    return map;
+  }, [cashEntries]);
+
   const handleAddTrip = async () => {
     if (!tripForm.document_number.trim()) { toast.error('Document number required'); return; }
     if (!tripForm.source_destination.trim()) { toast.error('Source/Destination required'); return; }
@@ -203,12 +215,14 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
             <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
             <TableHead className="text-xs font-semibold">Trip Type</TableHead>
             <TableHead className="text-xs font-semibold">Expenses</TableHead>
+            <TableHead className="text-xs font-semibold">Income</TableHead>
             <TableHead className="text-xs font-semibold">Action</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {allTrips.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No trips yet.</TableCell></TableRow>}
+            {allTrips.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No trips yet.</TableCell></TableRow>}
             {allTrips.map(t => {
               const exp = expenseByKey[t.key] || 0;
+              const inc = t.manual_id ? (incomeByManualId[t.manual_id] || 0) : 0;
               return (
                 <TableRow key={t.key}>
                   <TableCell className="text-xs font-mono">{t.trip_id || '-'}</TableCell>
@@ -225,6 +239,9 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                         ₹{exp.toFixed(2)}
                       </button>
                     ) : '-'}
+                  </TableCell>
+                  <TableCell className="text-xs font-mono-num">
+                    {inc > 0 ? <span className="text-green-600 dark:text-green-400">₹{inc.toFixed(2)}</span> : '-'}
                   </TableCell>
                   <TableCell className="text-xs">
                     <div className="flex gap-1">
