@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserManagementTab from '@/components/admin/UserManagementTab';
-import IPWhitelistTab from '@/components/admin/IPWhitelistTab';
+
 import ActionLogsTab from '@/components/admin/ActionLogsTab';
 import DeviceManagementTab from '@/components/admin/DeviceManagementTab';
 import MasterDataTab from '@/components/admin/MasterDataTab';
@@ -21,7 +21,7 @@ export default function AdminPage() {
         <TabsList className="flex-wrap">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="devices">Devices</TabsTrigger>
-          <TabsTrigger value="ips">IP Whitelist</TabsTrigger>
+          
           <TabsTrigger value="logs" className="gap-1.5">
             Logs & Approvals
             {pendingCount > 0 && (
@@ -35,7 +35,7 @@ export default function AdminPage() {
         </TabsList>
         <TabsContent value="users"><UserManagementTab /></TabsContent>
         <TabsContent value="devices"><DeviceManagementTab /></TabsContent>
-        <TabsContent value="ips"><IPWhitelistTab /></TabsContent>
+        
         <TabsContent value="logs"><ActionLogsTab /></TabsContent>
         <TabsContent value="master"><MasterDataTab /></TabsContent>
         <TabsContent value="dropdowns"><DropdownManagementTab /></TabsContent>
