@@ -493,7 +493,7 @@ export default function FGInventoryTab() {
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
