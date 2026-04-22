@@ -500,7 +500,7 @@ export default function FGInventoryTab() {
               const isOpen = expanded.has(g.key);
               return (
                 <>
-                  <TableRow key={g.key} className={`cursor-pointer hover:bg-muted/30 font-medium ${g.totalQty < 150 && g.totalQty < 0.9 * (g as any).totalOriginalQty ? 'bg-destructive/15' : 'bg-muted/10'}`} onClick={() => toggleExpand(g.key)}>
+                  <TableRow key={g.key} className={`cursor-pointer font-medium ${g.totalQty < 150 && g.totalQty < 0.9 * (g as any).totalOriginalQty ? 'bg-destructive/5 hover:bg-destructive/5' : 'bg-muted/10 hover:bg-muted/30'}`} onClick={() => toggleExpand(g.key)}>
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell />
                     <TableCell className="text-sm">{g.material}</TableCell>
@@ -520,7 +520,7 @@ export default function FGInventoryTab() {
                   {isOpen && g.items.map((item: any) => {
                     const availQty = getAvailableQty(item);
                     return (
-                      <TableRow key={item.id} className={`${availQty < 150 && availQty < 0.9 * (item.qty || 0) ? 'bg-destructive/10' : 'bg-background'} ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
+                      <TableRow key={item.id} className={`${availQty < 150 && availQty < 0.9 * (item.qty || 0) ? 'bg-destructive/5 hover:bg-destructive/5' : 'bg-background'} ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
                         <TableCell />
                         <TableCell className="w-8 px-2" onClick={e => e.stopPropagation()}>
                           {fgView === 'open' && availQty > 0 && (
