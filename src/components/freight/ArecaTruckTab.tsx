@@ -114,12 +114,14 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   }, [expensesByKey]);
 
   const { data: cashEntries = [] } = useCashEntries();
-  const incomeByManualId = useMemo(() => {
+  const incomeByKey = useMemo(() => {
     const map: Record<string, number> = {};
     (cashEntries as any[]).forEach((e: any) => {
-      if (e.source_type === 'truck_income' && e.source_id) {
-        map[e.source_id] = (map[e.source_id] || 0) + Number(e.amount || 0);
-      }
+      if (e.source_type !== 'truck_income') return;
+      const m = typeof e.comments === 'string' ? e.comments.match(/\[trip:([^\]]+)\]/) : null;
+      const key = m ? m[1] : (e.source_id ? `manual:${e.source_id}` : null);
+      if (!key) return;
+      map[key] = (map[key] || 0) + Number(e.amount || 0);
     });
     return map;
   }, [cashEntries]);
@@ -180,7 +182,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
       amount: amt,
       category: 'Truck Income',
       sub_category: trip.trip_type,
-      comments: `${truckNumber} · ${trip.trip_id || trip.document_number}${incomeForm.comments ? ` · ${incomeForm.comments}` : ''}`,
+      comments: `[trip:${trip.key}] ${truckNumber} · ${trip.trip_id || trip.document_number}${incomeForm.comments ? ` · ${incomeForm.comments}` : ''}`,
       source_type: 'truck_income',
       source_id: trip.manual_id || null,
     });
@@ -222,7 +224,7 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
             {allTrips.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No trips yet.</TableCell></TableRow>}
             {allTrips.map(t => {
               const exp = expenseByKey[t.key] || 0;
-              const inc = t.manual_id ? (incomeByManualId[t.manual_id] || 0) : 0;
+              const inc = incomeByKey[t.key] || 0;
               return (
                 <TableRow key={t.key}>
                   <TableCell className="text-xs font-mono">{t.trip_id || '-'}</TableCell>
