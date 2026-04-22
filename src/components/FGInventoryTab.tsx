@@ -483,7 +483,18 @@ export default function FGInventoryTab() {
               <TableHead />
               <TableHead><FilterSelect value={filterMaterial} onChange={setFilterMaterial} options={uniqueVals.material} placeholder="Material" /></TableHead>
               <TableHead><FilterSelect value={filterProcess} onChange={setFilterProcess} options={uniqueVals.process} placeholder="Process" /></TableHead>
-              <TableHead><FilterSelect value={filterDimension} onChange={setFilterDimension} options={uniqueVals.dimension} placeholder="Dimensions" /></TableHead>
+              <TableHead>
+                <Input
+                  list="fg-dim-options"
+                  value={filterDimension === 'all' ? '' : filterDimension}
+                  onChange={(e) => setFilterDimension(e.target.value || 'all')}
+                  placeholder="Dimensions"
+                  className="h-7 text-xs"
+                />
+                <datalist id="fg-dim-options">
+                  {uniqueVals.dimension.map(o => <option key={o} value={o} />)}
+                </datalist>
+              </TableHead>
               <TableHead><FilterSelect value={filterCoating} onChange={setFilterCoating} options={uniqueVals.coating} placeholder="Coating" /></TableHead>
               <TableHead><FilterSelect value={filterGrade} onChange={setFilterGrade} options={uniqueVals.grade} placeholder="Grade" /></TableHead>
               <TableHead />
