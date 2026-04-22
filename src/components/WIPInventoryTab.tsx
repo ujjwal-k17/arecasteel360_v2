@@ -131,14 +131,15 @@ export default function WIPInventoryTab() {
   }, [items]);
 
   const skuGroups = useMemo(() => {
-    const map = new Map<string, SKUGroup>();
+    const map = new Map<string, SKUGroup & { totalOriginalQty: number }>();
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalOriginalQty: 0, items: [] });
       }
       const g = map.get(key)!;
       g.totalQty += getAvailableQty(item);
+      g.totalOriginalQty += item.qty || 0;
       g.items.push(item);
     }
     return Array.from(map.values());
