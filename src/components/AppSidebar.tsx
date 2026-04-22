@@ -22,7 +22,7 @@ const modules = [
   { title: 'Inventory', url: '/inventory', icon: Package, page: 'inventory' },
   { title: 'Consumables', url: '/consumables', icon: Wrench, page: 'consumables' },
   { title: 'Order Book', url: '/order-book', icon: ClipboardList, page: 'order-book' },
-  { title: 'Working Capital', url: '/working-capital', icon: Wallet, page: 'working-capital' },
+  
   { title: 'Petty Cash', url: '/petty-cash', icon: Wallet, page: 'petty-cash' },
   { title: 'Transportation', url: '/freight', icon: Truck, page: 'freight' },
 ];
