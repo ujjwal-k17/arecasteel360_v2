@@ -131,14 +131,15 @@ export default function WIPInventoryTab() {
   }, [items]);
 
   const skuGroups = useMemo(() => {
-    const map = new Map<string, SKUGroup>();
+    const map = new Map<string, SKUGroup & { totalOriginalQty: number }>();
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalOriginalQty: 0, items: [] });
       }
       const g = map.get(key)!;
       g.totalQty += getAvailableQty(item);
+      g.totalOriginalQty += item.qty || 0;
       g.items.push(item);
     }
     return Array.from(map.values());
@@ -319,7 +320,7 @@ export default function WIPInventoryTab() {
               const isOpen = expanded.has(g.key);
               return (
                 <>
-                  <TableRow key={g.key} className="cursor-pointer hover:bg-muted/30 bg-muted/10 font-medium" onClick={() => toggleExpand(g.key)}>
+                  <TableRow key={g.key} className={`cursor-pointer font-medium ${g.totalQty < 150 && g.totalQty < 0.9 * (g as any).totalOriginalQty ? 'bg-destructive/5 hover:bg-destructive/5' : 'bg-success/5 hover:bg-success/5'}`} onClick={() => toggleExpand(g.key)}>
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell />
                     <TableCell className="text-sm">{g.material}</TableCell>
@@ -364,7 +365,7 @@ export default function WIPInventoryTab() {
                       }
                     };
                     return (
-                      <TableRow key={item.id} className={`bg-background ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
+                      <TableRow key={item.id} className={`${availQty < 150 && availQty < 0.9 * (item.qty || 0) ? 'bg-destructive/5 hover:bg-destructive/5' : 'bg-success/5 hover:bg-success/5'} ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
                         <TableCell />
                         <TableCell className="w-8 px-2" onClick={e => e.stopPropagation()}>
                           {availQty > 0 && (
