@@ -237,8 +237,9 @@ export default function FGInventoryTab() {
   const filteredItems = useMemo(() => {
     return items.filter(i => {
       const availQty = getAvailableQty(i);
-      if (fgView === 'open' && availQty <= 0) return false;
-      if (fgView === 'closed' && availQty > 0) return false;
+      // Close SKU strictly on Kg balance (ignore # Pcs). Use small epsilon for floating residuals.
+      if (fgView === 'open' && availQty <= 0.01) return false;
+      if (fgView === 'closed' && availQty > 0.01) return false;
       return (filterMaterial === 'all' || eqCI(i.material || '-', filterMaterial)) &&
         (filterProcess === 'all' || eqCI(i.process || '-', filterProcess)) &&
         (filterCoating === 'all' || eqCI(i.coating || '-', filterCoating)) &&
