@@ -530,8 +530,7 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
-                        <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
-                        <TableCell className="text-xs font-mono-num">{item.num_pcs ?? '-'}</TableCell>
+                        <TableCell className="text-xs font-mono-num whitespace-nowrap">{availQty.toFixed(2)}{item.num_pcs ? <span className="text-muted-foreground"> ({fmtInt(item.num_pcs)} pcs)</span> : null}</TableCell>
                         <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           <div className="flex gap-1">
