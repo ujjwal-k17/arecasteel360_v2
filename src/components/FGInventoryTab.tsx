@@ -255,14 +255,15 @@ export default function FGInventoryTab() {
   }, [items]);
 
   const skuGroups = useMemo(() => {
-    const map = new Map<string, SKUGroup>();
+    const map = new Map<string, SKUGroup & { totalOriginalQty: number }>();
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, totalOriginalQty: 0, items: [] });
       }
       const g = map.get(key)!;
       g.totalQty += getAvailableQty(item);
+      g.totalOriginalQty += item.qty || 0;
       g.totalPcs += item.num_pcs || 0;
       g.totalPallets += palletsByProcId.get(item.processing_record_id) || 0;
       g.items.push(item);
