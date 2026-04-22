@@ -244,7 +244,7 @@ export default function FGInventoryTab() {
         (filterProcess === 'all' || eqCI(i.process || '-', filterProcess)) &&
         (filterCoating === 'all' || eqCI(i.coating || '-', filterCoating)) &&
         (filterGrade === 'all' || eqCI(i.grade || '-', filterGrade)) &&
-        (filterDimension === 'all' || getDimLabel(i) === filterDimension);
+        (filterDimension === 'all' || filterDimension.trim() === '' || getDimLabel(i).toLowerCase().includes(filterDimension.toLowerCase()));
     });
   }, [items, filterMaterial, filterProcess, filterCoating, filterGrade, filterDimension, fgView, soldByItem, defectiveByItem]);
 
