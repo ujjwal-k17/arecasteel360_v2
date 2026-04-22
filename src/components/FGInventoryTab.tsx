@@ -500,7 +500,7 @@ export default function FGInventoryTab() {
               const isOpen = expanded.has(g.key);
               return (
                 <>
-                  <TableRow key={g.key} className={`cursor-pointer hover:bg-muted/30 font-medium ${g.totalQty < 150 ? 'bg-destructive/15' : 'bg-muted/10'}`} onClick={() => toggleExpand(g.key)}>
+                  <TableRow key={g.key} className={`cursor-pointer hover:bg-muted/30 font-medium ${g.totalQty < 150 && g.totalQty < 0.9 * (g as any).totalOriginalQty ? 'bg-destructive/15' : 'bg-muted/10'}`} onClick={() => toggleExpand(g.key)}>
                     <TableCell className="w-8 px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                     <TableCell />
                     <TableCell className="text-sm">{g.material}</TableCell>
