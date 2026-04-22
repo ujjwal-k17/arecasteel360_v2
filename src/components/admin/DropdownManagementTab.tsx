@@ -125,20 +125,20 @@ export default function DropdownManagementTab() {
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
         {CATEGORIES.map(cat => (
-          <Button key={cat} variant={selectedCategory === cat ? 'default' : 'outline'} size="sm" onClick={() => setSelectedCategory(cat)} className="capitalize">
-            {cat}
+          <Button key={cat} variant={selectedCategory === cat ? 'default' : 'outline'} size="sm" onClick={() => setSelectedCategory(cat)}>
+            {CATEGORY_LABELS[cat] || cat}
           </Button>
         ))}
       </div>
 
       {/* Add new option */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Input placeholder={`New ${selectedCategory} value`} value={newValue} onChange={e => setNewValue(e.target.value)} className="h-8 w-48 text-xs" onKeyDown={e => e.key === 'Enter' && handleAdd()} />
+        <Input placeholder={`New ${CATEGORY_LABELS[selectedCategory] || selectedCategory} value`} value={newValue} onChange={e => setNewValue(e.target.value)} className="h-8 w-48 text-xs" onKeyDown={e => e.key === 'Enter' && handleAdd()} />
         {needsParent && (
           <Select value={newParent} onValueChange={setNewParent}>
-            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Parent Material" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder={parentLabel} /></SelectTrigger>
             <SelectContent>
-              {(materials || []).map((m: string) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {parentOptions.map((m: string) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
             </SelectContent>
           </Select>
         )}
@@ -151,7 +151,7 @@ export default function DropdownManagementTab() {
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs">Value</TableHead>
-              {needsParent && <TableHead className="text-xs">Parent Material</TableHead>}
+              {needsParent && <TableHead className="text-xs">{parentLabel}</TableHead>}
               <TableHead className="text-xs">Status</TableHead>
               <TableHead className="text-xs">Actions</TableHead>
             </TableRow>
