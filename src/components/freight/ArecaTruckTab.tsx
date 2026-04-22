@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, IndianRupee, Truck, Trash2 } from 'lucide-react';
+import { Plus, IndianRupee, Truck, Trash2, TrendingUp } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTruckTrips, useTruckExpenses, useInsertTruckTrip, useInsertTruckExpense, useDeleteTruckTrip } from '@/hooks/useTruckTrips';
 import { useSubmitApproval } from '@/hooks/useActionLog';
@@ -48,6 +51,10 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   const [expDialog, setExpDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
   const [expForm, setExpForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), driver_expense: '', cng_amount: '', toll_parking: '', truck_expense: '', truck_expense_desc: '', other_expense: '', other_expense_desc: '' });
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
+  const [incomeDialog, setIncomeDialog] = useState<{ open: boolean; trip: UnifiedTrip | null }>({ open: false, trip: null });
+  const [incomeForm, setIncomeForm] = useState({ entry_date: new Date().toISOString().slice(0, 10), amount: '', comments: '' });
+  const [savingIncome, setSavingIncome] = useState(false);
+  const qc = useQueryClient();
 
   const manualTrips: UnifiedTrip[] = useMemo(() =>
     trips.filter(t => t.truck_number === truckNumber).map(t => ({
@@ -148,6 +155,31 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
     setExpForm({ expense_date: new Date().toISOString().slice(0, 10), driver_expense: '', cng_amount: '', toll_parking: '', truck_expense: '', truck_expense_desc: '', other_expense: '', other_expense_desc: '' });
   };
 
+  const handleAddIncome = async () => {
+    if (!incomeDialog.trip) return;
+    const amt = Number(incomeForm.amount);
+    if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    const trip = incomeDialog.trip;
+    setSavingIncome(true);
+    const { error } = await (supabase as any).from('cash_entries').insert({
+      direction: 'in',
+      status: 'receivable',
+      entry_date: incomeForm.entry_date,
+      amount: amt,
+      category: 'Truck Income',
+      sub_category: trip.trip_type,
+      comments: `${truckNumber} · ${trip.trip_id || trip.document_number}${incomeForm.comments ? ` · ${incomeForm.comments}` : ''}`,
+      source_type: 'truck_income',
+      source_id: trip.manual_id || null,
+    });
+    setSavingIncome(false);
+    if (error) { toast.error(error.message || 'Failed to add income'); return; }
+    toast.success('Income recorded · added to Cash In Receivable');
+    qc.invalidateQueries({ queryKey: ['cash_entries'] });
+    setIncomeDialog({ open: false, trip: null });
+    setIncomeForm({ entry_date: new Date().toISOString().slice(0, 10), amount: '', comments: '' });
+  };
+
   const isPurchaseLike = tripForm.trip_type === 'Purchase' || tripForm.trip_type === 'Job Work Return';
 
   return (
@@ -198,6 +230,9 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
                     <div className="flex gap-1">
                       <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setExpDialog({ open: true, trip: t })}>
                         <IndianRupee className="h-3 w-3" /> Expense
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setIncomeDialog({ open: true, trip: t })}>
+                        <TrendingUp className="h-3 w-3" /> Income
                       </Button>
                       {t.source !== 'manual' && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => onMoveBack(t)}>
@@ -346,6 +381,23 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDetailsDialog({ open: false, trip: null })}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Income Dialog */}
+      <Dialog open={incomeDialog.open} onOpenChange={o => setIncomeDialog(p => ({ ...p, open: o }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add Income — {incomeDialog.trip?.trip_id || incomeDialog.trip?.document_number}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label className="text-xs">Date</Label><Input type="date" value={incomeForm.entry_date} onChange={e => setIncomeForm(f => ({ ...f, entry_date: e.target.value }))} /></div>
+            <div><Label className="text-xs">Amount (₹)</Label><Input type="number" value={incomeForm.amount} onChange={e => setIncomeForm(f => ({ ...f, amount: e.target.value }))} /></div>
+            <div><Label className="text-xs">Comments</Label><Textarea rows={3} value={incomeForm.comments} onChange={e => setIncomeForm(f => ({ ...f, comments: e.target.value }))} placeholder="Optional notes" /></div>
+            <p className="text-[11px] text-muted-foreground">This creates a Cash In · Receivable entry under category "Truck Income".</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIncomeDialog({ open: false, trip: null })}>Cancel</Button>
+            <Button onClick={handleAddIncome} disabled={savingIncome}>Submit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
