@@ -520,7 +520,7 @@ export default function FGInventoryTab() {
                   {isOpen && g.items.map((item: any) => {
                     const availQty = getAvailableQty(item);
                     return (
-                      <TableRow key={item.id} className={`${availQty < 150 && availQty < 0.9 * (item.qty || 0) ? 'bg-destructive/5 hover:bg-destructive/5' : 'bg-background'} ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
+                      <TableRow key={item.id} className={`${availQty < 150 && availQty < 0.9 * (item.qty || 0) ? 'bg-destructive/5 hover:bg-destructive/5' : 'bg-success/5 hover:bg-success/5'} ${selectedItems.has(item.id) ? 'bg-primary/5' : ''}`}>
                         <TableCell />
                         <TableCell className="w-8 px-2" onClick={e => e.stopPropagation()}>
                           {fgView === 'open' && availQty > 0 && (
