@@ -56,6 +56,39 @@ Deno.serve(async (req) => {
   );
 
   try {
+    // --- AUTH: require admin ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const callerClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: userData, error: userErr } = await callerClient.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id);
+    const isAdmin = (roles || []).some((r: any) => r.role === "admin");
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: "Forbidden: admin required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const url = new URL(req.url);
     const action = url.searchParams.get("action") || "backup";
 
