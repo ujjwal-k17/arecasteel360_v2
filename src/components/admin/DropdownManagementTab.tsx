@@ -51,8 +51,18 @@ export default function DropdownManagementTab() {
     },
   });
 
+  const { data: cashCats } = useQuery({
+    queryKey: ['dropdown_options_cash_category'],
+    queryFn: async () => {
+      const { data } = await supabase.from('dropdown_options').select('value').eq('category', 'cash_category').eq('is_active', true);
+      return (data || []).map((d: any) => d.value);
+    },
+  });
+
   const filtered = (options || []).filter((o: any) => o.category === selectedCategory);
-  const needsParent = selectedCategory === 'coating' || selectedCategory === 'grade';
+  const needsParent = selectedCategory === 'coating' || selectedCategory === 'grade' || selectedCategory === 'cash_subcategory';
+  const parentOptions: string[] = selectedCategory === 'cash_subcategory' ? (cashCats || []) : (materials || []);
+  const parentLabel = selectedCategory === 'cash_subcategory' ? 'Parent Category' : 'Parent Material';
 
   const handleAdd = async () => {
     if (!newValue.trim()) { toast.error('Value is required'); return; }
