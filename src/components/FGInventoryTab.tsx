@@ -474,7 +474,7 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap"># Pcs</TableHead>
+              
               <TableHead className="text-xs font-semibold whitespace-nowrap"># Pallets</TableHead>
               <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
             </TableRow>
@@ -489,12 +489,11 @@ export default function FGInventoryTab() {
               <TableHead />
               <TableHead />
               <TableHead />
-              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No FG items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -509,7 +508,6 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm">{g.coating}</TableCell>
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{fmtInt(g.totalPcs)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{g.totalPallets > 0 ? fmtInt(g.totalPallets) : '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={() => setSalesHistoryGroup(g)}>
@@ -532,8 +530,7 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground font-mono-num whitespace-nowrap">{formatDimensions(item.thickness, item.width, item.length, item.process)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
-                        <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
-                        <TableCell className="text-xs font-mono-num">{item.num_pcs ?? '-'}</TableCell>
+                        <TableCell className="text-xs font-mono-num whitespace-nowrap">{availQty.toFixed(2)}{item.num_pcs ? <span className="text-muted-foreground"> ({fmtInt(item.num_pcs)} pcs)</span> : null}</TableCell>
                         <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           <div className="flex gap-1">
