@@ -23,8 +23,8 @@ const modules = [
   { title: 'Consumables', url: '/consumables', icon: Wrench, page: 'consumables' },
   { title: 'Order Book', url: '/order-book', icon: ClipboardList, page: 'order-book' },
   { title: 'Working Capital', url: '/working-capital', icon: Wallet, page: 'working-capital' },
-  { title: 'Cash Book', url: '/petty-cash', icon: Wallet, page: 'petty-cash' },
-  { title: 'Freight', url: '/freight', icon: Truck, page: 'freight' },
+  { title: 'Petty Cash', url: '/petty-cash', icon: Wallet, page: 'petty-cash' },
+  { title: 'Transportation', url: '/freight', icon: Truck, page: 'freight' },
 ];
 
 export function AppSidebar() {
