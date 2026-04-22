@@ -127,8 +127,12 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   }, [cashEntries]);
 
   const handleAddTrip = async () => {
+    if (!tripForm.trip_type) { toast.error('Trip type required'); return; }
+    if (!tripForm.trip_date) { toast.error('Trip date required'); return; }
     if (!tripForm.document_number.trim()) { toast.error('Document number required'); return; }
     if (!tripForm.source_destination.trim()) { toast.error('Source/Destination required'); return; }
+    const qtyNum = Number(tripForm.quantity);
+    if (!tripForm.quantity || isNaN(qtyNum) || qtyNum <= 0) { toast.error('Quantity required (must be > 0)'); return; }
     const docNorm = tripForm.document_number.trim().toLowerCase();
     const dup = allTrips.find(t => (t.document_number || '').trim().toLowerCase() === docNorm);
     if (dup) {
