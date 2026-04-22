@@ -489,7 +489,6 @@ export default function FGInventoryTab() {
               <TableHead />
               <TableHead />
               <TableHead />
-              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
