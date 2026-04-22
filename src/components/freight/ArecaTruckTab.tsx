@@ -129,11 +129,17 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   const handleAddTrip = async () => {
     if (!tripForm.document_number.trim()) { toast.error('Document number required'); return; }
     if (!tripForm.source_destination.trim()) { toast.error('Source/Destination required'); return; }
+    const docNorm = tripForm.document_number.trim().toLowerCase();
+    const dup = allTrips.find(t => (t.document_number || '').trim().toLowerCase() === docNorm);
+    if (dup) {
+      toast.error(`Document # already exists for trip ${dup.trip_id || dup.document_number} (${dup.trip_type})`);
+      return;
+    }
     await insertTrip.mutateAsync({
       truck_number: truckNumber,
       trip_type: tripForm.trip_type as any,
       trip_date: tripForm.trip_date,
-      document_number: tripForm.document_number,
+      document_number: tripForm.document_number.trim(),
       source_destination: tripForm.source_destination,
       quantity: tripForm.quantity ? Number(tripForm.quantity) : 0,
     });
