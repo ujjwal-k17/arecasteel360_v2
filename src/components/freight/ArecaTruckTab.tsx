@@ -133,12 +133,32 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
     if (!tripForm.source_destination.trim()) { toast.error('Source/Destination required'); return; }
     const qtyNum = Number(tripForm.quantity);
     if (!tripForm.quantity || isNaN(qtyNum) || qtyNum <= 0) { toast.error('Quantity required (must be > 0)'); return; }
-    const docNorm = tripForm.document_number.trim().toLowerCase();
-    const dup = allTrips.find(t => (t.document_number || '').trim().toLowerCase() === docNorm);
-    if (dup) {
-      toast.error(`Document # already exists for trip ${dup.trip_id || dup.document_number} (${dup.trip_type})`);
+    const docRaw = tripForm.document_number.trim();
+    const docNorm = docRaw.toLowerCase();
+
+    // Local check: all Areca trips currently shown (this truck)
+    const dupLocal = allTrips.find(t => (t.document_number || '').trim().toLowerCase() === docNorm);
+    if (dupLocal) {
+      toast.error(`Document # already exists for trip ${dupLocal.trip_id || dupLocal.document_number} (${dupLocal.trip_type})`);
       return;
     }
+
+    // Global check across both Areca trucks (truck_trips) + Transporter freight (transporter_freight.invoice_number)
+    const [tripsRes, freightRes] = await Promise.all([
+      (supabase as any).from('truck_trips').select('document_number, truck_number, trip_id').ilike('document_number', docRaw),
+      (supabase as any).from('transporter_freight').select('invoice_number').ilike('invoice_number', docRaw),
+    ]);
+    const tripDup = (tripsRes.data || []).find((r: any) => (r.document_number || '').trim().toLowerCase() === docNorm);
+    if (tripDup) {
+      toast.error(`Document # already used in truck ${tripDup.truck_number} (${tripDup.trip_id})`);
+      return;
+    }
+    const freightDup = (freightRes.data || []).find((r: any) => (r.invoice_number || '').trim().toLowerCase() === docNorm);
+    if (freightDup) {
+      toast.error(`Document # already exists in Transporter freight (${freightDup.invoice_number})`);
+      return;
+    }
+
     await insertTrip.mutateAsync({
       truck_number: truckNumber,
       trip_type: tripForm.trip_type as any,
