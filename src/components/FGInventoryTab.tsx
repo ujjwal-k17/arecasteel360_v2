@@ -508,7 +508,6 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm">{g.coating}</TableCell>
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{fmtInt(g.totalPcs)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{g.totalPallets > 0 ? fmtInt(g.totalPallets) : '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={() => setSalesHistoryGroup(g)}>
