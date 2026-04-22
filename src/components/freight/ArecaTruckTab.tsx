@@ -114,12 +114,14 @@ export function ArecaTruckTab({ truckNumber, internalKey, externalDispatches, ex
   }, [expensesByKey]);
 
   const { data: cashEntries = [] } = useCashEntries();
-  const incomeByManualId = useMemo(() => {
+  const incomeByKey = useMemo(() => {
     const map: Record<string, number> = {};
     (cashEntries as any[]).forEach((e: any) => {
-      if (e.source_type === 'truck_income' && e.source_id) {
-        map[e.source_id] = (map[e.source_id] || 0) + Number(e.amount || 0);
-      }
+      if (e.source_type !== 'truck_income') return;
+      const m = typeof e.comments === 'string' ? e.comments.match(/\[trip:([^\]]+)\]/) : null;
+      const key = m ? m[1] : (e.source_id ? `manual:${e.source_id}` : null);
+      if (!key) return;
+      map[key] = (map[key] || 0) + Number(e.amount || 0);
     });
     return map;
   }, [cashEntries]);
