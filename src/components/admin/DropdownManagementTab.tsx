@@ -9,7 +9,17 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const CATEGORIES = ['material', 'make', 'form', 'coating', 'grade'];
+const CATEGORIES = ['material', 'make', 'form', 'coating', 'grade', 'cash_category', 'cash_subcategory'];
+
+const CATEGORY_LABELS: Record<string, string> = {
+  material: 'Material',
+  make: 'Make',
+  form: 'Form',
+  coating: 'Coating',
+  grade: 'Grade',
+  cash_category: 'Cash Category',
+  cash_subcategory: 'Cash Sub-Category',
+};
 
 export default function DropdownManagementTab() {
   const qc = useQueryClient();
