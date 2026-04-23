@@ -1261,40 +1261,37 @@ function TransporterDispatchTable({
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8"></TableHead>
               <TableHead className="text-xs font-semibold">#</TableHead>
-              <TableHead className="text-xs font-semibold">Invoice Number</TableHead>
-              <TableHead className="text-xs font-semibold">Invoice Date</TableHead>
+              <TableHead className="text-xs font-semibold">Invoice</TableHead>
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold">Purchase / Sales</TableHead>
               <TableHead className="text-xs font-semibold">Transporter Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
-              <TableHead className="text-xs font-semibold">Approval</TableHead>
               <TableHead className="text-xs font-semibold">Paid Amount (₹)</TableHead>
-              <TableHead className="text-xs font-semibold">Payment Status</TableHead>
-              <TableHead className="text-xs font-semibold">Comments</TableHead>
-              <TableHead className="text-xs font-semibold">Action</TableHead>
+              <TableHead className="text-xs font-semibold">Approval / Payment</TableHead>
+              <TableHead className="text-xs font-semibold">Comments / Action</TableHead>
             </TableRow>
             {/* Filter row */}
             <TableRow>
               <TableHead></TableHead>
               <TableHead></TableHead>
               <TableHead>
-                <Select value={filterInvoice} onValueChange={v => setFilterInvoice(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    {uniqueInvoices.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select value={filterDate} onValueChange={v => setFilterDate(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    {uniqueDates.map(v => <SelectItem key={v} value={v}>{new Date(v).toLocaleDateString('en-IN')}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col gap-1">
+                  <Select value={filterDate} onValueChange={v => setFilterDate(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Date" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Dates</SelectItem>
+                      {uniqueDates.map(v => <SelectItem key={v} value={v}>{new Date(v).toLocaleDateString('en-IN')}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterInvoice} onValueChange={v => setFilterInvoice(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Invoice #" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Invoices</SelectItem>
+                      {uniqueInvoices.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </TableHead>
               <TableHead>
                 <Select value={filterCustomer} onValueChange={v => setFilterCustomer(v === '__all__' ? '' : v)}>
@@ -1326,37 +1323,36 @@ function TransporterDispatchTable({
                 </Select>
               </TableHead>
               <TableHead></TableHead>
-              <TableHead>
-                <Select value={filterApproval} onValueChange={v => setFilterApproval(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[90px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="hold">Hold</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
               <TableHead></TableHead>
               <TableHead>
-                <Select value={filterPaymentStatus} onValueChange={v => setFilterPaymentStatus(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[90px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    <SelectItem value="Unpaid">Unpaid</SelectItem>
-                    <SelectItem value="Partial Paid">Partial Paid</SelectItem>
-                    <SelectItem value="Full Paid">Full Paid</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col gap-1">
+                  <Select value={filterApproval} onValueChange={v => setFilterApproval(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Approval" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Approval</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="hold">Hold</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterPaymentStatus} onValueChange={v => setFilterPaymentStatus(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Payment" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Payment</SelectItem>
+                      <SelectItem value="Unpaid">Unpaid</SelectItem>
+                      <SelectItem value="Partial Paid">Partial Paid</SelectItem>
+                      <SelectItem value="Full Paid">Full Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </TableHead>
-              <TableHead></TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                   No transporter dispatches found.
                 </TableCell>
               </TableRow>
@@ -1378,8 +1374,12 @@ function TransporterDispatchTable({
                       {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
-                    <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                    <TableCell className="text-sm">
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-xs text-muted-foreground">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</span>
+                        <span className="font-medium">{s.invoice_number}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
                     <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
                     <TableCell className="text-sm">
@@ -1398,36 +1398,6 @@ function TransporterDispatchTable({
                       )}
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      {freightData ? (
-                        isAdmin ? (
-                          <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
-                            <SelectTrigger className={`h-7 text-xs w-[100px] ${
-                              approvalStatus === 'approved' ? 'border-green-500 text-green-700 bg-green-50' :
-                              approvalStatus === 'hold' ? 'border-amber-500 text-amber-700 bg-amber-50' :
-                              'border-orange-400 text-orange-600 bg-orange-50'
-                            }`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="approved">Approved</SelectItem>
-                              <SelectItem value="hold">Hold</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            approvalStatus === 'approved' ? 'bg-green-100 text-green-700' :
-                            approvalStatus === 'hold' ? 'bg-amber-100 text-amber-700' :
-                            'bg-orange-100 text-orange-600'
-                          }`}>
-                            {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <span className="font-mono-num">{paidAmount > 0 ? `₹${paidAmount.toLocaleString('en-IN')}` : '-'}</span>
                         {freightData && (
@@ -1437,47 +1407,74 @@ function TransporterDispatchTable({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        paymentStatus === 'Full Paid' ? 'bg-green-100 text-green-700' :
-                        paymentStatus === 'Partial Paid' ? 'bg-amber-100 text-amber-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {paymentStatus}
-                      </span>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      <div className="flex flex-col gap-1">
+                        {freightData ? (
+                          isAdmin ? (
+                            <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
+                              <SelectTrigger className={`h-6 text-[11px] w-[110px] ${
+                                approvalStatus === 'approved' ? 'border-green-500 text-green-700 bg-green-50' :
+                                approvalStatus === 'hold' ? 'border-amber-500 text-amber-700 bg-amber-50' :
+                                'border-orange-400 text-orange-600 bg-orange-50'
+                              }`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="approved">Approved</SelectItem>
+                                <SelectItem value="hold">Hold</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full text-center ${
+                              approvalStatus === 'approved' ? 'bg-green-100 text-green-700' :
+                              approvalStatus === 'hold' ? 'bg-amber-100 text-amber-700' :
+                              'bg-orange-100 text-orange-600'
+                            }`}>
+                              {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">-</span>
+                        )}
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full text-center ${
+                          paymentStatus === 'Full Paid' ? 'bg-green-100 text-green-700' :
+                          paymentStatus === 'Partial Paid' ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {paymentStatus}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      {freightData ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">{comments.length}</span>
-                          <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => onAddComment(freightData.id)}>
-                            <Plus className="h-3 w-3" /> Add
+                      <div className="flex flex-col gap-1 items-start">
+                        {freightData ? (
+                          <Button variant="outline" size="sm" className="h-6 text-xs gap-1 w-full justify-start" onClick={() => onAddComment(freightData.id)}>
+                            <Plus className="h-3 w-3" /> Comment ({comments.length})
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No comments</span>
+                        )}
+                        <div className="flex items-center gap-1 w-full">
+                          <Button
+                            variant={freightData ? 'outline' : 'default'}
+                            size="sm"
+                            className="h-6 text-xs gap-1 flex-1"
+                            onClick={() => onOpenFreightDialog(s.invoice_number)}
+                          >
+                            <Truck className="h-3 w-3" />
+                            {freightData ? 'Edit' : 'Add Freight'}
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5 text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
+                            ←
                           </Button>
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant={freightData ? 'outline' : 'default'}
-                          size="sm"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => onOpenFreightDialog(s.invoice_number)}
-                        >
-                          <Truck className="h-3.5 w-3.5" />
-                          {freightData ? 'Edit' : 'Add Freight'}
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                          ← Back
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
-                      <TableCell colSpan={14} className="bg-muted/30 p-4">
+                      <TableCell colSpan={11} className="bg-muted/30 p-4">
                         <div className="space-y-3">
                           {freightData?.lr_number && (
                             <div className="text-sm">
