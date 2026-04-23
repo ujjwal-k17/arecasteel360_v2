@@ -198,7 +198,20 @@ function FreightPage() {
     },
   });
 
-  const commentsByFreightId = useMemo(() => {
+  // Manual transporter trips (added via 'Add Trip' button in Transporter tab — not derived from a dispatch/purchase)
+  const { data: manualTransporterTrips } = useQuery({
+    queryKey: ['manual_transporter_trips'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('truck_trips')
+        .select('*')
+        .eq('truck_number', 'Transporter');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+
     const map: Record<string, any[]> = {};
     (freightComments || []).forEach((c: any) => {
       if (!map[c.transporter_freight_id]) map[c.transporter_freight_id] = [];
