@@ -1374,8 +1374,12 @@ function TransporterDispatchTable({
                       {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell className="text-sm font-medium">{s.invoice_number}</TableCell>
-                    <TableCell className="text-sm">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                    <TableCell className="text-sm">
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-xs text-muted-foreground">{s.invoice_date ? new Date(s.invoice_date).toLocaleDateString('en-IN') : '-'}</span>
+                        <span className="font-medium">{s.invoice_number}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
                     <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
                     <TableCell className="text-sm">
@@ -1394,36 +1398,6 @@ function TransporterDispatchTable({
                       )}
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      {freightData ? (
-                        isAdmin ? (
-                          <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
-                            <SelectTrigger className={`h-7 text-xs w-[100px] ${
-                              approvalStatus === 'approved' ? 'border-green-500 text-green-700 bg-green-50' :
-                              approvalStatus === 'hold' ? 'border-amber-500 text-amber-700 bg-amber-50' :
-                              'border-orange-400 text-orange-600 bg-orange-50'
-                            }`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="approved">Approved</SelectItem>
-                              <SelectItem value="hold">Hold</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            approvalStatus === 'approved' ? 'bg-green-100 text-green-700' :
-                            approvalStatus === 'hold' ? 'bg-amber-100 text-amber-700' :
-                            'bg-orange-100 text-orange-600'
-                          }`}>
-                            {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <span className="font-mono-num">{paidAmount > 0 ? `₹${paidAmount.toLocaleString('en-IN')}` : '-'}</span>
                         {freightData && (
@@ -1433,47 +1407,74 @@ function TransporterDispatchTable({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        paymentStatus === 'Full Paid' ? 'bg-green-100 text-green-700' :
-                        paymentStatus === 'Partial Paid' ? 'bg-amber-100 text-amber-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {paymentStatus}
-                      </span>
+                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
+                      <div className="flex flex-col gap-1">
+                        {freightData ? (
+                          isAdmin ? (
+                            <Select value={approvalStatus} onValueChange={v => onStatusChange(freightData.id, v)}>
+                              <SelectTrigger className={`h-6 text-[11px] w-[110px] ${
+                                approvalStatus === 'approved' ? 'border-green-500 text-green-700 bg-green-50' :
+                                approvalStatus === 'hold' ? 'border-amber-500 text-amber-700 bg-amber-50' :
+                                'border-orange-400 text-orange-600 bg-orange-50'
+                              }`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="approved">Approved</SelectItem>
+                                <SelectItem value="hold">Hold</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full text-center ${
+                              approvalStatus === 'approved' ? 'bg-green-100 text-green-700' :
+                              approvalStatus === 'hold' ? 'bg-amber-100 text-amber-700' :
+                              'bg-orange-100 text-orange-600'
+                            }`}>
+                              {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">-</span>
+                        )}
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full text-center ${
+                          paymentStatus === 'Full Paid' ? 'bg-green-100 text-green-700' :
+                          paymentStatus === 'Partial Paid' ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {paymentStatus}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      {freightData ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">{comments.length}</span>
-                          <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => onAddComment(freightData.id)}>
-                            <Plus className="h-3 w-3" /> Add
+                      <div className="flex flex-col gap-1 items-start">
+                        {freightData ? (
+                          <Button variant="outline" size="sm" className="h-6 text-xs gap-1 w-full justify-start" onClick={() => onAddComment(freightData.id)}>
+                            <Plus className="h-3 w-3" /> Comment ({comments.length})
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No comments</span>
+                        )}
+                        <div className="flex items-center gap-1 w-full">
+                          <Button
+                            variant={freightData ? 'outline' : 'default'}
+                            size="sm"
+                            className="h-6 text-xs gap-1 flex-1"
+                            onClick={() => onOpenFreightDialog(s.invoice_number)}
+                          >
+                            <Truck className="h-3 w-3" />
+                            {freightData ? 'Edit' : 'Add Freight'}
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5 text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
+                            ←
                           </Button>
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant={freightData ? 'outline' : 'default'}
-                          size="sm"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => onOpenFreightDialog(s.invoice_number)}
-                        >
-                          <Truck className="h-3.5 w-3.5" />
-                          {freightData ? 'Edit' : 'Add Freight'}
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
-                          ← Back
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
-                      <TableCell colSpan={14} className="bg-muted/30 p-4">
+                      <TableCell colSpan={11} className="bg-muted/30 p-4">
                         <div className="space-y-3">
                           {freightData?.lr_number && (
                             <div className="text-sm">
