@@ -310,12 +310,12 @@ function FreightPage() {
     // Sales items that have a dispatch_type
     const salesItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = invoiceSummaries.filter(s => s.dispatch_type);
 
-    // Purchase items grouped by purchase_invoice_number
+    // Purchase items grouped by purchase_invoice_number (FOR Purchase without invoice grouped by batch)
     const purchasesByInvoice: Record<string, PurchaseSummary[]> = {};
     purchaseSummaries
-      .filter(p => p.purchase_type && p.purchase_invoice_number)
+      .filter(p => p.purchase_type && (p.purchase_invoice_number || p.purchase_type === 'FOR Purchase'))
       .forEach(p => {
-        const key = p.purchase_invoice_number!;
+        const key = p.purchase_invoice_number || p.batch_number;
         if (!purchasesByInvoice[key]) purchasesByInvoice[key] = [];
         purchasesByInvoice[key].push(p);
       });
