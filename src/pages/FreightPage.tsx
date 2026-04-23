@@ -979,6 +979,7 @@ function TransporterDispatchTable({
   onAddComment,
   onAddPayment,
   onDownload,
+  onAddManualTrip,
 }: {
   data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   isAdmin: boolean;
@@ -992,8 +993,17 @@ function TransporterDispatchTable({
   onAddComment: (freightId: string) => void;
   onAddPayment: (freightId: string, invoiceNumber: string) => void;
   onDownload: () => void;
+  onAddManualTrip: (data: { trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [addTripOpen, setAddTripOpen] = useState(false);
+  const [tripForm, setTripForm] = useState({
+    trip_date: new Date().toISOString().slice(0, 10),
+    document_number: '',
+    source_destination: '',
+    quantity: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
   const [subTab, setSubTab] = useState<'all' | 'open' | 'closed'>('all');
   const [filterInvoice, setFilterInvoice] = useState('');
   const [filterDate, setFilterDate] = useState('');
