@@ -1261,40 +1261,37 @@ function TransporterDispatchTable({
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8"></TableHead>
               <TableHead className="text-xs font-semibold">#</TableHead>
-              <TableHead className="text-xs font-semibold">Invoice Number</TableHead>
-              <TableHead className="text-xs font-semibold">Invoice Date</TableHead>
+              <TableHead className="text-xs font-semibold">Invoice</TableHead>
               <TableHead className="text-xs font-semibold">Customer Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold">Purchase / Sales</TableHead>
               <TableHead className="text-xs font-semibold">Transporter Name</TableHead>
               <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
-              <TableHead className="text-xs font-semibold">Approval</TableHead>
               <TableHead className="text-xs font-semibold">Paid Amount (₹)</TableHead>
-              <TableHead className="text-xs font-semibold">Payment Status</TableHead>
-              <TableHead className="text-xs font-semibold">Comments</TableHead>
-              <TableHead className="text-xs font-semibold">Action</TableHead>
+              <TableHead className="text-xs font-semibold">Approval / Payment</TableHead>
+              <TableHead className="text-xs font-semibold">Comments / Action</TableHead>
             </TableRow>
             {/* Filter row */}
             <TableRow>
               <TableHead></TableHead>
               <TableHead></TableHead>
               <TableHead>
-                <Select value={filterInvoice} onValueChange={v => setFilterInvoice(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    {uniqueInvoices.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select value={filterDate} onValueChange={v => setFilterDate(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[100px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    {uniqueDates.map(v => <SelectItem key={v} value={v}>{new Date(v).toLocaleDateString('en-IN')}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col gap-1">
+                  <Select value={filterDate} onValueChange={v => setFilterDate(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Date" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Dates</SelectItem>
+                      {uniqueDates.map(v => <SelectItem key={v} value={v}>{new Date(v).toLocaleDateString('en-IN')}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterInvoice} onValueChange={v => setFilterInvoice(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Invoice #" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Invoices</SelectItem>
+                      {uniqueInvoices.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </TableHead>
               <TableHead>
                 <Select value={filterCustomer} onValueChange={v => setFilterCustomer(v === '__all__' ? '' : v)}>
@@ -1326,30 +1323,29 @@ function TransporterDispatchTable({
                 </Select>
               </TableHead>
               <TableHead></TableHead>
-              <TableHead>
-                <Select value={filterApproval} onValueChange={v => setFilterApproval(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[90px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="hold">Hold</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
               <TableHead></TableHead>
               <TableHead>
-                <Select value={filterPaymentStatus} onValueChange={v => setFilterPaymentStatus(v === '__all__' ? '' : v)}>
-                  <SelectTrigger className="h-6 text-[10px] w-[90px]"><SelectValue placeholder="All" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All</SelectItem>
-                    <SelectItem value="Unpaid">Unpaid</SelectItem>
-                    <SelectItem value="Partial Paid">Partial Paid</SelectItem>
-                    <SelectItem value="Full Paid">Full Paid</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col gap-1">
+                  <Select value={filterApproval} onValueChange={v => setFilterApproval(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Approval" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Approval</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="hold">Hold</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterPaymentStatus} onValueChange={v => setFilterPaymentStatus(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="h-6 text-[10px] w-[110px]"><SelectValue placeholder="Payment" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Payment</SelectItem>
+                      <SelectItem value="Unpaid">Unpaid</SelectItem>
+                      <SelectItem value="Partial Paid">Partial Paid</SelectItem>
+                      <SelectItem value="Full Paid">Full Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </TableHead>
-              <TableHead></TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
