@@ -405,16 +405,16 @@ function FreightPage() {
   });
 
   const saveFreightDetails = useMutation({
-    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number }) => {
+    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number; lr_number: string }) => {
       const existing = (transporterFreightMap || {})[data.invoice_number];
       if (existing) {
         const { error } = await supabase.from('transporter_freight')
-          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds })
+          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds, lr_number: data.lr_number })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('transporter_freight')
-          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds });
+          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds, lr_number: data.lr_number });
         if (error) throw error;
       }
     },
@@ -1311,6 +1311,12 @@ function TransporterDispatchTable({
                     <TableRow key={`${s.invoice_number}-detail`}>
                       <TableCell colSpan={14} className="bg-muted/30 p-4">
                         <div className="space-y-3">
+                          {freightData?.lr_number && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground font-medium">LR Number:</span>{' '}
+                              <span className="font-semibold">{freightData.lr_number}</span>
+                            </div>
+                          )}
                           {freightData && totalAmount > 0 && (
                             <div className="flex items-center gap-6 text-sm flex-wrap">
                               <div>

@@ -14,8 +14,8 @@ interface FreightDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   invoiceNumber: string;
   transporters: { id: string; name: string }[];
-  existingData?: { transporter_id: string | null; total_freight: number | null; gst: number | null; tds: number | null } | null;
-  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number }) => void;
+  existingData?: { transporter_id: string | null; total_freight: number | null; gst: number | null; tds: number | null; lr_number: string | null } | null;
+  onSave: (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number; lr_number: string }) => void;
 }
 
 export function FreightDetailsDialog({
@@ -31,6 +31,7 @@ export function FreightDetailsDialog({
   const [totalFreight, setTotalFreight] = useState('');
   const [gst, setGst] = useState('');
   const [tds, setTds] = useState('');
+  const [lrNumber, setLrNumber] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -40,6 +41,7 @@ export function FreightDetailsDialog({
       setTotalFreight(existingData?.total_freight?.toString() || '');
       setGst(existingData?.gst?.toString() || '');
       setTds(existingData?.tds?.toString() || '');
+      setLrNumber(existingData?.lr_number || '');
       setShowAddNew(false);
       setNewName('');
     }
@@ -62,13 +64,14 @@ export function FreightDetailsDialog({
   });
 
   const handleSave = () => {
-    if (!transporterId || !totalFreight) return;
+    if (!transporterId || !totalFreight || !lrNumber.trim()) return;
     onSave({
       invoice_number: invoiceNumber,
       transporter_id: transporterId,
       total_freight: parseFloat(totalFreight),
       gst: parseFloat(gst) || 0,
       tds: parseFloat(tds) || 0,
+      lr_number: lrNumber.trim(),
     });
     onOpenChange(false);
   };
@@ -112,6 +115,15 @@ export function FreightDetailsDialog({
             )}
           </div>
           <div className="space-y-2">
+            <Label>LR Number <span className="text-destructive">*</span></Label>
+            <Input
+              placeholder="Enter LR Number"
+              value={lrNumber}
+              onChange={e => setLrNumber(e.target.value)}
+              maxLength={100}
+            />
+          </div>
+          <div className="space-y-2">
             <Label>Freight Amount (₹)</Label>
             <Input
               type="number"
@@ -147,7 +159,7 @@ export function FreightDetailsDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!transporterId || !totalFreight}>Save</Button>
+          <Button onClick={handleSave} disabled={!transporterId || !totalFreight || !lrNumber.trim()}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
