@@ -31,6 +31,7 @@ export function FreightDetailsDialog({
   const [totalFreight, setTotalFreight] = useState('');
   const [gst, setGst] = useState('');
   const [tds, setTds] = useState('');
+  const [lrNumber, setLrNumber] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -40,6 +41,7 @@ export function FreightDetailsDialog({
       setTotalFreight(existingData?.total_freight?.toString() || '');
       setGst(existingData?.gst?.toString() || '');
       setTds(existingData?.tds?.toString() || '');
+      setLrNumber(existingData?.lr_number || '');
       setShowAddNew(false);
       setNewName('');
     }
@@ -62,13 +64,14 @@ export function FreightDetailsDialog({
   });
 
   const handleSave = () => {
-    if (!transporterId || !totalFreight) return;
+    if (!transporterId || !totalFreight || !lrNumber.trim()) return;
     onSave({
       invoice_number: invoiceNumber,
       transporter_id: transporterId,
       total_freight: parseFloat(totalFreight),
       gst: parseFloat(gst) || 0,
       tds: parseFloat(tds) || 0,
+      lr_number: lrNumber.trim(),
     });
     onOpenChange(false);
   };
