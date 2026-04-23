@@ -198,6 +198,19 @@ function FreightPage() {
     },
   });
 
+  // Manual transporter trips (added via 'Add Trip' button in Transporter tab — not derived from a dispatch/purchase)
+  const { data: manualTransporterTrips } = useQuery({
+    queryKey: ['manual_transporter_trips'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('truck_trips')
+        .select('*')
+        .eq('truck_number', 'Transporter');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const commentsByFreightId = useMemo(() => {
     const map: Record<string, any[]> = {};
     (freightComments || []).forEach((c: any) => {
@@ -334,8 +347,19 @@ function FreightPage() {
       source_type: 'purchase',
     }));
 
-    return [...salesItems, ...purchaseItems, ...intransitItems];
-  }, [invoiceSummaries, purchaseSummaries, intransitBatches]);
+    // Manual transporter trips — surface as Transporter dispatches (not from sales/purchases)
+    const manualItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = (manualTransporterTrips || []).map((t: any) => ({
+      invoice_number: t.document_number || t.trip_id,
+      invoice_date: t.trip_date,
+      order_id: null,
+      customer_name: t.source_destination,
+      total_qty: t.quantity || 0,
+      dispatch_type: 'Transporter',
+      source_type: 'manual',
+    }));
+
+    return [...salesItems, ...purchaseItems, ...intransitItems, ...manualItems];
+  }, [invoiceSummaries, purchaseSummaries, intransitBatches, manualTransporterTrips]);
 
   const filteredMappedItems = useMemo(() => {
     return allMappedItems.filter(s => {
@@ -623,6 +647,44 @@ function FreightPage() {
             onAddComment={(freightId) => setCommentDialog({ open: true, freightId, comment: '' })}
             onAddPayment={(freightId, invoiceNumber) => setPaymentDialog({ open: true, freightId, amount: '', invoiceNumber })}
             onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Transporter'), 'Transporter')}
+            onAddManualTrip={async (d) => {
+              // Save manual transporter trip to truck_trips with truck_number='Transporter'.
+              // Also block duplicates against existing truck_trips, transporter_freight, and invoice_details (Transporter dispatch type).
+              const normalizeDoc = (s: string | null | undefined) => (s || '').replace(/\s+/g, '').toLowerCase();
+              const docClean = d.document_number.replace(/\s+/g, '');
+              const docNorm = normalizeDoc(docClean);
+              if (!docNorm) { toast.error('Document number required'); return; }
+              const ilikePattern = `${docNorm[0]}%`;
+              const [tripsRes, freightRes, invDetRes] = await Promise.all([
+                supabase.from('truck_trips').select('document_number, truck_number').ilike('document_number', ilikePattern),
+                supabase.from('transporter_freight').select('invoice_number').ilike('invoice_number', ilikePattern),
+                supabase.from('invoice_details').select('invoice_number, purchase_invoice_number, dispatch_type').or(`invoice_number.ilike.${ilikePattern},purchase_invoice_number.ilike.${ilikePattern}`),
+              ]);
+              const tripDup = (tripsRes.data || []).find((r: any) => normalizeDoc(r.document_number) === docNorm);
+              if (tripDup) { toast.error(`Document # already exists${tripDup.truck_number ? ` under ${tripDup.truck_number}` : ''}`); return; }
+              const freightDup = (freightRes.data || []).find((r: any) => normalizeDoc(r.invoice_number) === docNorm);
+              if (freightDup) { toast.error('Document # already exists under Transporter'); return; }
+              const protectedDispatchTypes = ['Transporter', 'Areca 0720', 'Areca 2720'];
+              const invDup = (invDetRes.data || []).find((r: any) => protectedDispatchTypes.includes(r.dispatch_type) && (normalizeDoc(r.invoice_number) === docNorm || normalizeDoc(r.purchase_invoice_number) === docNorm));
+              if (invDup) {
+                const lbl = invDup.dispatch_type === 'Areca 0720' ? 'UP14KT0750' : invDup.dispatch_type === 'Areca 2720' ? 'UP14QT2750' : 'Transporter';
+                toast.error(`Document # already listed under ${lbl}`);
+                return;
+              }
+              const tripId = `TPT-${Date.now()}`;
+              const { error } = await supabase.from('truck_trips').insert({
+                trip_id: tripId,
+                truck_number: 'Transporter',
+                trip_type: 'Sales',
+                trip_date: d.trip_date,
+                document_number: docClean,
+                source_destination: d.source_destination,
+                quantity: d.quantity,
+              });
+              if (error) { toast.error('Failed to add trip'); return; }
+              toast.success('Trip added');
+              queryClient.invalidateQueries({ queryKey: ['manual_transporter_trips'] });
+            }}
           />
         </TabsContent>
 
@@ -955,6 +1017,7 @@ function TransporterDispatchTable({
   onAddComment,
   onAddPayment,
   onDownload,
+  onAddManualTrip,
 }: {
   data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   isAdmin: boolean;
@@ -968,8 +1031,17 @@ function TransporterDispatchTable({
   onAddComment: (freightId: string) => void;
   onAddPayment: (freightId: string, invoiceNumber: string) => void;
   onDownload: () => void;
+  onAddManualTrip: (data: { trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [addTripOpen, setAddTripOpen] = useState(false);
+  const [tripForm, setTripForm] = useState({
+    trip_date: new Date().toISOString().slice(0, 10),
+    document_number: '',
+    source_destination: '',
+    quantity: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
   const [subTab, setSubTab] = useState<'all' | 'open' | 'closed'>('all');
   const [filterInvoice, setFilterInvoice] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -1083,10 +1155,62 @@ function TransporterDispatchTable({
             setFilterInvoice(''); setFilterDate(''); setFilterCustomer(''); setFilterTransporter(''); setFilterApproval(''); setFilterPaymentStatus(''); setFilterSource('');
           }}>Clear Filters</Button>
         )}
-        <Button variant="outline" size="sm" onClick={onDownload} className="ml-auto gap-2 h-8">
+        <Button size="sm" className="ml-auto gap-2 h-8" onClick={() => setAddTripOpen(true)}>
+          <Plus className="h-3.5 w-3.5" /> Add Trip
+        </Button>
+        <Button variant="outline" size="sm" onClick={onDownload} className="gap-2 h-8">
           <Download className="h-3.5 w-3.5" /> Download Excel
         </Button>
       </div>
+
+      {/* Add Manual Transporter Trip Dialog */}
+      <Dialog open={addTripOpen} onOpenChange={(o) => { setAddTripOpen(o); if (!o) setTripForm({ trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Add Trip — Transporter</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Trip Date <span className="text-destructive">*</span></Label>
+              <Input type="date" value={tripForm.trip_date} onChange={e => setTripForm(f => ({ ...f, trip_date: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Document Number (Inv. / Challan) <span className="text-destructive">*</span></Label>
+              <Input value={tripForm.document_number} onChange={e => setTripForm(f => ({ ...f, document_number: e.target.value }))} placeholder="Enter invoice / challan #" maxLength={100} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Source / Destination <span className="text-destructive">*</span></Label>
+              <Input value={tripForm.source_destination} onChange={e => setTripForm(f => ({ ...f, source_destination: e.target.value }))} placeholder="From / To" maxLength={200} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Quantity (Kg) <span className="text-destructive">*</span></Label>
+              <Input type="number" value={tripForm.quantity} onChange={e => setTripForm(f => ({ ...f, quantity: e.target.value }))} placeholder="0" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddTripOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button
+              disabled={submitting || !tripForm.trip_date || !tripForm.document_number.trim() || !tripForm.source_destination.trim() || !tripForm.quantity || Number(tripForm.quantity) <= 0}
+              onClick={async () => {
+                setSubmitting(true);
+                try {
+                  await onAddManualTrip({
+                    trip_date: tripForm.trip_date,
+                    document_number: tripForm.document_number.trim(),
+                    source_destination: tripForm.source_destination.trim(),
+                    quantity: Number(tripForm.quantity),
+                  });
+                  setAddTripOpen(false);
+                  setTripForm({ trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              {submitting ? 'Saving…' : 'Add Trip'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
