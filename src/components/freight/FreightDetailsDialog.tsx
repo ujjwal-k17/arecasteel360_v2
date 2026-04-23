@@ -115,6 +115,15 @@ export function FreightDetailsDialog({
             )}
           </div>
           <div className="space-y-2">
+            <Label>LR Number <span className="text-destructive">*</span></Label>
+            <Input
+              placeholder="Enter LR Number"
+              value={lrNumber}
+              onChange={e => setLrNumber(e.target.value)}
+              maxLength={100}
+            />
+          </div>
+          <div className="space-y-2">
             <Label>Freight Amount (₹)</Label>
             <Input
               type="number"
