@@ -211,7 +211,7 @@ function FreightPage() {
     },
   });
 
-
+  const commentsByFreightId = useMemo(() => {
     const map: Record<string, any[]> = {};
     (freightComments || []).forEach((c: any) => {
       if (!map[c.transporter_freight_id]) map[c.transporter_freight_id] = [];
