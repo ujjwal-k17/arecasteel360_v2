@@ -405,16 +405,16 @@ function FreightPage() {
   });
 
   const saveFreightDetails = useMutation({
-    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number }) => {
+    mutationFn: async (data: { invoice_number: string; transporter_id: string; total_freight: number; gst: number; tds: number; lr_number: string }) => {
       const existing = (transporterFreightMap || {})[data.invoice_number];
       if (existing) {
         const { error } = await supabase.from('transporter_freight')
-          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds })
+          .update({ transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds, lr_number: data.lr_number })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('transporter_freight')
-          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds });
+          .insert({ invoice_number: data.invoice_number, transporter_id: data.transporter_id, total_freight: data.total_freight, gst: data.gst, tds: data.tds, lr_number: data.lr_number });
         if (error) throw error;
       }
     },
