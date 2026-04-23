@@ -310,12 +310,12 @@ function FreightPage() {
     // Sales items that have a dispatch_type
     const salesItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = invoiceSummaries.filter(s => s.dispatch_type);
 
-    // Purchase items grouped by purchase_invoice_number
+    // Purchase items grouped by purchase_invoice_number (FOR Purchase without invoice grouped by batch)
     const purchasesByInvoice: Record<string, PurchaseSummary[]> = {};
     purchaseSummaries
-      .filter(p => p.purchase_type && p.purchase_invoice_number)
+      .filter(p => p.purchase_type && (p.purchase_invoice_number || p.purchase_type === 'FOR Purchase'))
       .forEach(p => {
-        const key = p.purchase_invoice_number!;
+        const key = p.purchase_invoice_number || p.batch_number;
         if (!purchasesByInvoice[key]) purchasesByInvoice[key] = [];
         purchasesByInvoice[key].push(p);
       });
@@ -906,8 +906,8 @@ function PurchasesTable({
               <TableHead className="text-xs font-semibold">Supplier</TableHead>
               <TableHead className="text-xs font-semibold">Material</TableHead>
               <TableHead className="text-xs font-semibold">Gross Weight (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold">Purchase Invoice No.</TableHead>
               <TableHead className="text-xs font-semibold">Purchase Type</TableHead>
+              <TableHead className="text-xs font-semibold">Purchase Invoice No.</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -919,8 +919,6 @@ function PurchasesTable({
               </TableRow>
             )}
             {data.map((p, idx) => {
-              const hasPurchaseInvoice = !!(p.purchase_invoice_number || editingInvoice[p.batch_number]?.trim());
-
               return (
                 <TableRow key={p.batch_number}>
                   <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
@@ -930,7 +928,24 @@ function PurchasesTable({
                   <TableCell className="text-sm">{p.material || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{p.gross_weight.toFixed(2)}</TableCell>
                   <TableCell className="text-sm">
-                    {p.purchase_invoice_number && editingInvoice[p.batch_number] === undefined ? (
+                    <Select
+                      value={p.purchase_type || ''}
+                      onValueChange={v => onPurchaseTypeChange(p.batch_number, v)}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-[130px]">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PURCHASE_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {p.purchase_type === 'FOR Purchase' ? (
+                      <span className="text-xs text-muted-foreground">Not required</span>
+                    ) : p.purchase_invoice_number && editingInvoice[p.batch_number] === undefined ? (
                       <div className="flex items-center gap-1">
                         <span className="font-medium">{p.purchase_invoice_number}</span>
                         <Button
@@ -971,26 +986,6 @@ function PurchasesTable({
                           </Button>
                         )}
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {hasPurchaseInvoice || p.purchase_invoice_number ? (
-                      <Select
-                        value={p.purchase_type || ''}
-                        onValueChange={v => onPurchaseTypeChange(p.batch_number, v)}
-                        disabled={!p.purchase_invoice_number}
-                      >
-                        <SelectTrigger className="h-7 text-xs w-[130px]">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PURCHASE_TYPES.map(t => (
-                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Enter invoice first</span>
                     )}
                   </TableCell>
                 </TableRow>
