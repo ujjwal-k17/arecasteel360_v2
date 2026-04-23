@@ -347,8 +347,19 @@ function FreightPage() {
       source_type: 'purchase',
     }));
 
-    return [...salesItems, ...purchaseItems, ...intransitItems];
-  }, [invoiceSummaries, purchaseSummaries, intransitBatches]);
+    // Manual transporter trips — surface as Transporter dispatches (not from sales/purchases)
+    const manualItems: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[] = (manualTransporterTrips || []).map((t: any) => ({
+      invoice_number: t.document_number || t.trip_id,
+      invoice_date: t.trip_date,
+      order_id: null,
+      customer_name: t.source_destination,
+      total_qty: t.quantity || 0,
+      dispatch_type: 'Transporter',
+      source_type: 'manual',
+    }));
+
+    return [...salesItems, ...purchaseItems, ...intransitItems, ...manualItems];
+  }, [invoiceSummaries, purchaseSummaries, intransitBatches, manualTransporterTrips]);
 
   const filteredMappedItems = useMemo(() => {
     return allMappedItems.filter(s => {
