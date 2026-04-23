@@ -647,6 +647,44 @@ function FreightPage() {
             onAddComment={(freightId) => setCommentDialog({ open: true, freightId, comment: '' })}
             onAddPayment={(freightId, invoiceNumber) => setPaymentDialog({ open: true, freightId, amount: '', invoiceNumber })}
             onDownload={() => handleDownload(filteredMappedItems.filter(s => s.dispatch_type === 'Transporter'), 'Transporter')}
+            onAddManualTrip={async (d) => {
+              // Save manual transporter trip to truck_trips with truck_number='Transporter'.
+              // Also block duplicates against existing truck_trips, transporter_freight, and invoice_details (Transporter dispatch type).
+              const normalizeDoc = (s: string | null | undefined) => (s || '').replace(/\s+/g, '').toLowerCase();
+              const docClean = d.document_number.replace(/\s+/g, '');
+              const docNorm = normalizeDoc(docClean);
+              if (!docNorm) { toast.error('Document number required'); return; }
+              const ilikePattern = `${docNorm[0]}%`;
+              const [tripsRes, freightRes, invDetRes] = await Promise.all([
+                supabase.from('truck_trips').select('document_number, truck_number').ilike('document_number', ilikePattern),
+                supabase.from('transporter_freight').select('invoice_number').ilike('invoice_number', ilikePattern),
+                supabase.from('invoice_details').select('invoice_number, purchase_invoice_number, dispatch_type').or(`invoice_number.ilike.${ilikePattern},purchase_invoice_number.ilike.${ilikePattern}`),
+              ]);
+              const tripDup = (tripsRes.data || []).find((r: any) => normalizeDoc(r.document_number) === docNorm);
+              if (tripDup) { toast.error(`Document # already exists${tripDup.truck_number ? ` under ${tripDup.truck_number}` : ''}`); return; }
+              const freightDup = (freightRes.data || []).find((r: any) => normalizeDoc(r.invoice_number) === docNorm);
+              if (freightDup) { toast.error('Document # already exists under Transporter'); return; }
+              const protectedDispatchTypes = ['Transporter', 'Areca 0720', 'Areca 2720'];
+              const invDup = (invDetRes.data || []).find((r: any) => protectedDispatchTypes.includes(r.dispatch_type) && (normalizeDoc(r.invoice_number) === docNorm || normalizeDoc(r.purchase_invoice_number) === docNorm));
+              if (invDup) {
+                const lbl = invDup.dispatch_type === 'Areca 0720' ? 'UP14KT0750' : invDup.dispatch_type === 'Areca 2720' ? 'UP14QT2750' : 'Transporter';
+                toast.error(`Document # already listed under ${lbl}`);
+                return;
+              }
+              const tripId = `TPT-${Date.now()}`;
+              const { error } = await supabase.from('truck_trips').insert({
+                trip_id: tripId,
+                truck_number: 'Transporter',
+                trip_type: 'Sales',
+                trip_date: d.trip_date,
+                document_number: docClean,
+                source_destination: d.source_destination,
+                quantity: d.quantity,
+              });
+              if (error) { toast.error('Failed to add trip'); return; }
+              toast.success('Trip added');
+              queryClient.invalidateQueries({ queryKey: ['manual_transporter_trips'] });
+            }}
           />
         </TabsContent>
 
