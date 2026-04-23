@@ -506,13 +506,42 @@ function FreightPage() {
     <div className="container py-6">
       <h1 className="text-2xl font-semibold mb-6">Freight</h1>
       <Tabs defaultValue="all-dispatches">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="all-dispatches">All Dispatches</TabsTrigger>
-          <TabsTrigger value="purchases">Purchases</TabsTrigger>
-          <TabsTrigger value="ex-sales">Ex-Sales / FOR Purchases</TabsTrigger>
-          <TabsTrigger value="transporter">Transporter</TabsTrigger>
-          <TabsTrigger value="areca-trucks">Areca Trucks</TabsTrigger>
-        </TabsList>
+        <div className="space-y-2">
+          <TabsList className="flex-wrap bg-transparent p-0 gap-2 h-auto justify-start">
+            <TabsTrigger
+              value="all-dispatches"
+              className="bg-primary/10 text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              All Dispatches
+            </TabsTrigger>
+            <TabsTrigger
+              value="purchases"
+              className="bg-primary/10 text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              Purchases
+            </TabsTrigger>
+            <TabsTrigger
+              value="transporter"
+              className="bg-accent/10 text-accent data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+            >
+              Transporter
+            </TabsTrigger>
+            <TabsTrigger
+              value="areca-trucks"
+              className="bg-accent/10 text-accent data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+            >
+              Areca Trucks
+            </TabsTrigger>
+          </TabsList>
+          <TabsList className="flex-wrap bg-transparent p-0 gap-2 h-auto justify-start">
+            <TabsTrigger
+              value="ex-sales"
+              className="h-7 px-2 text-xs bg-muted text-muted-foreground data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground"
+            >
+              Ex-Sales / FOR Purchases
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <div className="flex items-center gap-3 flex-wrap my-4">
           <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2">
