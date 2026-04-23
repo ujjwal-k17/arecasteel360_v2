@@ -906,8 +906,8 @@ function PurchasesTable({
               <TableHead className="text-xs font-semibold">Supplier</TableHead>
               <TableHead className="text-xs font-semibold">Material</TableHead>
               <TableHead className="text-xs font-semibold">Gross Weight (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold">Purchase Invoice No.</TableHead>
               <TableHead className="text-xs font-semibold">Purchase Type</TableHead>
+              <TableHead className="text-xs font-semibold">Purchase Invoice No.</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
