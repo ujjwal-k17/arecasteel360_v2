@@ -955,14 +955,21 @@ function PurchasesTable({
           <TableBody>
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   No unassigned purchases found.
                 </TableCell>
               </TableRow>
             )}
             {data.map((p, idx) => {
               return (
-                <TableRow key={p.batch_number}>
+                <TableRow key={p.batch_number} data-state={selected.has(p.batch_number) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.has(p.batch_number)}
+                      onCheckedChange={() => toggleOne(p.batch_number)}
+                      aria-label={`Select ${p.batch_number}`}
+                    />
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
                   <TableCell className="text-sm font-medium">{p.batch_number}</TableCell>
                   <TableCell className="text-sm">{p.purchase_date ? new Date(p.purchase_date).toLocaleDateString('en-IN') : '-'}</TableCell>
