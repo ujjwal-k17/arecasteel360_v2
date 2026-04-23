@@ -919,8 +919,6 @@ function PurchasesTable({
               </TableRow>
             )}
             {data.map((p, idx) => {
-              const hasPurchaseInvoice = !!(p.purchase_invoice_number || editingInvoice[p.batch_number]?.trim());
-
               return (
                 <TableRow key={p.batch_number}>
                   <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
