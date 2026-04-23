@@ -1,0 +1,1 @@
+ALTER TABLE public.transporter_freight ADD COLUMN IF NOT EXISTS lr_number text;

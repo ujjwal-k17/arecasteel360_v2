@@ -1137,6 +1137,7 @@ export type Database = {
           gst: number | null
           id: string
           invoice_number: string
+          lr_number: string | null
           status: string
           tds: number | null
           total_freight: number | null
@@ -1149,6 +1150,7 @@ export type Database = {
           gst?: number | null
           id?: string
           invoice_number: string
+          lr_number?: string | null
           status?: string
           tds?: number | null
           total_freight?: number | null
@@ -1161,6 +1163,7 @@ export type Database = {
           gst?: number | null
           id?: string
           invoice_number?: string
+          lr_number?: string | null
           status?: string
           tds?: number | null
           total_freight?: number | null
