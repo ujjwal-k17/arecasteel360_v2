@@ -875,6 +875,7 @@ function PurchasesTable({
   onSavePurchaseInvoice: (batchNumber: string, invoiceNumber: string) => void;
 }) {
   const [editingInvoice, setEditingInvoice] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const handleSaveInvoice = (batchNumber: string) => {
     const val = editingInvoice[batchNumber]?.trim();
@@ -884,9 +885,28 @@ function PurchasesTable({
     }
   };
 
+  const toggleOne = (batchNumber: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(batchNumber)) n.delete(batchNumber); else n.add(batchNumber);
+      return n;
+    });
+  };
+
+  const allSelected = data.length > 0 && data.every(p => selected.has(p.batch_number));
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(data.map(p => p.batch_number)));
+  };
+
+  const handleBulkFOR = () => {
+    selected.forEach(batchNumber => onPurchaseTypeChange(batchNumber, 'FOR Purchase'));
+    setSelected(new Set());
+  };
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-4 text-sm">
+      <div className="flex items-center gap-4 text-sm flex-wrap">
         <div className="bg-muted/50 rounded-md px-3 py-1.5">
           <span className="text-muted-foreground">Batches:</span>{' '}
           <span className="font-semibold">{data.length}</span>
@@ -895,11 +915,32 @@ function PurchasesTable({
           <span className="text-muted-foreground">Total Weight:</span>{' '}
           <span className="font-semibold font-mono-num">{data.reduce((s, r) => s + r.gross_weight, 0).toFixed(2)} Kg</span>
         </div>
+        {selected.size > 0 && (
+          <>
+            <div className="bg-muted/50 rounded-md px-3 py-1.5">
+              <span className="text-muted-foreground">Selected:</span>{' '}
+              <span className="font-semibold">{selected.size}</span>
+            </div>
+            <Button size="sm" className="h-8 text-xs" onClick={handleBulkFOR}>
+              Mark as FOR Purchase
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+          </>
+        )}
       </div>
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              <TableHead className="text-xs font-semibold w-10">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead className="text-xs font-semibold">#</TableHead>
               <TableHead className="text-xs font-semibold">Batch Number</TableHead>
               <TableHead className="text-xs font-semibold">Purchase Date</TableHead>
