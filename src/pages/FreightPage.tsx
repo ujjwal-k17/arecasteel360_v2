@@ -507,7 +507,7 @@ function FreightPage() {
       <h1 className="text-2xl font-semibold mb-6">Freight</h1>
       <Tabs defaultValue="all-dispatches">
         <div className="space-y-2">
-          <TabsList className="flex-wrap bg-transparent p-0 gap-2 h-auto justify-start">
+          <TabsList className="flex flex-wrap bg-transparent p-0 gap-2 h-auto justify-start w-full">
             <TabsTrigger
               value="all-dispatches"
               className="bg-primary/10 text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -533,7 +533,7 @@ function FreightPage() {
               Areca Trucks
             </TabsTrigger>
           </TabsList>
-          <TabsList className="flex-wrap bg-transparent p-0 gap-2 h-auto justify-start">
+          <TabsList className="flex flex-wrap bg-transparent p-0 gap-2 h-auto justify-start w-full">
             <TabsTrigger
               value="ex-sales"
               className="h-7 px-2 text-xs bg-muted text-muted-foreground data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground"
