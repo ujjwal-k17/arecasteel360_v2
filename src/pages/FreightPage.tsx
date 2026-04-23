@@ -1311,6 +1311,12 @@ function TransporterDispatchTable({
                     <TableRow key={`${s.invoice_number}-detail`}>
                       <TableCell colSpan={14} className="bg-muted/30 p-4">
                         <div className="space-y-3">
+                          {freightData?.lr_number && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground font-medium">LR Number:</span>{' '}
+                              <span className="font-semibold">{freightData.lr_number}</span>
+                            </div>
+                          )}
                           {freightData && totalAmount > 0 && (
                             <div className="flex items-center gap-6 text-sm flex-wrap">
                               <div>
