@@ -159,7 +159,7 @@ export function FreightDetailsDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!transporterId || !totalFreight}>Save</Button>
+          <Button onClick={handleSave} disabled={!transporterId || !totalFreight || !lrNumber.trim()}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
