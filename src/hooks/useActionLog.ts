@@ -295,7 +295,7 @@ export function useReviewApproval() {
           await supabase.from('truck_trips' as any).delete().eq('id', entityId);
         } else if (actionType === 'edit' && (entityType === 'wip_item' || entityType === 'fg_item')) {
           const newValues = (meta as any).new_values || {};
-          const allowed = ['qty', 'num_pcs', 'length', 'width', 'thickness'];
+          const allowed = entityType === 'wip_item' ? ['width'] : ['width', 'length'];
           const updatePayload: Record<string, any> = {};
           for (const k of allowed) {
             if (k in newValues) updatePayload[k] = newValues[k];
