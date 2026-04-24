@@ -22,17 +22,8 @@ export default function EditInventoryDialog({ item, entityType, open, onClose }:
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
 
-  // Determine which dimension fields are editable based on entity & process
-  const editableFields = useMemo<('width' | 'length')[]>(() => {
-    if (entityType === 'wip_item') return ['width'];
-    // FG: depends on process
-    const proc = String(item?.process || '').toLowerCase();
-    if (proc.includes('ctl') || proc.includes('sheet')) return ['length'];
-    if (proc.includes('slit') || proc.includes('coil')) return ['width'];
-    // Fallback: allow whichever has a value
-    if (item?.length != null && item?.width == null) return ['length'];
-    return ['width'];
-  }, [entityType, item]);
+  // Only length is editable
+  const editableFields = useMemo<('length')[]>(() => ['length'], []);
 
   const [values, setValues] = useState<Record<string, string>>({
     width: item?.width != null ? String(item.width) : '',
