@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,19 +16,27 @@ interface Props {
   onClose: () => void;
 }
 
-const EDITABLE = ['qty', 'num_pcs', 'length', 'width', 'thickness'] as const;
-
 export default function EditInventoryDialog({ item, entityType, open, onClose }: Props) {
   const { isAdmin } = useAuth();
   const submitApproval = useSubmitApproval();
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
+
+  // Determine which dimension fields are editable based on entity & process
+  const editableFields = useMemo<('width' | 'length')[]>(() => {
+    if (entityType === 'wip_item') return ['width'];
+    // FG: depends on process
+    const proc = String(item?.process || '').toLowerCase();
+    if (proc.includes('ctl') || proc.includes('sheet')) return ['length'];
+    if (proc.includes('slit') || proc.includes('coil')) return ['width'];
+    // Fallback: allow whichever has a value
+    if (item?.length != null && item?.width == null) return ['length'];
+    return ['width'];
+  }, [entityType, item]);
+
   const [values, setValues] = useState<Record<string, string>>({
-    qty: item?.qty != null ? String(item.qty) : '',
-    num_pcs: item?.num_pcs != null ? String(item.num_pcs) : '',
-    length: item?.length != null ? String(item.length) : '',
     width: item?.width != null ? String(item.width) : '',
-    thickness: item?.thickness != null ? String(item.thickness) : '',
+    length: item?.length != null ? String(item.length) : '',
   });
 
   const handleNum = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setValues(v => ({ ...v, [k]: e.target.value }));
@@ -36,7 +44,7 @@ export default function EditInventoryDialog({ item, entityType, open, onClose }:
   const buildChanges = () => {
     const newValues: Record<string, number | null> = {};
     const oldValues: Record<string, number | null> = {};
-    for (const k of EDITABLE) {
+    for (const k of editableFields) {
       const raw = values[k];
       const parsed = raw === '' ? null : Number(raw);
       if (raw !== '' && Number.isNaN(parsed as any)) continue;
@@ -55,16 +63,11 @@ export default function EditInventoryDialog({ item, entityType, open, onClose }:
       toast.info('No changes to save');
       return;
     }
-    if (newValues.qty != null && (newValues.qty as number) < 0) {
-      toast.error('Quantity cannot be negative');
-      return;
-    }
     setSubmitting(true);
     try {
-      const desc = `Edit ${entityType === 'wip_item' ? 'WIP' : 'FG'} item (${item.material || '-'} ${item.thickness ?? ''}x${item.width ?? ''}): ${Object.keys(newValues).map(k => `${k} ${oldValues[k] ?? '-'} → ${newValues[k] ?? '-'}`).join(', ')}`;
+      const desc = `Edit ${entityType === 'wip_item' ? 'WIP' : 'FG'} item (${item.material || '-'} ${item.thickness ?? ''}): ${Object.keys(newValues).map(k => `${k} ${oldValues[k] ?? '-'} → ${newValues[k] ?? '-'}`).join(', ')}`;
 
       if (isAdmin) {
-        // Apply directly
         const table = entityType === 'wip_item' ? 'wip_items' : 'fg_items';
         const { error } = await supabase.from(table as any).update(newValues as any).eq('id', item.id);
         if (error) throw error;
@@ -90,31 +93,23 @@ export default function EditInventoryDialog({ item, entityType, open, onClose }:
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Edit {entityType === 'wip_item' ? 'WIP' : 'FG'} Item</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 py-2">
-          <div className="space-y-1">
-            <Label className="text-xs">Qty (Kg)</Label>
-            <Input type="number" step="0.01" value={values.qty} onChange={handleNum('qty')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">No. of Pieces</Label>
-            <Input type="number" step="1" value={values.num_pcs} onChange={handleNum('num_pcs')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Thickness</Label>
-            <Input type="number" step="0.01" value={values.thickness} onChange={handleNum('thickness')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Width</Label>
-            <Input type="number" step="0.01" value={values.width} onChange={handleNum('width')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
-          </div>
-          <div className="space-y-1 col-span-2">
-            <Label className="text-xs">Length</Label>
-            <Input type="number" step="0.01" value={values.length} onChange={handleNum('length')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
-          </div>
+        <div className="space-y-3 py-2">
+          {editableFields.includes('width') && (
+            <div className="space-y-1">
+              <Label className="text-xs">Width (mm)</Label>
+              <Input type="number" step="0.01" value={values.width} onChange={handleNum('width')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
+            </div>
+          )}
+          {editableFields.includes('length') && (
+            <div className="space-y-1">
+              <Label className="text-xs">Length (mm)</Label>
+              <Input type="number" step="0.01" value={values.length} onChange={handleNum('length')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
+            </div>
+          )}
         </div>
         {!isAdmin && (
           <p className="text-xs text-muted-foreground">Changes will be applied after admin approval.</p>
