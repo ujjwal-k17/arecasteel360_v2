@@ -305,14 +305,7 @@ export default function FGInventoryTab() {
       return qty > 0;
     });
     if (itemsToSell.length === 0) { toast.error('Enter quantity for at least one item'); return; }
-    for (const item of itemsToSell) {
-      const qty = Number(bulkQuantities[item.id]);
-      const avail = getAvailableQty(item);
-      if (qty > avail + 0.01) {
-        toast.error(`Quantity exceeds available for batch ${getBatchNumber(item)}`);
-        return;
-      }
-    }
+    // Over-quantity allowed; no blocking validation
     try {
       for (const item of itemsToSell) {
         await insertFGSale.mutateAsync({
