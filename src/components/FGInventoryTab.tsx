@@ -11,11 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 
-import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2, History } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2, History, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useOrders, useAllDispatches, useNonDispatchSalesByOrder } from '@/hooks/useOrders';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitApproval } from '@/hooks/useActionLog';
+import EditInventoryDialog from './EditInventoryDialog';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
@@ -58,6 +59,7 @@ export default function FGInventoryTab() {
   // Dialogs
   const [saleDialog, setSaleDialog] = useState<any | null>(null);
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
+  const [editItem, setEditItem] = useState<any | null>(null);
   const [salesHistoryGroup, setSalesHistoryGroup] = useState<SKUGroup | null>(null);
   const [saleCustomerId, setSaleCustomerId] = useState('');
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
