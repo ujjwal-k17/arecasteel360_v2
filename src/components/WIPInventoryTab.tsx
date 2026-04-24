@@ -469,6 +469,10 @@ export default function WIPInventoryTab() {
         <WIPProcessingDialog wipItem={processingItem} open={!!processingItem} onClose={() => setProcessingItem(null)} />
       )}
 
+      {editItem && (
+        <EditInventoryDialog item={editItem} entityType="wip_item" open={!!editItem} onClose={() => setEditItem(null)} />
+      )}
+
       {/* Defective Dialog */}
       <Dialog open={!!defectDialog} onOpenChange={() => setDefectDialog(null)}>
         <DialogContent className="max-w-sm">
