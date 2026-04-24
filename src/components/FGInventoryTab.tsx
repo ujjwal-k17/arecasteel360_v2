@@ -11,11 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 
-import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2, History } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, ShoppingCart, AlertTriangle, Trash2, Undo2, History, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useOrders, useAllDispatches, useNonDispatchSalesByOrder } from '@/hooks/useOrders';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitApproval } from '@/hooks/useActionLog';
+import EditInventoryDialog from './EditInventoryDialog';
 
 const DEFECT_TYPES = ['End pcs', 'Scratch/ Dent', 'Waviness', 'Other'];
 
@@ -58,6 +59,7 @@ export default function FGInventoryTab() {
   // Dialogs
   const [saleDialog, setSaleDialog] = useState<any | null>(null);
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
+  const [editItem, setEditItem] = useState<any | null>(null);
   const [salesHistoryGroup, setSalesHistoryGroup] = useState<SKUGroup | null>(null);
   const [saleCustomerId, setSaleCustomerId] = useState('');
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
@@ -551,23 +553,28 @@ export default function FGInventoryTab() {
                             <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }}>
                               <AlertTriangle className="h-3 w-3" /> Defective
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
-                              e.stopPropagation();
-                              const restoreTo = item.source_type === 'wip' ? 'WIP' : 'Coil Inventory';
-                              if (!confirm(`Request to move this FG item (${availQty.toFixed(2)} Kg) back to ${restoreTo}?`)) return;
-                              try {
-                                await submitApproval.mutateAsync({
-                                  action_type: 'move_back',
-                                  entity_type: 'fg_item',
-                                  entity_id: item.id,
-                                  description: `Move FG item (${availQty.toFixed(2)} Kg, ${item.material || '-'} ${item.thickness ?? ''}x${item.width ?? ''}) back to ${restoreTo}`,
-                                  metadata: { source_type: item.source_type, source_id: item.source_id, qty: item.qty, processing_record_id: item.processing_record_id },
-                                });
-                                toast.success('Move-back request submitted for approval');
-                              } catch { toast.error('Failed to submit request'); }
-                            }} title={`Move back to ${item.source_type === 'wip' ? 'WIP' : 'Coil Inventory'}`} disabled={submitApproval.isPending}>
-                              <Undo2 className="h-3 w-3" /> Move Back
+                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
+                              <Pencil className="h-3 w-3" /> Edit
                             </Button>
+                            {isAdmin && (
+                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                                e.stopPropagation();
+                                const restoreTo = item.source_type === 'wip' ? 'WIP' : 'Coil Inventory';
+                                if (!confirm(`Request to move this FG item (${availQty.toFixed(2)} Kg) back to ${restoreTo}?`)) return;
+                                try {
+                                  await submitApproval.mutateAsync({
+                                    action_type: 'move_back',
+                                    entity_type: 'fg_item',
+                                    entity_id: item.id,
+                                    description: `Move FG item (${availQty.toFixed(2)} Kg, ${item.material || '-'} ${item.thickness ?? ''}x${item.width ?? ''}) back to ${restoreTo}`,
+                                    metadata: { source_type: item.source_type, source_id: item.source_id, qty: item.qty, processing_record_id: item.processing_record_id },
+                                  });
+                                  toast.success('Move-back request submitted for approval');
+                                } catch { toast.error('Failed to submit request'); }
+                              }} title={`Move back to ${item.source_type === 'wip' ? 'WIP' : 'Coil Inventory'}`} disabled={submitApproval.isPending}>
+                                <Undo2 className="h-3 w-3" /> Move Back
+                              </Button>
+                            )}
                             {isAdmin && (
                               <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive hover:bg-destructive/10" onClick={async (e) => {
                                 e.stopPropagation();
@@ -635,6 +642,10 @@ export default function FGInventoryTab() {
           </TableBody>
         </Table>
       </div>
+
+      {editItem && (
+        <EditInventoryDialog item={editItem} entityType="fg_item" open={!!editItem} onClose={() => setEditItem(null)} />
+      )}
 
       {/* Sale Dialog */}
       <Dialog open={!!saleDialog} onOpenChange={() => setSaleDialog(null)}>

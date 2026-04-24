@@ -293,6 +293,18 @@ export function useReviewApproval() {
             await supabase.from('truck_trip_expenses' as any).delete().eq('truck_trip_id', entityId);
           }
           await supabase.from('truck_trips' as any).delete().eq('id', entityId);
+        } else if (actionType === 'edit' && (entityType === 'wip_item' || entityType === 'fg_item')) {
+          const newValues = (meta as any).new_values || {};
+          const allowed = ['qty', 'num_pcs', 'length', 'width', 'thickness'];
+          const updatePayload: Record<string, any> = {};
+          for (const k of allowed) {
+            if (k in newValues) updatePayload[k] = newValues[k];
+          }
+          if (Object.keys(updatePayload).length > 0) {
+            const table = entityType === 'wip_item' ? 'wip_items' : 'fg_items';
+            const { error: updErr } = await supabase.from(table as any).update(updatePayload as any).eq('id', entityId);
+            if (updErr) throw updErr;
+          }
         }
       }
 
