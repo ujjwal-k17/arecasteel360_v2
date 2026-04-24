@@ -22,17 +22,8 @@ export default function EditInventoryDialog({ item, entityType, open, onClose }:
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
 
-  // Determine which dimension fields are editable based on entity & process
-  const editableFields = useMemo<('width' | 'length')[]>(() => {
-    if (entityType === 'wip_item') return ['width'];
-    // FG: depends on process
-    const proc = String(item?.process || '').toLowerCase();
-    if (proc.includes('ctl') || proc.includes('sheet')) return ['length'];
-    if (proc.includes('slit') || proc.includes('coil')) return ['width'];
-    // Fallback: allow whichever has a value
-    if (item?.length != null && item?.width == null) return ['length'];
-    return ['width'];
-  }, [entityType, item]);
+  // Only length is editable
+  const editableFields = useMemo<('length')[]>(() => ['length'], []);
 
   const [values, setValues] = useState<Record<string, string>>({
     width: item?.width != null ? String(item.width) : '',
@@ -98,18 +89,10 @@ export default function EditInventoryDialog({ item, entityType, open, onClose }:
           <DialogTitle>Edit {entityType === 'wip_item' ? 'WIP' : 'FG'} Item</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">
-          {editableFields.includes('width') && (
-            <div className="space-y-1">
-              <Label className="text-xs">Width (mm)</Label>
-              <Input type="number" step="0.01" value={values.width} onChange={handleNum('width')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
-            </div>
-          )}
-          {editableFields.includes('length') && (
-            <div className="space-y-1">
-              <Label className="text-xs">Length (mm)</Label>
-              <Input type="number" step="0.01" value={values.length} onChange={handleNum('length')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
-            </div>
-          )}
+          <div className="space-y-1">
+            <Label className="text-xs">Length (mm)</Label>
+            <Input type="number" step="0.01" value={values.length} onChange={handleNum('length')} onWheel={(e) => (e.target as HTMLInputElement).blur()} />
+          </div>
         </div>
         {!isAdmin && (
           <p className="text-xs text-muted-foreground">Changes will be applied after admin approval.</p>
