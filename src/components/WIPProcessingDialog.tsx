@@ -304,7 +304,7 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
 
           {/* Soft warning — does not block submission */}
           {exceedsAvailable && (
-            <div className="bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs rounded-md p-2 font-medium">
+            <div className="bg-muted text-muted-foreground border border-border text-xs rounded-md p-2 font-medium">
               ⚠ Total ({totalCommitted.toFixed(2)} Kg) exceeds available qty ({(wipItem.qty || 0).toFixed(2)} Kg). You can still proceed.
             </div>
           )}
