@@ -95,10 +95,7 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
       toast.error('Please fill all CTL length entries');
       return;
     }
-    if (exceedsAvailable) {
-      toast.error(`Total (${totalCommitted.toFixed(2)} Kg) exceeds available qty (${(wipItem.qty || 0).toFixed(2)} Kg)`);
-      return;
-    }
+    // Note: over-quantity allowed; warning shown but submission permitted
 
     // Validate pallet BEFORE mutation
     if (!noPalletConsumption) {
@@ -305,17 +302,17 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
             </div>
           </div>
 
-          {/* Validation warning */}
+          {/* Soft warning — does not block submission */}
           {exceedsAvailable && (
-            <div className="bg-destructive/10 text-destructive text-xs rounded-md p-2 font-medium">
-              ⚠ Total ({totalCommitted.toFixed(2)} Kg) exceeds available qty ({(wipItem.qty || 0).toFixed(2)} Kg)
+            <div className="bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs rounded-md p-2 font-medium">
+              ⚠ Total ({totalCommitted.toFixed(2)} Kg) exceeds available qty ({(wipItem.qty || 0).toFixed(2)} Kg). You can still proceed.
             </div>
           )}
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || wipProcessing.isPending || exceedsAvailable}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || wipProcessing.isPending}>
             {isSubmitting || wipProcessing.isPending ? 'Saving...' : 'Process to FG'}
           </Button>
         </DialogFooter>

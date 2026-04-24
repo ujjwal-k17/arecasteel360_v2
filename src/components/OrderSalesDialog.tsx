@@ -51,16 +51,7 @@ export default function OrderSalesDialog({ open, onOpenChange, order }: Props) {
       return;
     }
 
-    // Validate no over-dispatch
-    for (const d of toDispatch) {
-      const item = items.find((i: any) => i.id === d.order_item_id);
-      const already = getDispatchedQty(d.order_item_id);
-      const balance = (Number(item?.net_weight) || 0) - already;
-      if (d.dispatch_qty > balance) {
-        toast.error(`Dispatch qty exceeds balance for ${getSkuLabel(item)}`);
-        return;
-      }
-    }
+    // Over-dispatch allowed; no blocking validation
 
     try {
       await insertDispatches.mutateAsync(toDispatch);
