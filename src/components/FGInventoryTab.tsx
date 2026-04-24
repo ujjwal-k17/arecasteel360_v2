@@ -643,6 +643,10 @@ export default function FGInventoryTab() {
         </Table>
       </div>
 
+      {editItem && (
+        <EditInventoryDialog item={editItem} entityType="fg_item" open={!!editItem} onClose={() => setEditItem(null)} />
+      )}
+
       {/* Sale Dialog */}
       <Dialog open={!!saleDialog} onOpenChange={() => setSaleDialog(null)}>
         <DialogContent className="max-w-sm">
