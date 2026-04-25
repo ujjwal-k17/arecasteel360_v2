@@ -299,12 +299,12 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
             ))}
           </div>
 
-          {/* Wooden Pallet Consumption — Multiple Sizes */}
+          {/* Pallet Consumption — Multiple Sizes (Wooden + Steel) */}
           <div className="border rounded-md p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Wooden Pallet Consumption</p>
+              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Pallet Consumption</p>
               {!noPalletConsumption && (
-                <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setPalletEntries(prev => [...prev, { skuId: '', pcs: '' }])}>
+                <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setPalletEntries(prev => [...prev, { skuKey: '', pcs: '' }])}>
                   <Plus className="h-3 w-3" /> Add Size
                 </Button>
               )}
@@ -313,11 +313,11 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
               <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
                 <div>
                   <Label className="text-xs">Pallet Size</Label>
-                  <Select value={entry.skuId} onValueChange={v => { const arr = [...palletEntries]; arr[i] = { ...arr[i], skuId: v }; setPalletEntries(arr); }}>
+                  <Select value={entry.skuKey} onValueChange={v => { const arr = [...palletEntries]; arr[i] = { ...arr[i], skuKey: v }; setPalletEntries(arr); }}>
                     <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
                     <SelectContent>
-                      {(palletSkus || []).map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
+                      {combinedPalletOptions.map(opt => (
+                        <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -333,14 +333,14 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
                 )}
               </div>
             ))}
-            {!noPalletConsumption && palletEntries.some(e => e.skuId && Number(e.pcs) > 0) && (
+            {!noPalletConsumption && palletEntries.some(e => e.skuKey && Number(e.pcs) > 0) && (
               <p className="text-xs text-muted-foreground">
-                Est. total weight: {palletEntries.reduce((sum, e) => sum + ((latestWtPerPc.get(e.skuId) || 0) * (Number(e.pcs) || 0)), 0).toFixed(2)} Kg
+                Est. total weight: {palletEntries.reduce((sum, e) => sum + ((latestWtPerPc.get(e.skuKey) || 0) * (Number(e.pcs) || 0)), 0).toFixed(2)} Kg
               </p>
             )}
             <div className="flex items-center gap-2 pt-1">
               <Checkbox id="wip-no-pallet-check" checked={noPalletConsumption} onCheckedChange={(v) => setNoPalletConsumption(!!v)} />
-              <Label htmlFor="wip-no-pallet-check" className="text-xs font-medium cursor-pointer">No Wooden Pallet Consumption</Label>
+              <Label htmlFor="wip-no-pallet-check" className="text-xs font-medium cursor-pointer">No Pallet Consumption</Label>
             </div>
           </div>
 
