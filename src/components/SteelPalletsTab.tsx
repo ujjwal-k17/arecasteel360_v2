@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RefreshCw, Plus, ShoppingCart, Upload, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -298,134 +299,147 @@ export default function SteelPalletsTab() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="w-8" />
-              <TableHead className="text-xs font-semibold whitespace-nowrap">
-                <div className="space-y-1">
-                  <span>Pallet Size</span>
-                  <Select value={sizeFilter} onValueChange={setSizeFilter}>
-                    <SelectTrigger className="h-6 text-[10px] w-full min-w-[100px]">
-                      <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      {(skus || []).map(s => (
-                        <SelectItem key={s.id} value={s.pallet_size}>{s.pallet_size}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Balance Weight (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Balance # of Pcs</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Last Purchase Date</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Last Consumed Date</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredSkus.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  {(!skus || skus.length === 0) ? 'No SKUs found. Add a new SKU or upload inventory.' : 'No SKUs match the selected filter.'}
-                </TableCell>
-              </TableRow>
-            )}
-            {filteredSkus.map(sku => {
-              const summary = skuSummary.get(sku.id) || { balanceWeight: 0, balancePcs: 0, lastPurchase: null, lastConsumption: null };
-              const isOpen = expanded.has(sku.id);
-              const skuPurchases = (purchases || []).filter(p => p.pallet_sku_id === sku.id);
-              const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
-              return (
-                <>
-                  <TableRow key={sku.id} className="cursor-pointer hover:bg-muted/30" onClick={() => toggleExpand(sku.id)}>
-                    <TableCell className="w-8">
-                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium">{sku.pallet_size}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{summary.balanceWeight.toFixed(2)}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{summary.balancePcs}</TableCell>
-                    <TableCell className="text-sm">{summary.lastPurchase ? new Date(summary.lastPurchase).toLocaleDateString('en-IN') : '-'}</TableCell>
-                    <TableCell className="text-sm">{summary.lastConsumption ? new Date(summary.lastConsumption).toLocaleDateString('en-IN') : '-'}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                        <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowPurchase(sku)}>
-                          <ShoppingCart className="h-3 w-3" /> Purchase
-                        </Button>
-                      </div>
+      <Tabs defaultValue="summary" className="w-full">
+        <TabsList>
+          <TabsTrigger value="summary">Purchase Summary</TabsTrigger>
+          <TabsTrigger value="sku">SKU Data Entry</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="summary" className="mt-4">
+          <SteelPurchaseSummarySection purchases={purchases || []} skus={skus || []} />
+        </TabsContent>
+
+        <TabsContent value="sku" className="mt-4">
+          <div className="overflow-x-auto rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-8" />
+                  <TableHead className="text-xs font-semibold whitespace-nowrap">
+                    <div className="space-y-1">
+                      <span>Pallet Size</span>
+                      <Select value={sizeFilter} onValueChange={setSizeFilter}>
+                        <SelectTrigger className="h-6 text-[10px] w-full min-w-[100px]">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          {(skus || []).map(s => (
+                            <SelectItem key={s.id} value={s.pallet_size}>{s.pallet_size}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold whitespace-nowrap">Balance Weight (Kg)</TableHead>
+                  <TableHead className="text-xs font-semibold whitespace-nowrap">Balance # of Pcs</TableHead>
+                  <TableHead className="text-xs font-semibold whitespace-nowrap">Last Purchase Date</TableHead>
+                  <TableHead className="text-xs font-semibold whitespace-nowrap">Last Consumed Date</TableHead>
+                  <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSkus.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      {(!skus || skus.length === 0) ? 'No SKUs found. Add a new SKU or upload inventory.' : 'No SKUs match the selected filter.'}
                     </TableCell>
                   </TableRow>
-                  {isOpen && (
-                    <TableRow key={`${sku.id}-details`}>
-                      <TableCell colSpan={7} className="p-0">
-                        <div className="bg-muted/10 p-4 space-y-4">
-                          <div>
-                            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Purchase History</h4>
-                            {skuPurchases.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">No purchases recorded.</p>
-                            ) : (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs">Date</TableHead>
-                                    <TableHead className="text-xs">Weight (Kg)</TableHead>
-                                    <TableHead className="text-xs"># Pcs</TableHead>
-                                    <TableHead className="text-xs">Rate/Kg</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {skuPurchases.map(p => (
-                                    <TableRow key={p.id}>
-                                      <TableCell className="text-xs">{new Date(p.purchase_date).toLocaleDateString('en-IN')}</TableCell>
-                                      <TableCell className="text-xs font-mono-num">{p.weight_kg}</TableCell>
-                                      <TableCell className="text-xs font-mono-num">{p.num_pcs}</TableCell>
-                                      <TableCell className="text-xs font-mono-num">{p.rate_per_kg ?? '-'}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            )}
+                )}
+                {filteredSkus.map(sku => {
+                  const summary = skuSummary.get(sku.id) || { balanceWeight: 0, balancePcs: 0, lastPurchase: null, lastConsumption: null };
+                  const isOpen = expanded.has(sku.id);
+                  const skuPurchases = (purchases || []).filter(p => p.pallet_sku_id === sku.id);
+                  const skuConsumptions = (consumptions || []).filter(c => c.pallet_sku_id === sku.id);
+                  return (
+                    <>
+                      <TableRow key={sku.id} className="cursor-pointer hover:bg-muted/30" onClick={() => toggleExpand(sku.id)}>
+                        <TableCell className="w-8">
+                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">{sku.pallet_size}</TableCell>
+                        <TableCell className="text-sm font-mono-num font-semibold">{summary.balanceWeight.toFixed(2)}</TableCell>
+                        <TableCell className="text-sm font-mono-num font-semibold">{summary.balancePcs}</TableCell>
+                        <TableCell className="text-sm">{summary.lastPurchase ? new Date(summary.lastPurchase).toLocaleDateString('en-IN') : '-'}</TableCell>
+                        <TableCell className="text-sm">{summary.lastConsumption ? new Date(summary.lastConsumption).toLocaleDateString('en-IN') : '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowPurchase(sku)}>
+                              <ShoppingCart className="h-3 w-3" /> Purchase
+                            </Button>
                           </div>
-                          <div>
-                            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Consumption History</h4>
-                            {skuConsumptions.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">No consumptions recorded.</p>
-                            ) : (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs">Date</TableHead>
-                                    <TableHead className="text-xs">Order ID</TableHead>
-                                    <TableHead className="text-xs">Weight (Kg)</TableHead>
-                                    <TableHead className="text-xs"># Pcs</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {skuConsumptions.map(c => (
-                                    <TableRow key={c.id}>
-                                      <TableCell className="text-xs">{new Date(c.consumption_date).toLocaleDateString('en-IN')}</TableCell>
-                                      <TableCell className="text-xs">{c.order_id || '-'}</TableCell>
-                                      <TableCell className="text-xs font-mono-num">{c.weight_kg}</TableCell>
-                                      <TableCell className="text-xs font-mono-num">{c.num_pcs}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+                        </TableCell>
+                      </TableRow>
+                      {isOpen && (
+                        <TableRow key={`${sku.id}-details`}>
+                          <TableCell colSpan={7} className="p-0">
+                            <div className="bg-muted/10 p-4 space-y-4">
+                              <div>
+                                <h4 className="text-xs font-semibold text-muted-foreground mb-2">Purchase History</h4>
+                                {skuPurchases.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">No purchases recorded.</p>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs">Date</TableHead>
+                                        <TableHead className="text-xs">Weight (Kg)</TableHead>
+                                        <TableHead className="text-xs"># Pcs</TableHead>
+                                        <TableHead className="text-xs">Rate/Kg</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {skuPurchases.map(p => (
+                                        <TableRow key={p.id}>
+                                          <TableCell className="text-xs">{new Date(p.purchase_date).toLocaleDateString('en-IN')}</TableCell>
+                                          <TableCell className="text-xs font-mono-num">{p.weight_kg}</TableCell>
+                                          <TableCell className="text-xs font-mono-num">{p.num_pcs}</TableCell>
+                                          <TableCell className="text-xs font-mono-num">{p.rate_per_kg ?? '-'}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-semibold text-muted-foreground mb-2">Consumption History</h4>
+                                {skuConsumptions.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">No consumptions recorded.</p>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs">Date</TableHead>
+                                        <TableHead className="text-xs">Order ID</TableHead>
+                                        <TableHead className="text-xs">Weight (Kg)</TableHead>
+                                        <TableHead className="text-xs"># Pcs</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {skuConsumptions.map(c => (
+                                        <TableRow key={c.id}>
+                                          <TableCell className="text-xs">{new Date(c.consumption_date).toLocaleDateString('en-IN')}</TableCell>
+                                          <TableCell className="text-xs">{c.order_id || '-'}</TableCell>
+                                          <TableCell className="text-xs font-mono-num">{c.weight_kg}</TableCell>
+                                          <TableCell className="text-xs font-mono-num">{c.num_pcs}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Add SKU Dialog */}
       <Dialog open={showAddSKU} onOpenChange={setShowAddSKU}>
@@ -482,6 +496,78 @@ export default function SteelPalletsTab() {
         </DialogContent>
       </Dialog>
 
+    </div>
+  );
+}
+
+/* ── Steel Purchase Summary: date-wise, sizes dropdown ── */
+function SteelPurchaseSummarySection({ purchases, skus }: { purchases: SteelPalletPurchase[]; skus: SteelPalletSKU[] }) {
+  const skuById = useMemo(() => {
+    const m: Record<string, string> = {};
+    skus.forEach(s => { m[s.id] = s.pallet_size; });
+    return m;
+  }, [skus]);
+
+  const grouped = useMemo(() => {
+    const m = new Map<string, { date: string; totalWeight: number; totalPcs: number; sizes: { size: string; weight: number; pcs: number }[] }>();
+    purchases.forEach(p => {
+      const key = p.purchase_date;
+      if (!m.has(key)) m.set(key, { date: p.purchase_date, totalWeight: 0, totalPcs: 0, sizes: [] });
+      const entry = m.get(key)!;
+      const sizeLabel = skuById[p.pallet_sku_id] || 'Unknown';
+      entry.totalWeight += p.weight_kg || 0;
+      entry.totalPcs += p.num_pcs || 0;
+      entry.sizes.push({ size: sizeLabel, weight: p.weight_kg || 0, pcs: p.num_pcs || 0 });
+    });
+    return Array.from(m.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [purchases, skuById]);
+
+  return (
+    <div className="rounded-md border bg-card">
+      <div className="px-4 py-2 border-b bg-muted/40">
+        <h3 className="text-sm font-semibold">Purchase Summary (Date-wise)</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/30">
+              <TableHead className="text-xs font-semibold">Date</TableHead>
+              <TableHead className="text-xs font-semibold">Sizes</TableHead>
+              <TableHead className="text-xs font-semibold">Total Weight (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold">Total Pcs</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {grouped.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground text-xs py-4">
+                  No purchases recorded.
+                </TableCell>
+              </TableRow>
+            ) : grouped.map((g, i) => (
+              <TableRow key={i}>
+                <TableCell className="text-xs">{g.date ? new Date(g.date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                <TableCell className="text-xs">
+                  <Select>
+                    <SelectTrigger className="h-7 text-xs w-[200px]">
+                      <SelectValue placeholder={`${g.sizes.length} size${g.sizes.length !== 1 ? 's' : ''}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {g.sizes.map((s, j) => (
+                        <SelectItem key={j} value={`${i}-${j}`} disabled>
+                          {s.size} — {s.weight.toFixed(2)} Kg / {s.pcs} pcs
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell className="text-xs font-mono-num font-semibold">{g.totalWeight.toFixed(2)}</TableCell>
+                <TableCell className="text-xs font-mono-num font-semibold">{g.totalPcs}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
