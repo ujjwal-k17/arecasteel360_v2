@@ -1,8 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useOrders } from '@/hooks/useOrders';
-import OrderIdCombobox from '@/components/OrderIdCombobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -96,13 +94,6 @@ export default function SteelPalletsTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['steel_pallet_purchases'] }),
   });
 
-  const insertConsumption = useMutation({
-    mutationFn: async (data: { pallet_sku_id: string; consumption_date: string; order_id: string | null; weight_kg: number; num_pcs: number }) => {
-      const { error } = await supabase.from('steel_pallet_consumptions' as any).insert(data);
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['steel_pallet_consumptions'] }),
-  });
 
   const skuSummary = useMemo(() => {
     const map = new Map<string, { balanceWeight: number; balancePcs: number; lastPurchase: string | null; lastConsumption: string | null }>();
@@ -160,24 +151,6 @@ export default function SteelPalletsTab() {
     } catch { toast.error('Failed to record purchase'); }
   };
 
-  const handleConsumptionSubmit = async () => {
-    if (!showConsumption) return;
-    if (!consumptionForm.date) { toast.error('Date is required'); return; }
-    if (!consumptionForm.weight || Number(consumptionForm.weight) <= 0) { toast.error('Weight is required'); return; }
-    if (!consumptionForm.pcs || Number(consumptionForm.pcs) <= 0) { toast.error('Number of Pcs is required'); return; }
-    try {
-      await insertConsumption.mutateAsync({
-        pallet_sku_id: showConsumption.id,
-        consumption_date: consumptionForm.date,
-        order_id: consumptionForm.orderId || null,
-        weight_kg: Number(consumptionForm.weight),
-        num_pcs: Number(consumptionForm.pcs),
-      });
-      toast.success('Consumption recorded');
-      setShowConsumption(null);
-      setConsumptionForm({ date: '', orderId: '', weight: '', pcs: '' });
-    } catch { toast.error('Failed to record consumption'); }
-  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
