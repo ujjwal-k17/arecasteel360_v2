@@ -127,9 +127,9 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
 
     // Validate pallet BEFORE mutation
     if (!noPalletConsumption) {
-      const validPalletEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+      const validPalletEntries = palletEntries.filter(e => e.skuKey && Number(e.pcs) > 0);
       if (validPalletEntries.length === 0) {
-        toast.error('Please add wooden pallet consumption or check "No Wooden Pallet Consumption"');
+        toast.error('Please add pallet consumption or check "No Pallet Consumption"');
         return;
       }
     }
@@ -149,22 +149,36 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
       });
       const processingRecordId = (procResult as any)?.id || null;
 
-      // Record pallet consumption — multiple entries
+      // Record pallet consumption — multiple entries (wooden or steel)
       if (!noPalletConsumption) {
-        const validEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+        const validEntries = palletEntries.filter(e => e.skuKey && Number(e.pcs) > 0);
         for (const entry of validEntries) {
-          const wtPerPc = latestWtPerPc.get(entry.skuId) || 0;
+          const wtPerPc = latestWtPerPc.get(entry.skuKey) || 0;
           const totalWt = wtPerPc * Number(entry.pcs);
-          await supabase.from('pallet_consumptions').insert({
-            pallet_sku_id: entry.skuId,
-            consumption_date: new Date().toISOString().slice(0, 10),
-            order_id: null,
-            weight_kg: totalWt,
-            num_pcs: Number(entry.pcs),
-            processing_record_id: processingRecordId,
-          } as any);
+          const [type, id] = entry.skuKey.split(':');
+          if (type === 'steel') {
+            await supabase.from('steel_pallet_consumptions' as any).insert({
+              pallet_sku_id: id,
+              consumption_date: new Date().toISOString().slice(0, 10),
+              order_id: null,
+              weight_kg: totalWt,
+              num_pcs: Number(entry.pcs),
+            } as any);
+          } else {
+            await supabase.from('pallet_consumptions').insert({
+              pallet_sku_id: id,
+              consumption_date: new Date().toISOString().slice(0, 10),
+              order_id: null,
+              weight_kg: totalWt,
+              num_pcs: Number(entry.pcs),
+              processing_record_id: processingRecordId,
+            } as any);
+          }
         }
-        if (validEntries.length > 0) queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+        if (validEntries.length > 0) {
+          queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+          queryClient.invalidateQueries({ queryKey: ['steel_pallet_consumptions'] });
+        }
       }
 
       toast.success('WIP processed to FG successfully');
