@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, Plus, ShoppingCart, Package, Upload, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { RefreshCw, Plus, ShoppingCart, Upload, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -41,7 +41,6 @@ interface SteelPalletConsumption {
 
 export default function SteelPalletsTab() {
   const queryClient = useQueryClient();
-  const { data: orders } = useOrders();
   const fileRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sizeFilter, setSizeFilter] = useState<string>('all');
@@ -52,9 +51,7 @@ export default function SteelPalletsTab() {
   const [newSKUWidth, setNewSKUWidth] = useState('');
   const [newSKULength, setNewSKULength] = useState('');
   const [showPurchase, setShowPurchase] = useState<SteelPalletSKU | null>(null);
-  const [showConsumption, setShowConsumption] = useState<SteelPalletSKU | null>(null);
   const [purchaseForm, setPurchaseForm] = useState({ date: '', weight: '', pcs: '', rate: '' });
-  const [consumptionForm, setConsumptionForm] = useState({ date: '', orderId: '', weight: '', pcs: '' });
 
   const { data: skus } = useQuery({
     queryKey: ['steel_pallet_skus'],
