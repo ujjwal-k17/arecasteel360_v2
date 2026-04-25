@@ -32,10 +32,11 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
   const [defectEntries, setDefectEntries] = useState<DefectEntry[]>([{ type: '', weight: '' }]);
 
   // Pallet consumption state — multiple sizes (default: consumption expected)
+  // skuKey format: "wooden:<id>" or "steel:<id>"
   const [noPalletConsumption, setNoPalletConsumption] = useState(false);
-  const [palletEntries, setPalletEntries] = useState<{ skuId: string; pcs: string }[]>([{ skuId: '', pcs: '' }]);
+  const [palletEntries, setPalletEntries] = useState<{ skuKey: string; pcs: string }[]>([{ skuKey: '', pcs: '' }]);
 
-  const { data: palletSkus } = useQuery({
+  const { data: woodenSkus } = useQuery({
     queryKey: ['pallet_skus'],
     queryFn: async () => {
       const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
@@ -44,7 +45,16 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
     },
   });
 
-  const { data: palletPurchases } = useQuery({
+  const { data: steelSkus } = useQuery({
+    queryKey: ['steel_pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('steel_pallet_skus' as any).select('*').order('pallet_size');
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const { data: woodenPurchases } = useQuery({
     queryKey: ['pallet_purchases'],
     queryFn: async () => {
       const { data, error } = await supabase.from('pallet_purchases').select('*').order('purchase_date', { ascending: false });
@@ -53,15 +63,33 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
     },
   });
 
+  const { data: steelPurchases } = useQuery({
+    queryKey: ['steel_pallet_purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('steel_pallet_purchases' as any).select('*').order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const combinedPalletOptions = useMemo(() => {
+    const wooden = (woodenSkus || []).map((s: any) => ({ key: `wooden:${s.id}`, label: `${s.pallet_size} (Wooden)` }));
+    const steel = (steelSkus || []).map((s: any) => ({ key: `steel:${s.id}`, label: `${s.pallet_size} (Steel)` }));
+    return [...wooden, ...steel];
+  }, [woodenSkus, steelSkus]);
+
   const latestWtPerPc = useMemo(() => {
     const map = new Map<string, number>();
-    (palletPurchases || []).forEach((p: any) => {
-      if (!map.has(p.pallet_sku_id) && p.num_pcs > 0) {
-        map.set(p.pallet_sku_id, p.weight_kg / p.num_pcs);
-      }
+    (woodenPurchases || []).forEach((p: any) => {
+      const k = `wooden:${p.pallet_sku_id}`;
+      if (!map.has(k) && p.num_pcs > 0) map.set(k, p.weight_kg / p.num_pcs);
+    });
+    (steelPurchases || []).forEach((p: any) => {
+      const k = `steel:${p.pallet_sku_id}`;
+      if (!map.has(k) && p.num_pcs > 0) map.set(k, p.weight_kg / p.num_pcs);
     });
     return map;
-  }, [palletPurchases]);
+  }, [woodenPurchases, steelPurchases]);
 
   const addDefectEntry = () => setDefectEntries(prev => [...prev, { type: '', weight: '' }]);
   const removeDefectEntry = (i: number) => setDefectEntries(prev => prev.filter((_, idx) => idx !== i));
