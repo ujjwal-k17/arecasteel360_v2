@@ -499,3 +499,75 @@ export default function SteelPalletsTab() {
     </div>
   );
 }
+
+/* ── Steel Purchase Summary: date-wise, sizes dropdown ── */
+function SteelPurchaseSummarySection({ purchases, skus }: { purchases: SteelPalletPurchase[]; skus: SteelPalletSKU[] }) {
+  const skuById = useMemo(() => {
+    const m: Record<string, string> = {};
+    skus.forEach(s => { m[s.id] = s.pallet_size; });
+    return m;
+  }, [skus]);
+
+  const grouped = useMemo(() => {
+    const m = new Map<string, { date: string; totalWeight: number; totalPcs: number; sizes: { size: string; weight: number; pcs: number }[] }>();
+    purchases.forEach(p => {
+      const key = p.purchase_date;
+      if (!m.has(key)) m.set(key, { date: p.purchase_date, totalWeight: 0, totalPcs: 0, sizes: [] });
+      const entry = m.get(key)!;
+      const sizeLabel = skuById[p.pallet_sku_id] || 'Unknown';
+      entry.totalWeight += p.weight_kg || 0;
+      entry.totalPcs += p.num_pcs || 0;
+      entry.sizes.push({ size: sizeLabel, weight: p.weight_kg || 0, pcs: p.num_pcs || 0 });
+    });
+    return Array.from(m.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [purchases, skuById]);
+
+  return (
+    <div className="rounded-md border bg-card">
+      <div className="px-4 py-2 border-b bg-muted/40">
+        <h3 className="text-sm font-semibold">Purchase Summary (Date-wise)</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/30">
+              <TableHead className="text-xs font-semibold">Date</TableHead>
+              <TableHead className="text-xs font-semibold">Sizes</TableHead>
+              <TableHead className="text-xs font-semibold">Total Weight (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold">Total Pcs</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {grouped.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground text-xs py-4">
+                  No purchases recorded.
+                </TableCell>
+              </TableRow>
+            ) : grouped.map((g, i) => (
+              <TableRow key={i}>
+                <TableCell className="text-xs">{g.date ? new Date(g.date).toLocaleDateString('en-IN') : '-'}</TableCell>
+                <TableCell className="text-xs">
+                  <Select>
+                    <SelectTrigger className="h-7 text-xs w-[200px]">
+                      <SelectValue placeholder={`${g.sizes.length} size${g.sizes.length !== 1 ? 's' : ''}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {g.sizes.map((s, j) => (
+                        <SelectItem key={j} value={`${i}-${j}`} disabled>
+                          {s.size} — {s.weight.toFixed(2)} Kg / {s.pcs} pcs
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell className="text-xs font-mono-num font-semibold">{g.totalWeight.toFixed(2)}</TableCell>
+                <TableCell className="text-xs font-mono-num font-semibold">{g.totalPcs}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
