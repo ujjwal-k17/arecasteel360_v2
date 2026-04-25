@@ -355,9 +355,6 @@ export default function SteelPalletsTab() {
                         <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowPurchase(sku)}>
                           <ShoppingCart className="h-3 w-3" /> Purchase
                         </Button>
-                        <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowConsumption(sku)}>
-                          <Package className="h-3 w-3" /> Consumption
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -485,34 +482,6 @@ export default function SteelPalletsTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Consumption Dialog */}
-      <Dialog open={!!showConsumption} onOpenChange={() => setShowConsumption(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Record Consumption - {showConsumption?.pallet_size}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Date *</Label>
-              <Input type="date" value={consumptionForm.date} onChange={e => setConsumptionForm(v => ({ ...v, date: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Order ID</Label>
-              <OrderIdCombobox value={consumptionForm.orderId} onChange={v => setConsumptionForm(f => ({ ...f, orderId: v }))} orders={(orders || []) as any[]} />
-            </div>
-            <div>
-              <Label className="text-xs">Weight (Kg) *</Label>
-              <Input type="number" value={consumptionForm.weight} onChange={e => setConsumptionForm(v => ({ ...v, weight: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs"># of Pcs *</Label>
-              <Input type="number" value={consumptionForm.pcs} onChange={e => setConsumptionForm(v => ({ ...v, pcs: e.target.value }))} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowConsumption(null)}>Cancel</Button>
-            <Button onClick={handleConsumptionSubmit} disabled={insertConsumption.isPending}>{insertConsumption.isPending ? 'Saving...' : 'Record Consumption'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
