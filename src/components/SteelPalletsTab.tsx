@@ -1,15 +1,13 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useOrders } from '@/hooks/useOrders';
-import OrderIdCombobox from '@/components/OrderIdCombobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, Plus, ShoppingCart, Package, Upload, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { RefreshCw, Plus, ShoppingCart, Upload, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -41,7 +39,6 @@ interface SteelPalletConsumption {
 
 export default function SteelPalletsTab() {
   const queryClient = useQueryClient();
-  const { data: orders } = useOrders();
   const fileRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sizeFilter, setSizeFilter] = useState<string>('all');
@@ -52,9 +49,7 @@ export default function SteelPalletsTab() {
   const [newSKUWidth, setNewSKUWidth] = useState('');
   const [newSKULength, setNewSKULength] = useState('');
   const [showPurchase, setShowPurchase] = useState<SteelPalletSKU | null>(null);
-  const [showConsumption, setShowConsumption] = useState<SteelPalletSKU | null>(null);
   const [purchaseForm, setPurchaseForm] = useState({ date: '', weight: '', pcs: '', rate: '' });
-  const [consumptionForm, setConsumptionForm] = useState({ date: '', orderId: '', weight: '', pcs: '' });
 
   const { data: skus } = useQuery({
     queryKey: ['steel_pallet_skus'],
@@ -99,13 +94,6 @@ export default function SteelPalletsTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['steel_pallet_purchases'] }),
   });
 
-  const insertConsumption = useMutation({
-    mutationFn: async (data: { pallet_sku_id: string; consumption_date: string; order_id: string | null; weight_kg: number; num_pcs: number }) => {
-      const { error } = await supabase.from('steel_pallet_consumptions' as any).insert(data);
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['steel_pallet_consumptions'] }),
-  });
 
   const skuSummary = useMemo(() => {
     const map = new Map<string, { balanceWeight: number; balancePcs: number; lastPurchase: string | null; lastConsumption: string | null }>();
@@ -163,24 +151,6 @@ export default function SteelPalletsTab() {
     } catch { toast.error('Failed to record purchase'); }
   };
 
-  const handleConsumptionSubmit = async () => {
-    if (!showConsumption) return;
-    if (!consumptionForm.date) { toast.error('Date is required'); return; }
-    if (!consumptionForm.weight || Number(consumptionForm.weight) <= 0) { toast.error('Weight is required'); return; }
-    if (!consumptionForm.pcs || Number(consumptionForm.pcs) <= 0) { toast.error('Number of Pcs is required'); return; }
-    try {
-      await insertConsumption.mutateAsync({
-        pallet_sku_id: showConsumption.id,
-        consumption_date: consumptionForm.date,
-        order_id: consumptionForm.orderId || null,
-        weight_kg: Number(consumptionForm.weight),
-        num_pcs: Number(consumptionForm.pcs),
-      });
-      toast.success('Consumption recorded');
-      setShowConsumption(null);
-      setConsumptionForm({ date: '', orderId: '', weight: '', pcs: '' });
-    } catch { toast.error('Failed to record consumption'); }
-  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -385,9 +355,6 @@ export default function SteelPalletsTab() {
                         <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowPurchase(sku)}>
                           <ShoppingCart className="h-3 w-3" /> Purchase
                         </Button>
-                        <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={() => setShowConsumption(sku)}>
-                          <Package className="h-3 w-3" /> Consumption
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -515,34 +482,6 @@ export default function SteelPalletsTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Consumption Dialog */}
-      <Dialog open={!!showConsumption} onOpenChange={() => setShowConsumption(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Record Consumption - {showConsumption?.pallet_size}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Date *</Label>
-              <Input type="date" value={consumptionForm.date} onChange={e => setConsumptionForm(v => ({ ...v, date: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Order ID</Label>
-              <OrderIdCombobox value={consumptionForm.orderId} onChange={v => setConsumptionForm(f => ({ ...f, orderId: v }))} orders={(orders || []) as any[]} />
-            </div>
-            <div>
-              <Label className="text-xs">Weight (Kg) *</Label>
-              <Input type="number" value={consumptionForm.weight} onChange={e => setConsumptionForm(v => ({ ...v, weight: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs"># of Pcs *</Label>
-              <Input type="number" value={consumptionForm.pcs} onChange={e => setConsumptionForm(v => ({ ...v, pcs: e.target.value }))} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowConsumption(null)}>Cancel</Button>
-            <Button onClick={handleConsumptionSubmit} disabled={insertConsumption.isPending}>{insertConsumption.isPending ? 'Saving...' : 'Record Consumption'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

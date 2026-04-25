@@ -39,11 +39,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
   const usableQty = calcUsableBalanceQty(batch, allActions, processingRecords);
   const coilWidth = batch.width || 0;
 
-  // Pallet consumption state — multiple sizes (default: consumption expected)
+  // Pallet consumption state — skuKey format: "wooden:<id>" or "steel:<id>"
   const [noPalletConsumption, setNoPalletConsumption] = useState(false);
-  const [palletEntries, setPalletEntries] = useState<{ skuId: string; pcs: string }[]>([{ skuId: '', pcs: '' }]);
+  const [palletEntries, setPalletEntries] = useState<{ skuKey: string; pcs: string }[]>([{ skuKey: '', pcs: '' }]);
 
-  const { data: palletSkus } = useQuery({
+  const { data: woodenSkus } = useQuery({
     queryKey: ['pallet_skus'],
     queryFn: async () => {
       const { data, error } = await supabase.from('pallet_skus').select('*').order('pallet_size');
@@ -52,7 +52,16 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     },
   });
 
-  const { data: palletPurchases } = useQuery({
+  const { data: steelSkus } = useQuery({
+    queryKey: ['steel_pallet_skus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('steel_pallet_skus' as any).select('*').order('pallet_size');
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const { data: woodenPurchases } = useQuery({
     queryKey: ['pallet_purchases'],
     queryFn: async () => {
       const { data, error } = await supabase.from('pallet_purchases').select('*').order('purchase_date', { ascending: false });
@@ -61,15 +70,33 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
     },
   });
 
+  const { data: steelPurchases } = useQuery({
+    queryKey: ['steel_pallet_purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('steel_pallet_purchases' as any).select('*').order('purchase_date', { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  const combinedPalletOptions = useMemo(() => {
+    const wooden = (woodenSkus || []).map((s: any) => ({ key: `wooden:${s.id}`, label: `${s.pallet_size} (Wooden)` }));
+    const steel = (steelSkus || []).map((s: any) => ({ key: `steel:${s.id}`, label: `${s.pallet_size} (Steel)` }));
+    return [...wooden, ...steel];
+  }, [woodenSkus, steelSkus]);
+
   const latestWtPerPc = useMemo(() => {
     const map = new Map<string, number>();
-    (palletPurchases || []).forEach((p: any) => {
-      if (!map.has(p.pallet_sku_id) && p.num_pcs > 0) {
-        map.set(p.pallet_sku_id, p.weight_kg / p.num_pcs);
-      }
+    (woodenPurchases || []).forEach((p: any) => {
+      const k = `wooden:${p.pallet_sku_id}`;
+      if (!map.has(k) && p.num_pcs > 0) map.set(k, p.weight_kg / p.num_pcs);
+    });
+    (steelPurchases || []).forEach((p: any) => {
+      const k = `steel:${p.pallet_sku_id}`;
+      if (!map.has(k) && p.num_pcs > 0) map.set(k, p.weight_kg / p.num_pcs);
     });
     return map;
-  }, [palletPurchases]);
+  }, [woodenPurchases, steelPurchases]);
 
   const [processType, setProcessType] = useState('');
   const [outputType, setOutputType] = useState('');
@@ -304,30 +331,44 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
 
       // Validate pallet: must have entries or be explicitly opted out (only for FG output)
       if (isOutputFG && !noPalletConsumption) {
-        const validPalletEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+        const validPalletEntries = palletEntries.filter(e => e.skuKey && Number(e.pcs) > 0);
         if (validPalletEntries.length === 0) {
-          toast.error('Please add wooden pallet consumption or check "No Wooden Pallet Consumption"');
+          toast.error('Please add pallet consumption or check "No Pallet Consumption"');
           setIsSubmitting(false);
           return;
         }
       }
 
-      // Record pallet consumption — multiple entries
+      // Record pallet consumption — multiple entries (wooden or steel)
       if (isOutputFG && !noPalletConsumption) {
-        const validEntries = palletEntries.filter(e => e.skuId && Number(e.pcs) > 0);
+        const validEntries = palletEntries.filter(e => e.skuKey && Number(e.pcs) > 0);
         for (const entry of validEntries) {
-          const wtPerPc = latestWtPerPc.get(entry.skuId) || 0;
+          const wtPerPc = latestWtPerPc.get(entry.skuKey) || 0;
           const totalWt = wtPerPc * Number(entry.pcs);
-          await supabase.from('pallet_consumptions').insert({
-            pallet_sku_id: entry.skuId,
-            consumption_date: new Date().toISOString().slice(0, 10),
-            order_id: null,
-            weight_kg: totalWt,
-            num_pcs: Number(entry.pcs),
-            processing_record_id: processingRecordId,
-          } as any);
+          const [type, id] = entry.skuKey.split(':');
+          if (type === 'steel') {
+            await supabase.from('steel_pallet_consumptions' as any).insert({
+              pallet_sku_id: id,
+              consumption_date: new Date().toISOString().slice(0, 10),
+              order_id: null,
+              weight_kg: totalWt,
+              num_pcs: Number(entry.pcs),
+            } as any);
+          } else {
+            await supabase.from('pallet_consumptions').insert({
+              pallet_sku_id: id,
+              consumption_date: new Date().toISOString().slice(0, 10),
+              order_id: null,
+              weight_kg: totalWt,
+              num_pcs: Number(entry.pcs),
+              processing_record_id: processingRecordId,
+            } as any);
+          }
         }
-        if (validEntries.length > 0) queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+        if (validEntries.length > 0) {
+          queryClient.invalidateQueries({ queryKey: ['pallet_consumptions'] });
+          queryClient.invalidateQueries({ queryKey: ['steel_pallet_consumptions'] });
+        }
       }
 
       toast.success(`Processing recorded for batch ${batch.batch_number}`);
@@ -573,13 +614,13 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
             )}
           </div>
 
-          {/* Wooden Pallet Consumption — only for FG output */}
+          {/* Pallet Consumption — only for FG output (Wooden + Steel) */}
           {isOutputFG && (
           <div className="border rounded-md p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Wooden Pallet Consumption</p>
+              <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Pallet Consumption</p>
               {!noPalletConsumption && (
-                <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setPalletEntries(prev => [...prev, { skuId: '', pcs: '' }])}>
+                <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setPalletEntries(prev => [...prev, { skuKey: '', pcs: '' }])}>
                   <Plus className="h-3 w-3" /> Add Size
                 </Button>
               )}
@@ -588,11 +629,11 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
               <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
                 <div>
                   <Label className="text-xs">Pallet Size</Label>
-                  <Select value={entry.skuId} onValueChange={v => { const arr = [...palletEntries]; arr[i] = { ...arr[i], skuId: v }; setPalletEntries(arr); }}>
+                  <Select value={entry.skuKey} onValueChange={v => { const arr = [...palletEntries]; arr[i] = { ...arr[i], skuKey: v }; setPalletEntries(arr); }}>
                     <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
                     <SelectContent>
-                      {(palletSkus || []).map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.pallet_size}</SelectItem>
+                      {combinedPalletOptions.map(opt => (
+                        <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -608,14 +649,14 @@ export default function ProcessingDialog({ batch, allActions, processingRecords,
                 )}
               </div>
             ))}
-            {!noPalletConsumption && palletEntries.some(e => e.skuId && Number(e.pcs) > 0) && (
+            {!noPalletConsumption && palletEntries.some(e => e.skuKey && Number(e.pcs) > 0) && (
               <p className="text-xs text-muted-foreground">
-                Est. total weight: {palletEntries.reduce((sum, e) => sum + ((latestWtPerPc.get(e.skuId) || 0) * (Number(e.pcs) || 0)), 0).toFixed(2)} Kg
+                Est. total weight: {palletEntries.reduce((sum, e) => sum + ((latestWtPerPc.get(e.skuKey) || 0) * (Number(e.pcs) || 0)), 0).toFixed(2)} Kg
               </p>
             )}
             <div className="flex items-center gap-2 pt-1">
               <Checkbox id="proc-no-pallet-check" checked={noPalletConsumption} onCheckedChange={(v) => setNoPalletConsumption(!!v)} />
-              <Label htmlFor="proc-no-pallet-check" className="text-xs font-medium cursor-pointer">No Wooden Pallet Consumption</Label>
+              <Label htmlFor="proc-no-pallet-check" className="text-xs font-medium cursor-pointer">No Pallet Consumption</Label>
             </div>
           </div>
           )}
