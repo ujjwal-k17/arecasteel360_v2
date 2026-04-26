@@ -397,7 +397,57 @@ export default function DashboardTab() {
           />
         </div>
       </Section>
+
+      <DrillDialog drill={drill} onOpenChange={(open) => { if (!open) setDrill(null); }} />
     </div>
+  );
+}
+
+function DrillDialog({ drill, onOpenChange }: { drill: { stage: string; material: string; bucket: AgeBucket; items: DrillItem[] } | null; onOpenChange: (open: boolean) => void }) {
+  const filtered = useMemo(() => {
+    if (!drill) return [];
+    return drill.items
+      .filter(it => it.material === drill.material && bucketOf(it.age) === drill.bucket)
+      .sort((a, b) => b.age - a.age);
+  }, [drill]);
+  const totalQty = filtered.reduce((s, i) => s + i.qty, 0);
+  return (
+    <Dialog open={!!drill} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {drill ? `${drill.stage} · ${drill.material} · ${BUCKET_LABELS[drill.bucket]}` : ''}
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} · {fmtNum(totalQty)} Kg total
+          </p>
+        </DialogHeader>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">No items in this bucket.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Reference</TableHead>
+                <TableHead className="text-xs">Specification</TableHead>
+                <TableHead className="text-xs text-right">Qty (Kg)</TableHead>
+                <TableHead className="text-xs text-right">Age</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map(it => (
+                <TableRow key={it.id}>
+                  <TableCell className="text-xs font-medium">{it.ref}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{it.spec || '—'}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{fmtNum(it.qty)}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{it.age} D</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
