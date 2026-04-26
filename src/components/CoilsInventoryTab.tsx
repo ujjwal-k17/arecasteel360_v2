@@ -486,9 +486,10 @@ export default function CoilsInventoryTab() {
                   <TableCell className="text-sm font-mono-num">{g.thickness ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.width ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
-                  <TableCell className="text-sm">{g.coating || '-'}</TableCell>
-                  <TableCell className="text-sm">{g.grade || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalUsableQty)}</TableCell>
+                  <TableCell className="text-sm">
+                    <div className="leading-tight"><div>{g.coating || '-'}</div><div className="text-xs text-muted-foreground">{g.grade || '-'}</div></div>
+                  </TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalNetWeight)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} days` : '-'}</TableCell>
                 </TableRow>
