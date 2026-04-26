@@ -14,7 +14,7 @@ import { RefreshCw, ChevronRight, ChevronDown, Trash2, Undo2, ArrowRightCircle, 
 import { toast } from 'sonner';
 import WIPProcessingDialog from './WIPProcessingDialog';
 import BulkWIPProcessingDialog from './BulkWIPProcessingDialog';
-import EditInventoryDialog from './EditInventoryDialog';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitApproval } from '@/hooks/useActionLog';
 
