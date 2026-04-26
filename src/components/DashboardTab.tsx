@@ -480,7 +480,55 @@ export default function DashboardTab() {
         </div>
       </Section>
 
+      {/* === Production Summary (current month) === */}
+      <Section title="Production Summary · This Month" subtitle="Input quantity processed split by process type">
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="text-[11px] font-semibold">Process</TableHead>
+                <TableHead className="text-[11px] font-semibold text-right">Qty (Kg)</TableHead>
+                <TableHead className="text-[11px] font-semibold text-right">Records</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {productionSummary.rows.length === 0 && (
+                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground text-xs py-6">No production this month.</TableCell></TableRow>
+              )}
+              {productionSummary.rows.map(r => (
+                <TableRow key={r.process}>
+                  <TableCell className="text-xs font-medium">{r.process}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{fmtNum(r.qty)}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{r.count}</TableCell>
+                </TableRow>
+              ))}
+              {productionSummary.rows.length > 0 && (
+                <TableRow className="bg-muted/30 font-bold border-t-2">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{fmtNum(productionSummary.total)}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{productionSummary.totalCount}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Section>
+
       <DrillDialog drill={drill} onOpenChange={(open) => { if (!open) setDrill(null); }} />
+    </div>
+  );
+}
+
+function StatCard({ tone, label, value, unit, sub }: { tone: string; label: string; value: number; unit?: string; sub?: string }) {
+  const t = TONE_MAP[tone] || TONE_MAP.blue;
+  return (
+    <div className={`rounded-lg border ${t.bg} p-3.5 flex flex-col gap-1`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wide ${t.text}`}>{label}</p>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-xl font-bold font-mono-num leading-none">{fmt(value)}</span>
+        {unit && <span className="text-[10px] text-muted-foreground">{unit}</span>}
+      </div>
+      {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
     </div>
   );
 }
