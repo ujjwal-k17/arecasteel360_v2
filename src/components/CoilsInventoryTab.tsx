@@ -491,7 +491,7 @@ export default function CoilsInventoryTab() {
                   </TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalNetWeight)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} days` : '-'}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} D` : '-'}</TableCell>
                 </TableRow>
                 {expandedSKU === g.key && (
                   <TableRow key={`${g.key}-detail`}>
