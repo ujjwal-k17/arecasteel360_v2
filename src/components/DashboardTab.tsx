@@ -60,19 +60,19 @@ export default function DashboardTab() {
   });
   const { data: fgSales } = useQuery({
     queryKey: ['fg_sales'],
-    queryFn: async () => (await supabase.from('fg_sales' as any).select('*')).data || [],
+    queryFn: async () => ((await supabase.from('fg_sales' as any).select('*')).data || []) as any[],
   });
   const { data: fgDefectives } = useQuery({
     queryKey: ['fg_defectives'],
-    queryFn: async () => (await supabase.from('fg_defectives' as any).select('*')).data || [],
+    queryFn: async () => ((await supabase.from('fg_defectives' as any).select('*')).data || []) as any[],
   });
   const { data: wipDefectives } = useQuery({
     queryKey: ['wip_defectives'],
-    queryFn: async () => (await supabase.from('wip_defectives' as any).select('*')).data || [],
+    queryFn: async () => ((await supabase.from('wip_defectives' as any).select('*')).data || []) as any[],
   });
   const { data: defectiveSales } = useQuery({
     queryKey: ['defective_sales'],
-    queryFn: async () => (await supabase.from('defective_sales').select('*')).data || [],
+    queryFn: async () => ((await supabase.from('defective_sales').select('*')).data || []) as any[],
   });
 
   const refreshAll = () => {
