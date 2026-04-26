@@ -88,7 +88,7 @@ export default function DashboardTab() {
   });
   const { data: ordersData } = useQuery({
     queryKey: ['dashboard_orders'],
-    queryFn: async () => ((await supabase.from('orders').select('*, customers(customer_type), order_items(net_weight)')).data || []) as any[],
+    queryFn: async () => ((await supabase.from('orders').select('*, customers(customer_type), order_items(id, net_weight)')).data || []) as any[],
   });
   const { data: dispatchesData } = useQuery({
     queryKey: ['dashboard_dispatches'],
