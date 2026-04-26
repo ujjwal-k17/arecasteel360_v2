@@ -575,12 +575,11 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <div className="flex flex-col gap-1 items-stretch min-w-[110px]">
-                                        <div className="flex flex-col gap-1">
+                                      <div className="flex flex-col gap-1 min-w-[110px]">
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
                                             <Button
-                                              size="sm" variant="outline" className="text-xs h-7 gap-1"
+                                              size="sm" variant="outline" className="text-xs h-7 gap-1 w-full justify-center"
                                               disabled={isSold}
                                               title={isSold ? 'Already sold' : ''}
                                               onClick={(e) => e.stopPropagation()}
@@ -603,30 +602,32 @@ export default function CoilsInventoryTab() {
                                           </DropdownMenuContent>
                                         </DropdownMenu>
                                         <Button
-                                          size="sm" variant="outline" className="text-xs h-7"
+                                          size="sm" variant="outline" className="text-xs h-7 w-full justify-center"
                                           disabled={isSold}
                                           title={isSold ? 'Already sold' : ''}
                                           onClick={(e) => { e.stopPropagation(); setProcessingBatch(b); }}
                                         >
                                           Processing
                                         </Button>
-                                        <Button size="sm" variant="ghost" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setExpandedBatchActions(isExpanded ? null : b.id); }}>
-                                          <Eye className="h-3.5 w-3.5" />
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="text-xs h-7 text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteBatch(b); }} title="Delete Batch">
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="text-xs h-7 text-warning" onClick={async (e) => {
-                                          e.stopPropagation();
-                                          if (!confirm(`Move batch ${b.batch_number} back to In-Transit?`)) return;
-                                          try {
-                                            await updateBatch.mutateAsync({ id: b.id, status: 'in-transit' } as any);
-                                            toast.success(`Batch ${b.batch_number} moved to In-Transit`);
-                                            queryClient.invalidateQueries({ queryKey: ['batches'] });
-                                          } catch { toast.error('Failed to move batch'); }
-                                        }} title="Move to In-Transit">
-                                          <Undo2 className="h-3.5 w-3.5" />
-                                        </Button>
+                                        <div className="flex gap-1 justify-center">
+                                          <Button size="sm" variant="ghost" className="text-xs h-7 px-1" onClick={(e) => { e.stopPropagation(); setExpandedBatchActions(isExpanded ? null : b.id); }}>
+                                            <Eye className="h-3.5 w-3.5" />
+                                          </Button>
+                                          <Button size="sm" variant="ghost" className="text-xs h-7 px-1 text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteBatch(b); }} title="Delete Batch">
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                          <Button size="sm" variant="ghost" className="text-xs h-7 px-1 text-warning" onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (!confirm(`Move batch ${b.batch_number} back to In-Transit?`)) return;
+                                            try {
+                                              await updateBatch.mutateAsync({ id: b.id, status: 'in-transit' } as any);
+                                              toast.success(`Batch ${b.batch_number} moved to In-Transit`);
+                                              queryClient.invalidateQueries({ queryKey: ['batches'] });
+                                            } catch { toast.error('Failed to move batch'); }
+                                          }} title="Move to In-Transit">
+                                            <Undo2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
                                       </div>
                                     </TableCell>
                                   </TableRow>
