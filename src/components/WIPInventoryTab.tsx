@@ -132,17 +132,38 @@ export default function WIPInventoryTab() {
     return uniqueCaseInsensitive(items.map(i => i.material || '').filter(Boolean)).sort();
   }, [items]);
 
+  const calcAgeingDays = (dateStr: string | null | undefined): number | null => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const ms = Date.now() - d.getTime();
+    return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+  };
+
   const skuGroups = useMemo(() => {
-    const map = new Map<string, SKUGroup & { totalOriginalQty: number }>();
+    const map = new Map<string, SKUGroup & { totalOriginalQty: number; weightedAvgAgeing: number }>();
+    const ageingAccum = new Map<string, { wSum: number; wTotal: number }>();
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalOriginalQty: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalOriginalQty: 0, weightedAvgAgeing: 0, items: [] });
+        ageingAccum.set(key, { wSum: 0, wTotal: 0 });
       }
       const g = map.get(key)!;
-      g.totalQty += getAvailableQty(item);
+      const av = getAvailableQty(item);
+      g.totalQty += av;
       g.totalOriginalQty += item.qty || 0;
       g.items.push(item);
+      const ag = calcAgeingDays(item.created_at);
+      if (ag != null && av > 0) {
+        const acc = ageingAccum.get(key)!;
+        acc.wSum += ag * av;
+        acc.wTotal += av;
+      }
+    }
+    for (const [k, g] of map) {
+      const acc = ageingAccum.get(k)!;
+      g.weightedAvgAgeing = acc.wTotal > 0 ? acc.wSum / acc.wTotal : 0;
     }
     return Array.from(map.values());
   }, [filteredItems, defectiveByItem]);
