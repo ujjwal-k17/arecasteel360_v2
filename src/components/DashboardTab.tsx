@@ -259,14 +259,17 @@ export default function DashboardTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
-          <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </Button>
-      </div>
-
       {/* === Inventory by Material — 4 panels === */}
-      <Section title="Inventory by Material" subtitle="Quantities (Kg) split across each stage">
+      <Section
+        title="Inventory by Material"
+        subtitle="Quantities (Kg) split across each stage"
+        action={
+          <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          </Button>
+        }
+      >
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <MaterialPanel
             icon={<Package className="h-4 w-4" />} title="In-Transit" tone="blue"
@@ -355,12 +358,15 @@ const TONE_MAP: Record<string, { bg: string; ring: string; text: string; bar: st
   slate:   { bg: 'bg-slate-50 dark:bg-slate-950/30',     ring: 'ring-slate-200 dark:ring-slate-800',     text: 'text-slate-700 dark:text-slate-300',     bar: 'bg-slate-500' },
 };
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({ title, subtitle, children, action }: { title: string; subtitle?: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <section>
-      <div className="mb-3">
-        <h3 className="text-base font-bold tracking-tight">{title}</h3>
-        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold tracking-tight">{title}</h3>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
+        {action}
       </div>
       {children}
     </section>
