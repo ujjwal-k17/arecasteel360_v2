@@ -534,7 +534,7 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
                                     <TableCell className="text-sm">
-                                      <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-xs text-muted-foreground">{b.grade || '-'}</div></div>
+                                      <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-muted-foreground">{b.grade || '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm font-mono-num">
                                       <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-xs text-muted-foreground">{b.net_weight ?? '-'}</div></div>
