@@ -533,10 +533,12 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
-                                    <TableCell className="text-sm">{b.coating || '-'}</TableCell>
-                                    <TableCell className="text-sm">{b.grade || '-'}</TableCell>
-                                    <TableCell className="text-sm font-mono-num">{b.gross_weight ?? '-'}</TableCell>
-                                    <TableCell className="text-sm font-mono-num">{b.net_weight ?? '-'}</TableCell>
+                                    <TableCell className="text-sm">
+                                      <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-xs text-muted-foreground">{b.grade || '-'}</div></div>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-mono-num">
+                                      <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-xs text-muted-foreground">{b.net_weight ?? '-'}</div></div>
+                                    </TableCell>
                                     <TableCell className="text-sm">
                                       {editingCoilNumber === b.id ? (
                                         <Input
@@ -566,9 +568,10 @@ export default function CoilsInventoryTab() {
                                         </span>
                                       )}
                                     </TableCell>
-                                    <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
+                                    <TableCell className="text-sm">
+                                      <div className="leading-tight"><div>{b.purchase_from || '-'}</div><div className="text-xs text-muted-foreground">{b.purchase_date || '-'}</div></div>
+                                    </TableCell>
                                     <TableCell className="text-sm font-mono-num">{(() => { const a = calcAgeingDays(b.purchase_date); return a != null ? `${a} days` : '-'; })()}</TableCell>
-                                    <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
