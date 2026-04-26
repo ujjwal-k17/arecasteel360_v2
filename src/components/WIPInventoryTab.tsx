@@ -355,6 +355,7 @@ export default function WIPInventoryTab() {
                     <TableCell className="text-sm">{g.coating}</TableCell>
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{(g as any).weightedAvgAgeing > 0 ? `${Math.round((g as any).weightedAvgAgeing)} D` : '-'}</TableCell>
                     <TableCell><span className="text-xs text-muted-foreground">{g.items.length} item{g.items.length !== 1 ? 's' : ''}</span></TableCell>
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {
