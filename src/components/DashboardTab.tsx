@@ -325,6 +325,87 @@ export default function DashboardTab() {
         title="Inventory by Material"
         subtitle="Quantities (Kg) split across each stage"
         action={
+  // ---------- Order summary (current month) ----------
+  const orderSummary = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inMonth = (d: string | null | undefined) => {
+      if (!d) return false;
+      const dt = new Date(d);
+      return !isNaN(dt.getTime()) && dt >= monthStart && dt <= now;
+    };
+    const orderQty = (o: any) => (o.order_items || []).reduce((s: number, it: any) => s + (Number(it.net_weight) || 0), 0);
+
+    let openOEMQty = 0, openOEMCount = 0;
+    let openTradeQty = 0, openTradeCount = 0;
+    let monthOrderQty = 0, monthOrderCount = 0;
+
+    for (const o of (ordersData || [])) {
+      const qty = orderQty(o);
+      if ((o.status || 'open') === 'open') {
+        const type = (o.customers?.customer_type || '').toLowerCase();
+        if (type === 'oem') { openOEMQty += qty; openOEMCount++; }
+        else { openTradeQty += qty; openTradeCount++; }
+      }
+      if (inMonth(o.order_date || o.created_at)) {
+        monthOrderQty += qty; monthOrderCount++;
+      }
+    }
+
+    let monthDispatchQty = 0, monthDispatchCount = 0;
+    for (const d of (dispatchesData || [])) {
+      if (inMonth(d.dispatch_date || d.created_at)) {
+        monthDispatchQty += Number(d.dispatch_qty) || 0;
+        monthDispatchCount++;
+      }
+    }
+    return {
+      openOEMQty, openOEMCount,
+      openTradeQty, openTradeCount,
+      monthOrderQty, monthOrderCount,
+      monthDispatchQty, monthDispatchCount,
+    };
+  }, [ordersData, dispatchesData]);
+
+  // ---------- Production summary (current month) by process ----------
+  const productionSummary = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const map = new Map<string, { qty: number; count: number }>();
+    let total = 0, totalCount = 0;
+    for (const p of (allProcRecords || [])) {
+      const dt = new Date(p.created_at);
+      if (isNaN(dt.getTime()) || dt < monthStart || dt > now) continue;
+      const key = p.process_type || '—';
+      if (!map.has(key)) map.set(key, { qty: 0, count: 0 });
+      const g = map.get(key)!;
+      const q = Number(p.input_qty) || 0;
+      g.qty += q; g.count++;
+      total += q; totalCount++;
+    }
+    const rows = Array.from(map.entries())
+      .map(([process, v]) => ({ process, qty: v.qty, count: v.count }))
+      .sort((a, b) => b.qty - a.qty);
+    return { rows, total, totalCount };
+  }, [allProcRecords]);
+
+  return (
+    <div className="space-y-6">
+      {/* === Order Summary === */}
+      <Section title="Order Summary" subtitle="Snapshot of open orders & current-month activity">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard tone="indigo" label="Open Orders · OEM" value={orderSummary.openOEMQty} unit="Kg" sub={`${orderSummary.openOEMCount} orders`} />
+          <StatCard tone="blue" label="Open Orders · Trade" value={orderSummary.openTradeQty} unit="Kg" sub={`${orderSummary.openTradeCount} orders`} />
+          <StatCard tone="amber" label="Orders · This Month" value={orderSummary.monthOrderQty} unit="Kg" sub={`${orderSummary.monthOrderCount} orders`} />
+          <StatCard tone="emerald" label="Dispatches · This Month" value={orderSummary.monthDispatchQty} unit="Kg" sub={`${orderSummary.monthDispatchCount} dispatches`} />
+        </div>
+      </Section>
+
+      {/* === Inventory by Material — 4 panels === */}
+      <Section
+        title="Inventory by Material"
+        subtitle="Quantities (Kg) split across each stage"
+        action={
           <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
