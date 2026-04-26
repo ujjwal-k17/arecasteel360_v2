@@ -569,7 +569,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
-function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, emptyMsg }: {
+function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, emptyMsg, onCellClick }: {
   title: string;
   qtyLabel: string;
   countLabel: string;
@@ -577,12 +577,26 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
   total: number;
   totalAvgAge: number;
   emptyMsg: string;
+  onCellClick?: (material: string, bucket: AgeBucket) => void;
 }) {
   const totalCount = rows.reduce((s, g) => s + g.count, 0);
   const tot = rows.reduce(
     (s, g) => ({ b0: s.b0 + g.b0, b1: s.b1 + g.b1, b2: s.b2 + g.b2, b3: s.b3 + g.b3 }),
     { b0: 0, b1: 0, b2: 0, b3: 0 }
   );
+  const renderClickable = (material: string, bucket: AgeBucket, value: number, colorClass: string) => {
+    if (value <= 0) return <span className="text-muted-foreground">—</span>;
+    if (!onCellClick) return <span className={colorClass}>{fmtNum(value)}</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => onCellClick(material, bucket)}
+        className={`${colorClass} underline-offset-2 hover:underline cursor-pointer font-semibold`}
+      >
+        {fmtNum(value)}
+      </button>
+    );
+  };
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-3 py-2 bg-muted/40 border-b flex items-center justify-between gap-3">
@@ -617,9 +631,9 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
               <TableCell className="text-xs font-mono-num text-right">{g.count}</TableCell>
               <TableCell className="text-xs font-mono-num font-semibold text-right">{Math.round(g.avgAge)} D</TableCell>
               <TableCell className="text-xs font-mono-num text-right text-emerald-600 dark:text-emerald-400">{g.b0 > 0 ? fmtNum(g.b0) : '—'}</TableCell>
-              <TableCell className="text-xs font-mono-num text-right text-yellow-600 dark:text-yellow-400">{g.b1 > 0 ? fmtNum(g.b1) : '—'}</TableCell>
-              <TableCell className="text-xs font-mono-num text-right text-amber-600 dark:text-amber-400">{g.b2 > 0 ? fmtNum(g.b2) : '—'}</TableCell>
-              <TableCell className="text-xs font-mono-num text-right text-destructive">{g.b3 > 0 ? fmtNum(g.b3) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{renderClickable(g.material, 1, g.b1, 'text-yellow-600 dark:text-yellow-400')}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{renderClickable(g.material, 2, g.b2, 'text-amber-600 dark:text-amber-400')}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{renderClickable(g.material, 3, g.b3, 'text-destructive')}</TableCell>
             </TableRow>
           ))}
           {rows.length > 0 && (
