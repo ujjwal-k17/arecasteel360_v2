@@ -309,10 +309,9 @@ export default function DashboardTab() {
         </div>
       </Section>
 
-      {/* === Coils Ageing Section === */}
       {/* === Ageing Sections === */}
       <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty)">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="space-y-4">
           <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory." />
           <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items." />
           <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items." />
