@@ -19,7 +19,7 @@ function DateRangeFilter({ dateRange, setDateRange, label }: { dateRange: DateRa
     { label: 'Today', from: startOfDay(today), to: endOfDay(today) },
     { label: 'Yesterday', from: startOfDay(subDays(today, 1)), to: endOfDay(subDays(today, 1)) },
     { label: 'This Week', from: startOfWeek(today, { weekStartsOn: 1 }), to: endOfDay(today) },
-    { label: 'This Month', from: startOfMonth(today), to: endOfDay(today) },
+    { label: `${today.toLocaleString('en-US', { month: 'long' })} '${String(today.getFullYear()).slice(-2)}`, from: startOfMonth(today), to: endOfDay(today) },
     { label: 'Last 7 Days', from: startOfDay(subDays(today, 6)), to: endOfDay(today) },
     { label: 'Last 30 Days', from: startOfDay(subDays(today, 29)), to: endOfDay(today) },
   ];
