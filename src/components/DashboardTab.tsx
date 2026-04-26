@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAllBatches, useAllActions, calcUsableBalanceQty, type InventoryAction } from '@/hooks/useBatches';
@@ -6,12 +6,24 @@ import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/usePro
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
 import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const fmt = (n: number) => fmtNum(n);
 const fmtInt = (n: number) => Math.round(n).toLocaleString('en-IN');
+
+type AgeBucket = 0 | 1 | 2 | 3;
+const BUCKET_LABELS = ['≤30 D', '31–60 D', '61–90 D', '>90 D'] as const;
+function bucketOf(age: number | null): AgeBucket | null {
+  if (age == null) return null;
+  if (age <= 30) return 0;
+  if (age <= 60) return 1;
+  if (age <= 90) return 2;
+  return 3;
+}
+type DrillItem = { id: string; ref: string; material: string; spec: string; qty: number; age: number };
 
 // ----- helpers -----
 function ageingDays(date: string | null | undefined): number | null {
@@ -80,6 +92,8 @@ export default function DashboardTab() {
     toast.success('Dashboard refreshed');
   };
 
+  const [drill, setDrill] = useState<{ stage: string; material: string; bucket: AgeBucket; items: DrillItem[] } | null>(null);
+
   const allBatches = batches || [];
   const allActions = (actions || []) as any[];
   const allActionsTyped = allActions as InventoryAction[];
@@ -98,6 +112,7 @@ export default function DashboardTab() {
   const coils = useMemo(() => {
     const received = allBatches.filter(b => b.status === 'received');
     const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
+    const items: DrillItem[] = [];
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0;
 
     for (const b of received) {
@@ -119,6 +134,14 @@ export default function DashboardTab() {
         else if (age <= 60) g.b1 += usable;
         else if (age <= 90) g.b2 += usable;
         else g.b3 += usable;
+        items.push({
+          id: b.id,
+          ref: b.batch_number || b.coil_number || '—',
+          material: mat,
+          spec: [b.thickness && `${b.thickness}mm`, b.width && `${b.width}mm`, b.coating, b.grade].filter(Boolean).join(' · '),
+          qty: usable,
+          age,
+        });
       }
     }
 
@@ -126,7 +149,7 @@ export default function DashboardTab() {
       .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
       .sort((a, b) => b.qty - a.qty);
     const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
-    return { byMat, total: grandQty, totalAvgAge };
+    return { byMat, total: grandQty, totalAvgAge, items };
   }, [allBatches, allActionsTyped, allProcRecords]);
 
   // ---------- WIP by Material (qty - defectives, active only) ----------
@@ -137,6 +160,7 @@ export default function DashboardTab() {
       wipDefByItem.set(d.wip_item_id, (wipDefByItem.get(d.wip_item_id) || 0) + (d.quantity || 0));
     }
     const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
+    const drill: DrillItem[] = [];
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
     for (const i of items as any[]) {
       const qty = Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0));
@@ -153,13 +177,21 @@ export default function DashboardTab() {
         else if (age <= 60) g.b1 += qty;
         else if (age <= 90) g.b2 += qty;
         else g.b3 += qty;
+        drill.push({
+          id: i.id,
+          ref: i.process || 'WIP',
+          material: mat,
+          spec: [i.thickness && `${i.thickness}mm`, i.width && `${i.width}mm`, i.length && `${i.length}mm`, i.coating, i.grade].filter(Boolean).join(' · '),
+          qty,
+          age,
+        });
       }
     }
     const byMat = Array.from(map.values())
       .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
       .sort((a, b) => b.qty - a.qty);
     const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
-    return { byMat, total: grandQty, totalCount, totalAvgAge };
+    return { byMat, total: grandQty, totalCount, totalAvgAge, items: drill };
   }, [wipItems, wipDefectives]);
 
   // ---------- FG by Material (qty - sold - defective) ----------
@@ -174,6 +206,7 @@ export default function DashboardTab() {
       defByItem.set(d.fg_item_id, (defByItem.get(d.fg_item_id) || 0) + (d.quantity || 0));
     }
     const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
+    const drill: DrillItem[] = [];
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
     for (const i of items as any[]) {
       const qty = Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0));
@@ -190,13 +223,21 @@ export default function DashboardTab() {
         else if (age <= 60) g.b1 += qty;
         else if (age <= 90) g.b2 += qty;
         else g.b3 += qty;
+        drill.push({
+          id: i.id,
+          ref: i.process || 'FG',
+          material: mat,
+          spec: [i.thickness && `${i.thickness}mm`, i.width && `${i.width}mm`, i.length && `${i.length}mm`, i.coating, i.grade].filter(Boolean).join(' · '),
+          qty,
+          age,
+        });
       }
     }
     const byMat = Array.from(map.values())
       .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
       .sort((a, b) => b.qty - a.qty);
     const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
-    return { byMat, total: grandQty, totalCount, totalAvgAge };
+    return { byMat, total: grandQty, totalCount, totalAvgAge, items: drill };
   }, [fgItems, fgSales, fgDefectives]);
 
   // ---------- Scrap by Material (unsold) ----------
@@ -310,11 +351,14 @@ export default function DashboardTab() {
       </Section>
 
       {/* === Ageing Sections === */}
-      <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty)">
+      <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty). Click a bucket count to see details.">
         <div className="space-y-4">
-          <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory." />
-          <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items." />
-          <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items." />
+          <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory."
+            onCellClick={(material, bucket) => setDrill({ stage: 'Coils', material, bucket, items: coils.items })} />
+          <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items."
+            onCellClick={(material, bucket) => setDrill({ stage: 'WIP', material, bucket, items: wip.items })} />
+          <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items."
+            onCellClick={(material, bucket) => setDrill({ stage: 'Finished Goods', material, bucket, items: fg.items })} />
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-2">
           <LegendDot color="bg-emerald-500" label="≤30 D" />
@@ -353,7 +397,57 @@ export default function DashboardTab() {
           />
         </div>
       </Section>
+
+      <DrillDialog drill={drill} onOpenChange={(open) => { if (!open) setDrill(null); }} />
     </div>
+  );
+}
+
+function DrillDialog({ drill, onOpenChange }: { drill: { stage: string; material: string; bucket: AgeBucket; items: DrillItem[] } | null; onOpenChange: (open: boolean) => void }) {
+  const filtered = useMemo(() => {
+    if (!drill) return [];
+    return drill.items
+      .filter(it => it.material === drill.material && bucketOf(it.age) === drill.bucket)
+      .sort((a, b) => b.age - a.age);
+  }, [drill]);
+  const totalQty = filtered.reduce((s, i) => s + i.qty, 0);
+  return (
+    <Dialog open={!!drill} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {drill ? `${drill.stage} · ${drill.material} · ${BUCKET_LABELS[drill.bucket]}` : ''}
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} · {fmtNum(totalQty)} Kg total
+          </p>
+        </DialogHeader>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">No items in this bucket.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Reference</TableHead>
+                <TableHead className="text-xs">Specification</TableHead>
+                <TableHead className="text-xs text-right">Qty (Kg)</TableHead>
+                <TableHead className="text-xs text-right">Age</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map(it => (
+                <TableRow key={it.id}>
+                  <TableCell className="text-xs font-medium">{it.ref}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{it.spec || '—'}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{fmtNum(it.qty)}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{it.age} D</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -475,7 +569,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
-function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, emptyMsg }: {
+function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, emptyMsg, onCellClick }: {
   title: string;
   qtyLabel: string;
   countLabel: string;
@@ -483,12 +577,26 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
   total: number;
   totalAvgAge: number;
   emptyMsg: string;
+  onCellClick?: (material: string, bucket: AgeBucket) => void;
 }) {
   const totalCount = rows.reduce((s, g) => s + g.count, 0);
   const tot = rows.reduce(
     (s, g) => ({ b0: s.b0 + g.b0, b1: s.b1 + g.b1, b2: s.b2 + g.b2, b3: s.b3 + g.b3 }),
     { b0: 0, b1: 0, b2: 0, b3: 0 }
   );
+  const renderClickable = (material: string, bucket: AgeBucket, value: number, colorClass: string) => {
+    if (value <= 0) return <span className="text-muted-foreground">—</span>;
+    if (!onCellClick) return <span className={colorClass}>{fmtNum(value)}</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => onCellClick(material, bucket)}
+        className={`${colorClass} underline-offset-2 hover:underline cursor-pointer font-semibold`}
+      >
+        {fmtNum(value)}
+      </button>
+    );
+  };
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-3 py-2 bg-muted/40 border-b flex items-center justify-between gap-3">
@@ -523,9 +631,9 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
               <TableCell className="text-xs font-mono-num text-right">{g.count}</TableCell>
               <TableCell className="text-xs font-mono-num font-semibold text-right">{Math.round(g.avgAge)} D</TableCell>
               <TableCell className="text-xs font-mono-num text-right text-emerald-600 dark:text-emerald-400">{g.b0 > 0 ? fmtNum(g.b0) : '—'}</TableCell>
-              <TableCell className="text-xs font-mono-num text-right text-yellow-600 dark:text-yellow-400">{g.b1 > 0 ? fmtNum(g.b1) : '—'}</TableCell>
-              <TableCell className="text-xs font-mono-num text-right text-amber-600 dark:text-amber-400">{g.b2 > 0 ? fmtNum(g.b2) : '—'}</TableCell>
-              <TableCell className="text-xs font-mono-num text-right text-destructive">{g.b3 > 0 ? fmtNum(g.b3) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{renderClickable(g.material, 1, g.b1, 'text-yellow-600 dark:text-yellow-400')}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{renderClickable(g.material, 2, g.b2, 'text-amber-600 dark:text-amber-400')}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{renderClickable(g.material, 3, g.b3, 'text-destructive')}</TableCell>
             </TableRow>
           ))}
           {rows.length > 0 && (
