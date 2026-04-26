@@ -346,9 +346,26 @@ export default function DashboardTab() {
     }
 
     let monthDispatchQty = 0, monthDispatchCount = 0;
+    // FG order dispatches
     for (const d of (dispatchesData || [])) {
       if (inMonth(d.dispatch_date || d.created_at)) {
         monthDispatchQty += Number(d.dispatch_qty) || 0;
+        monthDispatchCount++;
+      }
+    }
+    // Coil sales from inventory_actions (pack_coil_sale, loose_coil_sale, sales)
+    const SALE_TYPES = new Set(['sales', 'pack_coil_sale', 'loose_coil_sale']);
+    for (const a of (allActions || [])) {
+      if (!SALE_TYPES.has((a as any).action_type)) continue;
+      if (inMonth((a as any).sales_date || (a as any).created_at)) {
+        monthDispatchQty += Number((a as any).net_weight) || 0;
+        monthDispatchCount++;
+      }
+    }
+    // FG sales
+    for (const s of (fgSales || [])) {
+      if (inMonth(s.sales_date || s.created_at)) {
+        monthDispatchQty += Number(s.quantity) || 0;
         monthDispatchCount++;
       }
     }
@@ -358,7 +375,7 @@ export default function DashboardTab() {
       monthOrderQty, monthOrderCount,
       monthDispatchQty, monthDispatchCount,
     };
-  }, [ordersData, dispatchesData]);
+  }, [ordersData, dispatchesData, allActions, fgSales]);
 
   // ---------- Production summary (current month) by process ----------
   const productionSummary = useMemo(() => {
