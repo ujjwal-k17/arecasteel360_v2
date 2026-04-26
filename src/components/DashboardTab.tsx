@@ -340,7 +340,7 @@ export default function DashboardTab() {
         if (type === 'oem') { openOEMQty += qty; openOEMCount++; }
         else { openTradeQty += qty; openTradeCount++; }
       }
-      if (inMonth(o.order_date || o.created_at)) {
+      if (inMonth(o.order_date)) {
         monthOrderQty += qty; monthOrderCount++;
       }
     }
