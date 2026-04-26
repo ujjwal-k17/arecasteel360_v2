@@ -497,7 +497,7 @@ export default function CoilsInventoryTab() {
                   <TableRow key={`${g.key}-detail`}>
                     <TableCell colSpan={skuCols.length} className="p-0">
                       <div className="bg-[hsl(var(--batch-row))] p-3">
-                        <Table>
+                        <Table className="[&_td]:px-2 [&_th]:px-2">
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-10">
