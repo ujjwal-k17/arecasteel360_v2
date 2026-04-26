@@ -259,14 +259,17 @@ export default function DashboardTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
-          <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </Button>
-      </div>
-
       {/* === Inventory by Material — 4 panels === */}
-      <Section title="Inventory by Material" subtitle="Quantities (Kg) split across each stage">
+      <Section
+        title="Inventory by Material"
+        subtitle="Quantities (Kg) split across each stage"
+        action={
+          <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          </Button>
+        }
+      >
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <MaterialPanel
             icon={<Package className="h-4 w-4" />} title="In-Transit" tone="blue"
