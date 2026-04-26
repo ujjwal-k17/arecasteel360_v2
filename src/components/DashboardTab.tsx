@@ -494,3 +494,64 @@ function LegendDot({ color, label }: { color: string; label: string }) {
     </span>
   );
 }
+
+function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, emptyMsg }: {
+  title: string;
+  qtyLabel: string;
+  countLabel: string;
+  rows: { material: string; qty: number; count: number; avgAge: number }[];
+  total: number;
+  totalAvgAge: number;
+  emptyMsg: string;
+}) {
+  const totalCount = rows.reduce((s, g) => s + g.count, 0);
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="px-3 py-2 bg-muted/40 border-b">
+        <h4 className="text-xs font-bold uppercase tracking-wide">{title}</h4>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/20">
+            <TableHead className="text-[11px] font-semibold">Material</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">{qtyLabel}</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">{countLabel}</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">Avg Ageing</TableHead>
+            <TableHead className="text-[11px] font-semibold w-24">Profile</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 && (
+            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-6">{emptyMsg}</TableCell></TableRow>
+          )}
+          {rows.map(g => {
+            const tone = g.avgAge > 90 ? 'bg-destructive' : g.avgAge > 60 ? 'bg-amber-500' : g.avgAge > 30 ? 'bg-yellow-400' : 'bg-emerald-500';
+            const widthPct = Math.min(100, (g.avgAge / 120) * 100);
+            return (
+              <TableRow key={g.material}>
+                <TableCell className="text-xs font-medium">{g.material}</TableCell>
+                <TableCell className="text-xs font-mono-num text-right">{fmtNum(g.qty)}</TableCell>
+                <TableCell className="text-xs font-mono-num text-right">{g.count}</TableCell>
+                <TableCell className="text-xs font-mono-num font-semibold text-right">{Math.round(g.avgAge)} D</TableCell>
+                <TableCell>
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full ${tone}`} style={{ width: `${widthPct}%` }} />
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+          {rows.length > 0 && (
+            <TableRow className="bg-muted/30 font-bold border-t-2">
+              <TableCell className="text-xs">Total</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{fmtNum(total)}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{totalCount}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{Math.round(totalAvgAge)} D</TableCell>
+              <TableCell />
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
