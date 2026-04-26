@@ -34,6 +34,7 @@ function groupByMaterial<T>(items: T[], getMaterial: (i: T) => string, getQty: (
 }
 
 export default function DashboardTab() {
+  const queryClient = useQueryClient();
   const { data: batches } = useAllBatches();
   const { data: actions } = useAllActions();
   const { data: wipItems } = useWIPItems();
@@ -57,6 +58,27 @@ export default function DashboardTab() {
     queryKey: ['steel_pallet_consumptions'],
     queryFn: async () => (await supabase.from('steel_pallet_consumptions' as any).select('*')).data || [],
   });
+  const { data: fgSales } = useQuery({
+    queryKey: ['fg_sales'],
+    queryFn: async () => (await supabase.from('fg_sales' as any).select('*')).data || [],
+  });
+  const { data: fgDefectives } = useQuery({
+    queryKey: ['fg_defectives'],
+    queryFn: async () => (await supabase.from('fg_defectives' as any).select('*')).data || [],
+  });
+  const { data: wipDefectives } = useQuery({
+    queryKey: ['wip_defectives'],
+    queryFn: async () => (await supabase.from('wip_defectives' as any).select('*')).data || [],
+  });
+  const { data: defectiveSales } = useQuery({
+    queryKey: ['defective_sales'],
+    queryFn: async () => (await supabase.from('defective_sales').select('*')).data || [],
+  });
+
+  const refreshAll = () => {
+    queryClient.invalidateQueries();
+    toast.success('Dashboard refreshed');
+  };
 
   const allBatches = batches || [];
   const allActions = (actions || []) as any[];
