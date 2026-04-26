@@ -238,10 +238,15 @@ export default function DashboardTab() {
             <h2 className="text-lg font-bold tracking-tight">Inventory Snapshot</h2>
             <p className="text-xs text-muted-foreground">As of {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground">Coils Avg Ageing:</span>
-            <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} days</span>
+          <div className="flex items-center gap-3 text-xs flex-wrap">
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">Coils Avg Ageing:</span>
+              <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} days</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            </Button>
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
