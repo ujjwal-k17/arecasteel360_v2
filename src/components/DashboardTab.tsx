@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAllBatches, useAllActions, calcUsableBalanceQty, type InventoryAction } from '@/hooks/useBatches';
 import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/useProcessing';
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, Clock, RefreshCw } from 'lucide-react';
 import { fmtNum } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const fmt = (n: number) => fmtNum(n);
 const fmtInt = (n: number) => Math.round(n).toLocaleString('en-IN');
