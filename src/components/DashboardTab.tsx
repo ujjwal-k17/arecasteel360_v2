@@ -309,10 +309,9 @@ export default function DashboardTab() {
         </div>
       </Section>
 
-      {/* === Coils Ageing Section === */}
       {/* === Ageing Sections === */}
       <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty)">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="space-y-4">
           <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory." />
           <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items." />
           <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items." />
@@ -492,8 +491,13 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
   );
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="px-3 py-2 bg-muted/40 border-b">
+      <div className="px-3 py-2 bg-muted/40 border-b flex items-center justify-between gap-3">
         <h4 className="text-xs font-bold uppercase tracking-wide">{title}</h4>
+        {rows.length > 0 && (
+          <div className="text-[11px] text-muted-foreground">
+            Wtd. avg ageing: <span className="font-mono-num font-semibold text-foreground">{Math.round(totalAvgAge)} D</span>
+          </div>
+        )}
       </div>
       <Table>
         <TableHeader>
