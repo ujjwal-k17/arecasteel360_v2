@@ -38,6 +38,16 @@ interface SKUGroup {
   totalNetWeight: number;
   totalBalanceQty: number;
   totalUsableQty: number;
+  weightedAvgAgeing: number;
+}
+
+function calcAgeingDays(purchaseDate: string | null | undefined): number | null {
+  if (!purchaseDate) return null;
+  const pd = new Date(purchaseDate);
+  if (isNaN(pd.getTime())) return null;
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - pd.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, diff);
 }
 
 const DROPDOWN_FIELDS = ['material', 'make', 'coating', 'grade', 'form'];
@@ -167,11 +177,19 @@ export default function CoilsInventoryTab() {
       const totalNetWeight = batchList.reduce((s, b) => s + (b.net_weight || 0), 0);
       const totalBalanceQty = batchList.reduce((s, b) => s + calcBalanceQty(b, allActions, allProcRecords), 0);
       const totalUsableQty = batchList.reduce((s, b) => s + calcUsableBalanceQty(b, allActions, allProcRecords), 0);
+      // Weighted average ageing by net_weight
+      let wSum = 0; let wTotal = 0;
+      batchList.forEach(b => {
+        const a = calcAgeingDays(b.purchase_date);
+        const w = b.net_weight || 0;
+        if (a != null && w > 0) { wSum += a * w; wTotal += w; }
+      });
+      const weightedAvgAgeing = wTotal > 0 ? wSum / wTotal : 0;
       groups.push({
         key, batches: batchList, material: first.material, make: first.make,
         thickness: first.thickness, width: first.width, length: first.length,
         coating: first.coating, grade: first.grade,
-        totalNetWeight, totalBalanceQty, totalUsableQty,
+        totalNetWeight, totalBalanceQty, totalUsableQty, weightedAvgAgeing,
       });
     });
     return groups;
@@ -354,8 +372,8 @@ export default function CoilsInventoryTab() {
 
   const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
   // SKU summary: removed Form column
-  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Usable Qty (Kg)', 'Total Inv (Kg)'];
-  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Usable Qty (Kg)', 'Total Inv (Kg)', 'Avg Ageing'];
+  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Ageing', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
@@ -472,6 +490,7 @@ export default function CoilsInventoryTab() {
                   <TableCell className="text-sm">{g.grade || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalUsableQty)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} days` : '-'}</TableCell>
                 </TableRow>
                 {expandedSKU === g.key && (
                   <TableRow key={`${g.key}-detail`}>
@@ -547,6 +566,7 @@ export default function CoilsInventoryTab() {
                                       )}
                                     </TableCell>
                                     <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
+                                    <TableCell className="text-sm font-mono-num">{(() => { const a = calcAgeingDays(b.purchase_date); return a != null ? `${a} days` : '-'; })()}</TableCell>
                                     <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
