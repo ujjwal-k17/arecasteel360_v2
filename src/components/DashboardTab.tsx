@@ -322,56 +322,18 @@ export default function DashboardTab() {
       </Section>
 
       {/* === Coils Ageing Section === */}
-      <Section title="Coils Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on usable Kg)">
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead className="text-xs font-semibold">Material</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Usable Qty (Kg)</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Coils</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Weighted Avg Ageing</TableHead>
-                <TableHead className="text-xs font-semibold w-32">Ageing Profile</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coils.byMat.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-6">No coils in inventory.</TableCell></TableRow>
-              )}
-              {coils.byMat.map(g => {
-                const tone = g.avgAge > 90 ? 'bg-destructive' : g.avgAge > 60 ? 'bg-amber-500' : g.avgAge > 30 ? 'bg-yellow-400' : 'bg-emerald-500';
-                const widthPct = Math.min(100, (g.avgAge / 120) * 100);
-                return (
-                  <TableRow key={g.material}>
-                    <TableCell className="text-sm font-medium">{g.material}</TableCell>
-                    <TableCell className="text-sm font-mono-num text-right">{fmt(g.qty)}</TableCell>
-                    <TableCell className="text-sm font-mono-num text-right">{g.count}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold text-right">{Math.round(g.avgAge)} days</TableCell>
-                    <TableCell>
-                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full ${tone}`} style={{ width: `${widthPct}%` }} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {coils.byMat.length > 0 && (
-                <TableRow className="bg-muted/30 font-bold border-t-2">
-                  <TableCell className="text-sm">Total</TableCell>
-                  <TableCell className="text-sm font-mono-num text-right">{fmt(coils.total)}</TableCell>
-                  <TableCell className="text-sm font-mono-num text-right">{coils.byMat.reduce((s, g) => s + g.count, 0)}</TableCell>
-                  <TableCell className="text-sm font-mono-num text-right">{Math.round(coils.totalAvgAge)} days</TableCell>
-                  <TableCell />
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+      {/* === Ageing Sections === */}
+      <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty)">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory." />
+          <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items." />
+          <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items." />
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-2">
-          <LegendDot color="bg-emerald-500" label="≤30 days" />
-          <LegendDot color="bg-yellow-400" label="31–60 days" />
-          <LegendDot color="bg-amber-500" label="61–90 days" />
-          <LegendDot color="bg-destructive" label="&gt;90 days" />
+          <LegendDot color="bg-emerald-500" label="≤30 D" />
+          <LegendDot color="bg-yellow-400" label="31–60 D" />
+          <LegendDot color="bg-amber-500" label="61–90 D" />
+          <LegendDot color="bg-destructive" label="&gt;90 D" />
         </div>
       </Section>
 
