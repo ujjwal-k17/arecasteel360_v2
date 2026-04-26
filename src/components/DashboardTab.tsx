@@ -269,8 +269,18 @@ export default function DashboardTab() {
           <div className="flex items-center gap-3 text-xs flex-wrap">
             <div className="flex items-center gap-2">
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Coils Avg Ageing:</span>
-              <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} days</span>
+              <span className="text-muted-foreground">Coils:</span>
+              <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} D</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">WIP:</span>
+              <span className="font-bold font-mono-num">{Math.round(wip.totalAvgAge)} D</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">FG:</span>
+              <span className="font-bold font-mono-num">{Math.round(fg.totalAvgAge)} D</span>
             </div>
             <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh
