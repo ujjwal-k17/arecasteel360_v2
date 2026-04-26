@@ -563,7 +563,7 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs font-mono-num">{(() => { const a = calcAgeingDays(item.created_at); return a != null ? `${a} D` : '-'; })()}</TableCell>
                         <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
                         <TableCell>
-                          <div className="grid grid-cols-2 gap-1 max-w-[160px]">
+                          <div className="grid grid-cols-3 gap-1 max-w-[200px]">
                             <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }} title="Record Sale">
                               <ShoppingCart className="h-3 w-3" /> Sale
                             </Button>
