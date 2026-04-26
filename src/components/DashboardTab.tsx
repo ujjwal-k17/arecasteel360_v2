@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAllBatches, useAllActions, calcUsableBalanceQty, type InventoryAction } from '@/hooks/useBatches';
@@ -6,12 +6,24 @@ import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/usePro
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
 import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const fmt = (n: number) => fmtNum(n);
 const fmtInt = (n: number) => Math.round(n).toLocaleString('en-IN');
+
+type AgeBucket = 0 | 1 | 2 | 3;
+const BUCKET_LABELS = ['≤30 D', '31–60 D', '61–90 D', '>90 D'] as const;
+function bucketOf(age: number | null): AgeBucket | null {
+  if (age == null) return null;
+  if (age <= 30) return 0;
+  if (age <= 60) return 1;
+  if (age <= 90) return 2;
+  return 3;
+}
+type DrillItem = { id: string; ref: string; material: string; spec: string; qty: number; age: number };
 
 // ----- helpers -----
 function ageingDays(date: string | null | undefined): number | null {
