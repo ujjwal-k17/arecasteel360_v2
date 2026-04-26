@@ -574,40 +574,42 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <div className="flex flex-col gap-1 min-w-[110px]">
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              size="sm" variant="outline" className="text-xs h-7 gap-1 w-full justify-center"
-                                              disabled={isSold}
-                                              title={isSold ? 'Already sold' : ''}
-                                              onClick={(e) => e.stopPropagation()}
-                                            >
-                                              Coil Sale <ChevronDown className="h-3 w-3" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="start">
-                                            <DropdownMenuItem
-                                              disabled={status === 'loose' || batchActions.some(a => a.action_type === 'loose_coil_sale')}
-                                              onClick={(e) => { e.stopPropagation(); setCoilSaleMode('pack'); setPackCoilBatch(b); }}
-                                            >
-                                              Pack Coil Sale
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                              onClick={(e) => { e.stopPropagation(); setCoilSaleMode('loose'); setPackCoilBatch(b); }}
-                                            >
-                                              Loose Coil Sale
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                        <Button
-                                          size="sm" variant="outline" className="text-xs h-7 w-full justify-center"
-                                          disabled={isSold}
-                                          title={isSold ? 'Already sold' : ''}
-                                          onClick={(e) => { e.stopPropagation(); setProcessingBatch(b); }}
-                                        >
-                                          Processing
-                                        </Button>
+                                      <div className="flex flex-col gap-1 min-w-[140px]">
+                                        <div className="flex gap-1">
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button
+                                                size="sm" variant="outline" className="text-xs h-7 gap-1 flex-1 justify-center"
+                                                disabled={isSold}
+                                                title={isSold ? 'Already sold' : ''}
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                Coil Sale <ChevronDown className="h-3 w-3" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="start">
+                                              <DropdownMenuItem
+                                                disabled={status === 'loose' || batchActions.some(a => a.action_type === 'loose_coil_sale')}
+                                                onClick={(e) => { e.stopPropagation(); setCoilSaleMode('pack'); setPackCoilBatch(b); }}
+                                              >
+                                                Pack Coil Sale
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem
+                                                onClick={(e) => { e.stopPropagation(); setCoilSaleMode('loose'); setPackCoilBatch(b); }}
+                                              >
+                                                Loose Coil Sale
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                          <Button
+                                            size="sm" variant="outline" className="text-xs h-7 flex-1 justify-center"
+                                            disabled={isSold}
+                                            title={isSold ? 'Already sold' : ''}
+                                            onClick={(e) => { e.stopPropagation(); setProcessingBatch(b); }}
+                                          >
+                                            Processing
+                                          </Button>
+                                        </div>
                                         <div className="flex gap-1 justify-center">
                                           <Button size="sm" variant="ghost" className="text-xs h-7 px-1" onClick={(e) => { e.stopPropagation(); setExpandedBatchActions(isExpanded ? null : b.id); }}>
                                             <Eye className="h-3.5 w-3.5" />
