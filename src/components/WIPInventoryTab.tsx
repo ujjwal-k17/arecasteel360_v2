@@ -10,11 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { RefreshCw, ChevronRight, ChevronDown, Trash2, Undo2, ArrowRightCircle, AlertTriangle, Pencil } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, Trash2, Undo2, ArrowRightCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import WIPProcessingDialog from './WIPProcessingDialog';
 import BulkWIPProcessingDialog from './BulkWIPProcessingDialog';
-import EditInventoryDialog from './EditInventoryDialog';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitApproval } from '@/hooks/useActionLog';
 
@@ -46,7 +46,7 @@ export default function WIPInventoryTab() {
 
   // Defective dialog
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
-  const [editItem, setEditItem] = useState<any | null>(null);
+  
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '' });
 
   // Filters
@@ -417,9 +417,6 @@ export default function WIPInventoryTab() {
                             <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }} title="Mark as defective">
                               <AlertTriangle className="h-3 w-3" /> Def
                             </Button>
-                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
-                              <Pencil className="h-3 w-3" />
-                            </Button>
                             {isAdmin && (
                               <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-warning" onClick={async (e) => {
                                 e.stopPropagation();
@@ -494,9 +491,7 @@ export default function WIPInventoryTab() {
         <WIPProcessingDialog wipItem={processingItem} open={!!processingItem} onClose={() => setProcessingItem(null)} />
       )}
 
-      {editItem && (
-        <EditInventoryDialog item={editItem} entityType="wip_item" open={!!editItem} onClose={() => setEditItem(null)} />
-      )}
+
 
       {/* Defective Dialog */}
       <Dialog open={!!defectDialog} onOpenChange={() => setDefectDialog(null)}>
