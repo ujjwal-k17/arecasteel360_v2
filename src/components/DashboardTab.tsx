@@ -414,6 +414,11 @@ export default function DashboardTab() {
     return { rows, total, totalCount };
   }, [allProcRecords]);
 
+  const monthLabel = useMemo(() => {
+    const d = new Date();
+    return `${d.toLocaleString('en-US', { month: 'long' })} '${String(d.getFullYear()).slice(-2)}`;
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* === Order Summary === */}
