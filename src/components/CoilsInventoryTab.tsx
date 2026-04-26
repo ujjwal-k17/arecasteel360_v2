@@ -537,7 +537,7 @@ export default function CoilsInventoryTab() {
                                       <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-muted-foreground">{b.grade || '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm font-mono-num">
-                                      <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-xs text-muted-foreground">{b.net_weight ?? '-'}</div></div>
+                                      <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-muted-foreground">{b.net_weight ?? '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm">
                                       {editingCoilNumber === b.id ? (
