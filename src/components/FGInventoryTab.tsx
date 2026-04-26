@@ -560,20 +560,21 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                         <TableCell className="text-xs font-mono-num whitespace-nowrap">{availQty.toFixed(2)}{item.num_pcs ? <span className="text-muted-foreground"> ({fmtInt(item.num_pcs)} pcs)</span> : null}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{(() => { const a = calcAgeingDays(item.created_at); return a != null ? `${a} D` : '-'; })()}</TableCell>
                         <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }}>
+                        <TableCell>
+                          <div className="grid grid-cols-2 gap-1 max-w-[160px]">
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }} title="Record Sale">
                               <ShoppingCart className="h-3 w-3" /> Sale
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }}>
-                              <AlertTriangle className="h-3 w-3" /> Defective
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }} title="Mark Defective">
+                              <AlertTriangle className="h-3 w-3" /> Def
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
-                              <Pencil className="h-3 w-3" /> Edit
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
+                              <Pencil className="h-3 w-3" />
                             </Button>
                             {isAdmin && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-warning" onClick={async (e) => {
                                 e.stopPropagation();
                                 const restoreTo = item.source_type === 'wip' ? 'WIP' : 'Coil Inventory';
                                 if (!confirm(`Request to move this FG item (${availQty.toFixed(2)} Kg) back to ${restoreTo}?`)) return;
@@ -588,24 +589,21 @@ export default function FGInventoryTab() {
                                   toast.success('Move-back request submitted for approval');
                                 } catch { toast.error('Failed to submit request'); }
                               }} title={`Move back to ${item.source_type === 'wip' ? 'WIP' : 'Coil Inventory'}`} disabled={submitApproval.isPending}>
-                                <Undo2 className="h-3 w-3" /> Move Back
+                                <Undo2 className="h-3 w-3" />
                               </Button>
                             )}
                             {isAdmin && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-destructive" onClick={async (e) => {
                                 e.stopPropagation();
                                 const restoreTo = item.source_type === 'wip' ? 'WIP' : 'Coil';
                                 if (!confirm(`Delete this FG item (${availQty.toFixed(2)} Kg)? Quantity will be restored to ${restoreTo}.`)) return;
                                 try {
                                   if (item.source_type === 'wip' && item.source_id) {
-                                    // Try to restore qty to WIP item
                                     const { data: wipItem } = await supabase.from('wip_items').select('id, qty, status').eq('id', item.source_id).maybeSingle();
                                     if (wipItem) {
-                                      // source_id correctly points to a WIP item
                                       const newQty = (wipItem.qty || 0) + (item.qty || 0);
                                       await supabase.from('wip_items').update({ qty: newQty, status: 'active' } as any).eq('id', item.source_id);
                                     } else {
-                                      // Legacy: source_id might be a batch ID — re-create WIP item
                                       await supabase.from('wip_items').insert({
                                         source_batch_id: item.source_id,
                                         processing_record_id: item.processing_record_id,
@@ -624,10 +622,8 @@ export default function FGInventoryTab() {
                                       } as any);
                                     }
                                   }
-                                  // Delete associated processing output items & record
                                   if (item.processing_record_id) {
                                     await supabase.from('processing_output_items').delete().eq('processing_record_id', item.processing_record_id);
-                                    // Only delete processing record if no other FG items reference it
                                     const { data: otherFGs } = await supabase.from('fg_items').select('id').eq('processing_record_id', item.processing_record_id).neq('id', item.id);
                                     if (!otherFGs || otherFGs.length === 0) {
                                       await supabase.from('processing_records').delete().eq('id', item.processing_record_id);
