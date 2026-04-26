@@ -318,13 +318,6 @@ export default function DashboardTab() {
     };
   }, [palletPurchases, palletConsumptions, steelPalletPurchases, steelPalletConsumptions]);
 
-  return (
-    <div className="space-y-6">
-      {/* === Inventory by Material — 4 panels === */}
-      <Section
-        title="Inventory by Material"
-        subtitle="Quantities (Kg) split across each stage"
-        action={
   // ---------- Order summary (current month) ----------
   const orderSummary = useMemo(() => {
     const now = new Date();
