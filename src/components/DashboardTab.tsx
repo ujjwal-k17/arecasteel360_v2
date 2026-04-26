@@ -158,6 +158,7 @@ export default function DashboardTab() {
       wipDefByItem.set(d.wip_item_id, (wipDefByItem.get(d.wip_item_id) || 0) + (d.quantity || 0));
     }
     const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
+    const drill: DrillItem[] = [];
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
     for (const i of items as any[]) {
       const qty = Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0));
@@ -174,13 +175,21 @@ export default function DashboardTab() {
         else if (age <= 60) g.b1 += qty;
         else if (age <= 90) g.b2 += qty;
         else g.b3 += qty;
+        drill.push({
+          id: i.id,
+          ref: i.process || 'WIP',
+          material: mat,
+          spec: [i.thickness && `${i.thickness}mm`, i.width && `${i.width}mm`, i.length && `${i.length}mm`, i.coating, i.grade].filter(Boolean).join(' · '),
+          qty,
+          age,
+        });
       }
     }
     const byMat = Array.from(map.values())
       .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
       .sort((a, b) => b.qty - a.qty);
     const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
-    return { byMat, total: grandQty, totalCount, totalAvgAge };
+    return { byMat, total: grandQty, totalCount, totalAvgAge, items: drill };
   }, [wipItems, wipDefectives]);
 
   // ---------- FG by Material (qty - sold - defective) ----------
