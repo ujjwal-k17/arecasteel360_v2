@@ -491,8 +491,13 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
   );
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="px-3 py-2 bg-muted/40 border-b">
+      <div className="px-3 py-2 bg-muted/40 border-b flex items-center justify-between gap-3">
         <h4 className="text-xs font-bold uppercase tracking-wide">{title}</h4>
+        {rows.length > 0 && (
+          <div className="text-[11px] text-muted-foreground">
+            Wtd. avg ageing: <span className="font-mono-num font-semibold text-foreground">{Math.round(totalAvgAge)} D</span>
+          </div>
+        )}
       </div>
       <Table>
         <TableHeader>
