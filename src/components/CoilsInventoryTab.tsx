@@ -373,7 +373,7 @@ export default function CoilsInventoryTab() {
   const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
   // SKU summary: Total Net Weight replaces Usable Qty
   const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating / Grade', 'Total Net Wt (Kg)', 'Total Inv (Kg)', 'Avg Ageing'];
-  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating / Grade', 'Gross / Net Wt', 'Coil No', 'Purchase From / Date', 'Ageing', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating / Grade', 'Net / Gross Wt', 'Coil No', 'Purchase From / Date', 'Ageing', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
@@ -537,7 +537,7 @@ export default function CoilsInventoryTab() {
                                       <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-muted-foreground">{b.grade || '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm font-mono-num">
-                                      <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-muted-foreground">{b.net_weight ?? '-'}</div></div>
+                                      <div className="leading-tight"><div>{b.net_weight ?? '-'}</div><div className="text-muted-foreground">{b.gross_weight ?? '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm">
                                       {editingCoilNumber === b.id ? (
