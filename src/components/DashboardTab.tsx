@@ -351,11 +351,14 @@ export default function DashboardTab() {
       </Section>
 
       {/* === Ageing Sections === */}
-      <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty)">
+      <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty). Click a bucket count to see details.">
         <div className="space-y-4">
-          <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory." />
-          <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items." />
-          <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items." />
+          <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory."
+            onCellClick={(material, bucket) => setDrill({ stage: 'Coils', material, bucket, items: coils.items })} />
+          <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items."
+            onCellClick={(material, bucket) => setDrill({ stage: 'WIP', material, bucket, items: wip.items })} />
+          <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items."
+            onCellClick={(material, bucket) => setDrill({ stage: 'Finished Goods', material, bucket, items: fg.items })} />
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-2">
           <LegendDot color="bg-emerald-500" label="≤30 D" />
