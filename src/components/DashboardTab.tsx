@@ -7,7 +7,7 @@ import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, RefreshCw, ClipboardList, Truck, Factory } from 'lucide-react';
+import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
 import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 
