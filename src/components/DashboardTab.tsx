@@ -6,7 +6,7 @@ import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/usePro
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, Clock, RefreshCw } from 'lucide-react';
+import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
 import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -259,40 +259,10 @@ export default function DashboardTab() {
 
   return (
     <div className="space-y-6">
-      {/* === Executive Summary Header === */}
-      <div className="rounded-xl border bg-gradient-to-br from-card to-muted/20 p-5 shadow-sm">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <div>
-            <h2 className="text-lg font-bold tracking-tight">Inventory Snapshot</h2>
-            <p className="text-xs text-muted-foreground">As of {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-          </div>
-          <div className="flex items-center gap-3 text-xs flex-wrap">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Coils:</span>
-              <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} D</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">WIP:</span>
-              <span className="font-bold font-mono-num">{Math.round(wip.totalAvgAge)} D</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">FG:</span>
-              <span className="font-bold font-mono-num">{Math.round(fg.totalAvgAge)} D</span>
-            </div>
-            <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </Button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard icon={<Package className="h-4 w-4" />} label="In-Transit" value={fmt(inTransit.total)} unit="Kg" sub={`${inTransit.totalCount} coils`} tone="blue" />
-          <KpiCard icon={<Warehouse className="h-4 w-4" />} label="Coils Inventory" value={fmt(coils.total)} unit="Kg" sub={`${coils.byMat.reduce((s, g) => s + g.count, 0)} coils`} tone="indigo" />
-          <KpiCard icon={<Layers className="h-4 w-4" />} label="WIP" value={fmt(wip.total)} unit="Kg" sub={`${wip.totalCount} items`} tone="amber" />
-          <KpiCard icon={<CheckCircle className="h-4 w-4" />} label="Finished Goods" value={fmt(fg.total)} unit="Kg" sub={`${fg.totalCount} items`} tone="emerald" />
-        </div>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
+          <RefreshCw className="h-3.5 w-3.5" /> Refresh
+        </Button>
       </div>
 
       {/* === Inventory by Material — 4 panels === */}
@@ -305,18 +275,21 @@ export default function DashboardTab() {
           />
           <MaterialPanel
             icon={<Warehouse className="h-4 w-4" />} title="Coils Inventory" tone="indigo"
-            rows={coils.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} coils` }))}
+            rows={coils.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} coils`, age: g.avgAge }))}
             total={coils.total} totalLabel={`${coils.byMat.reduce((s, g) => s + g.count, 0)} coils`}
+            avgAge={coils.totalAvgAge}
           />
           <MaterialPanel
             icon={<Layers className="h-4 w-4" />} title="WIP" tone="amber"
-            rows={wip.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items` }))}
+            rows={wip.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items`, age: g.avgAge }))}
             total={wip.total} totalLabel={`${wip.totalCount} items`}
+            avgAge={wip.totalAvgAge}
           />
           <MaterialPanel
             icon={<CheckCircle className="h-4 w-4" />} title="Finished Goods" tone="emerald"
-            rows={fg.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items` }))}
+            rows={fg.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items`, age: g.avgAge }))}
             total={fg.total} totalLabel={`${fg.totalCount} items`}
+            avgAge={fg.totalAvgAge}
           />
         </div>
       </Section>
@@ -382,20 +355,6 @@ const TONE_MAP: Record<string, { bg: string; ring: string; text: string; bar: st
   slate:   { bg: 'bg-slate-50 dark:bg-slate-950/30',     ring: 'ring-slate-200 dark:ring-slate-800',     text: 'text-slate-700 dark:text-slate-300',     bar: 'bg-slate-500' },
 };
 
-function KpiCard({ icon, label, value, unit, sub, tone }: { icon: React.ReactNode; label: string; value: string; unit: string; sub: string; tone: string }) {
-  const t = TONE_MAP[tone];
-  return (
-    <div className={`rounded-lg border ${t.bg} ring-1 ${t.ring} p-3.5`}>
-      <div className={`flex items-center gap-1.5 ${t.text} mb-1`}>{icon}<span className="text-[10px] font-bold uppercase tracking-widest">{label}</span></div>
-      <div className="flex items-baseline gap-1">
-        <p className="text-2xl font-bold font-mono-num leading-none">{value}</p>
-        <span className="text-[10px] text-muted-foreground font-medium">{unit}</span>
-      </div>
-      <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>
-    </div>
-  );
-}
-
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section>
@@ -408,10 +367,10 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
   );
 }
 
-function MaterialPanel({ icon, title, tone, rows, total, totalLabel }: {
+function MaterialPanel({ icon, title, tone, rows, total, totalLabel, avgAge }: {
   icon: React.ReactNode; title: string; tone: string;
-  rows: { label: string; qty: number; extra?: string }[];
-  total: number; totalLabel?: string;
+  rows: { label: string; qty: number; extra?: string; age?: number }[];
+  total: number; totalLabel?: string; avgAge?: number;
 }) {
   const t = TONE_MAP[tone];
   const max = Math.max(1, ...rows.map(r => r.qty));
@@ -421,6 +380,9 @@ function MaterialPanel({ icon, title, tone, rows, total, totalLabel }: {
         <div className={t.text}>{icon}</div>
         <div className="flex-1">
           <p className={`text-xs font-bold uppercase tracking-wide ${t.text}`}>{title}</p>
+          {avgAge != null && (
+            <p className="text-[9px] text-muted-foreground mt-0.5">Avg ageing: <span className="font-mono-num font-semibold text-foreground">{Math.round(avgAge)} D</span></p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-base font-bold font-mono-num leading-none">{fmt(total)}</p>
@@ -438,6 +400,7 @@ function MaterialPanel({ icon, title, tone, rows, total, totalLabel }: {
               <div className="text-right">
                 <span className="text-xs font-mono-num font-semibold">{fmt(r.qty)}</span>
                 {r.extra && <span className="text-[9px] text-muted-foreground ml-1">· {r.extra}</span>}
+                {r.age != null && <span className="text-[9px] text-muted-foreground ml-1">· {Math.round(r.age)} D</span>}
               </div>
             </div>
             <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
