@@ -132,12 +132,26 @@ export default function DashboardTab() {
     for (const d of (wipDefectives || [])) {
       wipDefByItem.set(d.wip_item_id, (wipDefByItem.get(d.wip_item_id) || 0) + (d.quantity || 0));
     }
-    const enriched = items.map((i: any) => ({
-      material: i.material || '—',
-      qty: Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0)),
-    })).filter(i => i.qty > 0);
-    const byMat = groupByMaterial(enriched, i => i.material, i => i.qty);
-    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: enriched.length };
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
+    for (const i of items as any[]) {
+      const qty = Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0));
+      if (qty <= 0) continue;
+      const mat = i.material || '—';
+      const age = ageingDays(i.created_at);
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      const g = map.get(mat)!;
+      g.qty += qty; g.count++; grandQty += qty; totalCount++;
+      if (age != null) {
+        g.ageWeighted += age * qty; g.ageBase += qty;
+        grandAgeW += age * qty; grandAgeBase += qty;
+      }
+    }
+    const byMat = Array.from(map.values())
+      .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
+      .sort((a, b) => b.qty - a.qty);
+    const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
+    return { byMat, total: grandQty, totalCount, totalAvgAge };
   }, [wipItems, wipDefectives]);
 
   // ---------- FG by Material (qty - sold - defective) ----------
@@ -151,12 +165,26 @@ export default function DashboardTab() {
     for (const d of (fgDefectives || [])) {
       defByItem.set(d.fg_item_id, (defByItem.get(d.fg_item_id) || 0) + (d.quantity || 0));
     }
-    const enriched = items.map((i: any) => ({
-      material: i.material || '—',
-      qty: Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0)),
-    })).filter(i => i.qty > 0);
-    const byMat = groupByMaterial(enriched, i => i.material, i => i.qty);
-    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: enriched.length };
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
+    for (const i of items as any[]) {
+      const qty = Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0));
+      if (qty <= 0) continue;
+      const mat = i.material || '—';
+      const age = ageingDays(i.created_at);
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      const g = map.get(mat)!;
+      g.qty += qty; g.count++; grandQty += qty; totalCount++;
+      if (age != null) {
+        g.ageWeighted += age * qty; g.ageBase += qty;
+        grandAgeW += age * qty; grandAgeBase += qty;
+      }
+    }
+    const byMat = Array.from(map.values())
+      .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
+      .sort((a, b) => b.qty - a.qty);
+    const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
+    return { byMat, total: grandQty, totalCount, totalAvgAge };
   }, [fgItems, fgSales, fgDefectives]);
 
   // ---------- Scrap by Material (unsold) ----------
@@ -241,8 +269,18 @@ export default function DashboardTab() {
           <div className="flex items-center gap-3 text-xs flex-wrap">
             <div className="flex items-center gap-2">
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Coils Avg Ageing:</span>
-              <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} days</span>
+              <span className="text-muted-foreground">Coils:</span>
+              <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} D</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">WIP:</span>
+              <span className="font-bold font-mono-num">{Math.round(wip.totalAvgAge)} D</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">FG:</span>
+              <span className="font-bold font-mono-num">{Math.round(fg.totalAvgAge)} D</span>
             </div>
             <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh
@@ -284,56 +322,18 @@ export default function DashboardTab() {
       </Section>
 
       {/* === Coils Ageing Section === */}
-      <Section title="Coils Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on usable Kg)">
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead className="text-xs font-semibold">Material</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Usable Qty (Kg)</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Coils</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Weighted Avg Ageing</TableHead>
-                <TableHead className="text-xs font-semibold w-32">Ageing Profile</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coils.byMat.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-6">No coils in inventory.</TableCell></TableRow>
-              )}
-              {coils.byMat.map(g => {
-                const tone = g.avgAge > 90 ? 'bg-destructive' : g.avgAge > 60 ? 'bg-amber-500' : g.avgAge > 30 ? 'bg-yellow-400' : 'bg-emerald-500';
-                const widthPct = Math.min(100, (g.avgAge / 120) * 100);
-                return (
-                  <TableRow key={g.material}>
-                    <TableCell className="text-sm font-medium">{g.material}</TableCell>
-                    <TableCell className="text-sm font-mono-num text-right">{fmt(g.qty)}</TableCell>
-                    <TableCell className="text-sm font-mono-num text-right">{g.count}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold text-right">{Math.round(g.avgAge)} days</TableCell>
-                    <TableCell>
-                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full ${tone}`} style={{ width: `${widthPct}%` }} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {coils.byMat.length > 0 && (
-                <TableRow className="bg-muted/30 font-bold border-t-2">
-                  <TableCell className="text-sm">Total</TableCell>
-                  <TableCell className="text-sm font-mono-num text-right">{fmt(coils.total)}</TableCell>
-                  <TableCell className="text-sm font-mono-num text-right">{coils.byMat.reduce((s, g) => s + g.count, 0)}</TableCell>
-                  <TableCell className="text-sm font-mono-num text-right">{Math.round(coils.totalAvgAge)} days</TableCell>
-                  <TableCell />
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+      {/* === Ageing Sections === */}
+      <Section title="Inventory Ageing" subtitle="Weighted avg ageing days by material (weighted on qty)">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <AgeingTable title="Coils" qtyLabel="Usable Qty (Kg)" countLabel="Coils" rows={coils.byMat} total={coils.total} totalAvgAge={coils.totalAvgAge} emptyMsg="No coils in inventory." />
+          <AgeingTable title="WIP" qtyLabel="Qty (Kg)" countLabel="Items" rows={wip.byMat} total={wip.total} totalAvgAge={wip.totalAvgAge} emptyMsg="No WIP items." />
+          <AgeingTable title="Finished Goods" qtyLabel="Qty (Kg)" countLabel="Items" rows={fg.byMat} total={fg.total} totalAvgAge={fg.totalAvgAge} emptyMsg="No FG items." />
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-2">
-          <LegendDot color="bg-emerald-500" label="≤30 days" />
-          <LegendDot color="bg-yellow-400" label="31–60 days" />
-          <LegendDot color="bg-amber-500" label="61–90 days" />
-          <LegendDot color="bg-destructive" label="&gt;90 days" />
+          <LegendDot color="bg-emerald-500" label="≤30 D" />
+          <LegendDot color="bg-yellow-400" label="31–60 D" />
+          <LegendDot color="bg-amber-500" label="61–90 D" />
+          <LegendDot color="bg-destructive" label="&gt;90 D" />
         </div>
       </Section>
 
@@ -492,5 +492,66 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
       <span dangerouslySetInnerHTML={{ __html: label }} />
     </span>
+  );
+}
+
+function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, emptyMsg }: {
+  title: string;
+  qtyLabel: string;
+  countLabel: string;
+  rows: { material: string; qty: number; count: number; avgAge: number }[];
+  total: number;
+  totalAvgAge: number;
+  emptyMsg: string;
+}) {
+  const totalCount = rows.reduce((s, g) => s + g.count, 0);
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="px-3 py-2 bg-muted/40 border-b">
+        <h4 className="text-xs font-bold uppercase tracking-wide">{title}</h4>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/20">
+            <TableHead className="text-[11px] font-semibold">Material</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">{qtyLabel}</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">{countLabel}</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">Avg Ageing</TableHead>
+            <TableHead className="text-[11px] font-semibold w-24">Profile</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 && (
+            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-6">{emptyMsg}</TableCell></TableRow>
+          )}
+          {rows.map(g => {
+            const tone = g.avgAge > 90 ? 'bg-destructive' : g.avgAge > 60 ? 'bg-amber-500' : g.avgAge > 30 ? 'bg-yellow-400' : 'bg-emerald-500';
+            const widthPct = Math.min(100, (g.avgAge / 120) * 100);
+            return (
+              <TableRow key={g.material}>
+                <TableCell className="text-xs font-medium">{g.material}</TableCell>
+                <TableCell className="text-xs font-mono-num text-right">{fmtNum(g.qty)}</TableCell>
+                <TableCell className="text-xs font-mono-num text-right">{g.count}</TableCell>
+                <TableCell className="text-xs font-mono-num font-semibold text-right">{Math.round(g.avgAge)} D</TableCell>
+                <TableCell>
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full ${tone}`} style={{ width: `${widthPct}%` }} />
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+          {rows.length > 0 && (
+            <TableRow className="bg-muted/30 font-bold border-t-2">
+              <TableCell className="text-xs">Total</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{fmtNum(total)}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{totalCount}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{Math.round(totalAvgAge)} D</TableCell>
+              <TableCell />
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
