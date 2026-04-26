@@ -46,7 +46,7 @@ export default function WIPInventoryTab() {
 
   // Defective dialog
   const [defectDialog, setDefectDialog] = useState<any | null>(null);
-  const [editItem, setEditItem] = useState<any | null>(null);
+  
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '' });
 
   // Filters
