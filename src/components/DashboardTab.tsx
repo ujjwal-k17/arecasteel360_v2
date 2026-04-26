@@ -6,7 +6,7 @@ import { useWIPItems, useFGItems, useAllProcessingRecords } from '@/hooks/usePro
 import { useScrapSales } from '@/hooks/useScrapSales';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, Clock, RefreshCw } from 'lucide-react';
+import { Package, Warehouse, Layers, CheckCircle, Trash2, AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
 import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -355,36 +355,10 @@ const TONE_MAP: Record<string, { bg: string; ring: string; text: string; bar: st
   slate:   { bg: 'bg-slate-50 dark:bg-slate-950/30',     ring: 'ring-slate-200 dark:ring-slate-800',     text: 'text-slate-700 dark:text-slate-300',     bar: 'bg-slate-500' },
 };
 
-function KpiCard({ icon, label, value, unit, sub, tone }: { icon: React.ReactNode; label: string; value: string; unit: string; sub: string; tone: string }) {
-  const t = TONE_MAP[tone];
-  return (
-    <div className={`rounded-lg border ${t.bg} ring-1 ${t.ring} p-3.5`}>
-      <div className={`flex items-center gap-1.5 ${t.text} mb-1`}>{icon}<span className="text-[10px] font-bold uppercase tracking-widest">{label}</span></div>
-      <div className="flex items-baseline gap-1">
-        <p className="text-2xl font-bold font-mono-num leading-none">{value}</p>
-        <span className="text-[10px] text-muted-foreground font-medium">{unit}</span>
-      </div>
-      <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>
-    </div>
-  );
-}
-
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <div className="mb-3">
-        <h3 className="text-base font-bold tracking-tight">{title}</h3>
-        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function MaterialPanel({ icon, title, tone, rows, total, totalLabel }: {
+function MaterialPanel({ icon, title, tone, rows, total, totalLabel, avgAge }: {
   icon: React.ReactNode; title: string; tone: string;
-  rows: { label: string; qty: number; extra?: string }[];
-  total: number; totalLabel?: string;
+  rows: { label: string; qty: number; extra?: string; age?: number }[];
+  total: number; totalLabel?: string; avgAge?: number;
 }) {
   const t = TONE_MAP[tone];
   const max = Math.max(1, ...rows.map(r => r.qty));
@@ -394,6 +368,9 @@ function MaterialPanel({ icon, title, tone, rows, total, totalLabel }: {
         <div className={t.text}>{icon}</div>
         <div className="flex-1">
           <p className={`text-xs font-bold uppercase tracking-wide ${t.text}`}>{title}</p>
+          {avgAge != null && (
+            <p className="text-[9px] text-muted-foreground mt-0.5">Avg ageing: <span className="font-mono-num font-semibold text-foreground">{Math.round(avgAge)} D</span></p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-base font-bold font-mono-num leading-none">{fmt(total)}</p>
@@ -411,6 +388,7 @@ function MaterialPanel({ icon, title, tone, rows, total, totalLabel }: {
               <div className="text-right">
                 <span className="text-xs font-mono-num font-semibold">{fmt(r.qty)}</span>
                 {r.extra && <span className="text-[9px] text-muted-foreground ml-1">· {r.extra}</span>}
+                {r.age != null && <span className="text-[9px] text-muted-foreground ml-1">· {Math.round(r.age)} D</span>}
               </div>
             </div>
             <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
