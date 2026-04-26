@@ -20,13 +20,16 @@ export default function PettyCashPage() {
   const { data: entries = [] } = useCashEntries();
   const insertEntry = useInsertCashEntry();
   const updateEntry = useUpdateCashEntry();
-  const { data: cat } = useCashCategories();
-  const categories = cat?.categories || [];
-  const subByParent = cat?.subByParent || {};
+  const { data: catIn } = useCashCategories('in');
+  const { data: catOut } = useCashCategories('out');
 
   const [addDialog, setAddDialog] = useState<{ open: boolean; direction: Direction }>({ open: false, direction: 'in' });
   const [form, setForm] = useState({ entry_date: new Date().toISOString().slice(0, 10), amount: '', category: '', sub_category: '', comments: '' });
   const [receiveDialog, setReceiveDialog] = useState<{ open: boolean; entry: CashEntry | null; received_date: string }>({ open: false, entry: null, received_date: new Date().toISOString().slice(0, 10) });
+
+  const activeCat = addDialog.direction === 'in' ? catIn : catOut;
+  const categories = activeCat?.categories || [];
+  const subByParent = activeCat?.subByParent || {};
 
   const receivable = useMemo(() => entries.filter(e => e.direction === 'in' && e.status === 'receivable'), [entries]);
   const received = useMemo(() => entries.filter(e => e.direction === 'in' && e.status === 'received'), [entries]);

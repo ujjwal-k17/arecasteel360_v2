@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const CATEGORIES = ['material', 'make', 'form', 'coating', 'grade', 'cash_category', 'cash_subcategory'];
+const CATEGORIES = ['material', 'make', 'form', 'coating', 'grade', 'cash_in_category', 'cash_in_subcategory', 'cash_out_category', 'cash_out_subcategory'];
 
 const CATEGORY_LABELS: Record<string, string> = {
   material: 'Material',
@@ -17,8 +17,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   form: 'Form',
   coating: 'Coating',
   grade: 'Grade',
-  cash_category: 'Cash Category',
-  cash_subcategory: 'Cash Sub-Category',
+  cash_in_category: 'Cash In Category',
+  cash_in_subcategory: 'Cash In Sub-Category',
+  cash_out_category: 'Cash Out Category',
+  cash_out_subcategory: 'Cash Out Sub-Category',
 };
 
 export default function DropdownManagementTab() {
@@ -51,18 +53,30 @@ export default function DropdownManagementTab() {
     },
   });
 
-  const { data: cashCats } = useQuery({
-    queryKey: ['dropdown_options_cash_category'],
+  const { data: cashInCats } = useQuery({
+    queryKey: ['dropdown_options_cash_in_category'],
     queryFn: async () => {
-      const { data } = await supabase.from('dropdown_options').select('value').eq('category', 'cash_category').eq('is_active', true);
+      const { data } = await supabase.from('dropdown_options').select('value').eq('category', 'cash_in_category').eq('is_active', true);
+      return (data || []).map((d: any) => d.value);
+    },
+  });
+
+  const { data: cashOutCats } = useQuery({
+    queryKey: ['dropdown_options_cash_out_category'],
+    queryFn: async () => {
+      const { data } = await supabase.from('dropdown_options').select('value').eq('category', 'cash_out_category').eq('is_active', true);
       return (data || []).map((d: any) => d.value);
     },
   });
 
   const filtered = (options || []).filter((o: any) => o.category === selectedCategory);
-  const needsParent = selectedCategory === 'coating' || selectedCategory === 'grade' || selectedCategory === 'cash_subcategory';
-  const parentOptions: string[] = selectedCategory === 'cash_subcategory' ? (cashCats || []) : (materials || []);
-  const parentLabel = selectedCategory === 'cash_subcategory' ? 'Parent Category' : 'Parent Material';
+  const needsParent = selectedCategory === 'coating' || selectedCategory === 'grade' || selectedCategory === 'cash_in_subcategory' || selectedCategory === 'cash_out_subcategory';
+  const parentOptions: string[] = selectedCategory === 'cash_in_subcategory'
+    ? (cashInCats || [])
+    : selectedCategory === 'cash_out_subcategory'
+      ? (cashOutCats || [])
+      : (materials || []);
+  const parentLabel = (selectedCategory === 'cash_in_subcategory' || selectedCategory === 'cash_out_subcategory') ? 'Parent Category' : 'Parent Material';
 
   const handleAdd = async () => {
     if (!newValue.trim()) { toast.error('Value is required'); return; }
