@@ -86,6 +86,14 @@ export default function DashboardTab() {
     queryKey: ['defective_sales'],
     queryFn: async () => ((await supabase.from('defective_sales').select('*')).data || []) as any[],
   });
+  const { data: ordersData } = useQuery({
+    queryKey: ['dashboard_orders'],
+    queryFn: async () => ((await supabase.from('orders').select('*, customers(customer_type), order_items(net_weight)')).data || []) as any[],
+  });
+  const { data: dispatchesData } = useQuery({
+    queryKey: ['dashboard_dispatches'],
+    queryFn: async () => ((await supabase.from('order_dispatches').select('*')).data || []) as any[],
+  });
 
   const refreshAll = () => {
     queryClient.invalidateQueries();
@@ -310,8 +318,82 @@ export default function DashboardTab() {
     };
   }, [palletPurchases, palletConsumptions, steelPalletPurchases, steelPalletConsumptions]);
 
+  // ---------- Order summary (current month) ----------
+  const orderSummary = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inMonth = (d: string | null | undefined) => {
+      if (!d) return false;
+      const dt = new Date(d);
+      return !isNaN(dt.getTime()) && dt >= monthStart && dt <= now;
+    };
+    const orderQty = (o: any) => (o.order_items || []).reduce((s: number, it: any) => s + (Number(it.net_weight) || 0), 0);
+
+    let openOEMQty = 0, openOEMCount = 0;
+    let openTradeQty = 0, openTradeCount = 0;
+    let monthOrderQty = 0, monthOrderCount = 0;
+
+    for (const o of (ordersData || [])) {
+      const qty = orderQty(o);
+      if ((o.status || 'open') === 'open') {
+        const type = (o.customers?.customer_type || '').toLowerCase();
+        if (type === 'oem') { openOEMQty += qty; openOEMCount++; }
+        else { openTradeQty += qty; openTradeCount++; }
+      }
+      if (inMonth(o.order_date || o.created_at)) {
+        monthOrderQty += qty; monthOrderCount++;
+      }
+    }
+
+    let monthDispatchQty = 0, monthDispatchCount = 0;
+    for (const d of (dispatchesData || [])) {
+      if (inMonth(d.dispatch_date || d.created_at)) {
+        monthDispatchQty += Number(d.dispatch_qty) || 0;
+        monthDispatchCount++;
+      }
+    }
+    return {
+      openOEMQty, openOEMCount,
+      openTradeQty, openTradeCount,
+      monthOrderQty, monthOrderCount,
+      monthDispatchQty, monthDispatchCount,
+    };
+  }, [ordersData, dispatchesData]);
+
+  // ---------- Production summary (current month) by process ----------
+  const productionSummary = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const map = new Map<string, { qty: number; count: number }>();
+    let total = 0, totalCount = 0;
+    for (const p of (allProcRecords || [])) {
+      const dt = new Date(p.created_at);
+      if (isNaN(dt.getTime()) || dt < monthStart || dt > now) continue;
+      const key = p.process_type || '—';
+      if (!map.has(key)) map.set(key, { qty: 0, count: 0 });
+      const g = map.get(key)!;
+      const q = Number(p.input_qty) || 0;
+      g.qty += q; g.count++;
+      total += q; totalCount++;
+    }
+    const rows = Array.from(map.entries())
+      .map(([process, v]) => ({ process, qty: v.qty, count: v.count }))
+      .sort((a, b) => b.qty - a.qty);
+    return { rows, total, totalCount };
+  }, [allProcRecords]);
+
   return (
     <div className="space-y-6">
+      {/* === Order Summary === */}
+      <Section title="Order Summary" subtitle="Snapshot of open orders & current-month activity">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard tone="indigo" label="Open Orders · OEM" value={orderSummary.openOEMQty} unit="Kg" sub={`${orderSummary.openOEMCount} orders`} />
+          <StatCard tone="blue" label="Open Orders · Trade" value={orderSummary.openTradeQty} unit="Kg" sub={`${orderSummary.openTradeCount} orders`} />
+          <StatCard tone="amber" label="Orders · This Month" value={orderSummary.monthOrderQty} unit="Kg" sub={`${orderSummary.monthOrderCount} orders`} />
+          <StatCard tone="emerald" label="Dispatches · This Month" value={orderSummary.monthDispatchQty} unit="Kg" sub={`${orderSummary.monthDispatchCount} dispatches`} />
+        </div>
+      </Section>
+
       {/* === Inventory by Material — 4 panels === */}
       <Section
         title="Inventory by Material"
@@ -398,7 +480,55 @@ export default function DashboardTab() {
         </div>
       </Section>
 
+      {/* === Production Summary (current month) === */}
+      <Section title="Production Summary · This Month" subtitle="Input quantity processed split by process type">
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="text-[11px] font-semibold">Process</TableHead>
+                <TableHead className="text-[11px] font-semibold text-right">Qty (Kg)</TableHead>
+                <TableHead className="text-[11px] font-semibold text-right">Records</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {productionSummary.rows.length === 0 && (
+                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground text-xs py-6">No production this month.</TableCell></TableRow>
+              )}
+              {productionSummary.rows.map(r => (
+                <TableRow key={r.process}>
+                  <TableCell className="text-xs font-medium">{r.process}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{fmtNum(r.qty)}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{r.count}</TableCell>
+                </TableRow>
+              ))}
+              {productionSummary.rows.length > 0 && (
+                <TableRow className="bg-muted/30 font-bold border-t-2">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{fmtNum(productionSummary.total)}</TableCell>
+                  <TableCell className="text-xs font-mono-num text-right">{productionSummary.totalCount}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Section>
+
       <DrillDialog drill={drill} onOpenChange={(open) => { if (!open) setDrill(null); }} />
+    </div>
+  );
+}
+
+function StatCard({ tone, label, value, unit, sub }: { tone: string; label: string; value: number; unit?: string; sub?: string }) {
+  const t = TONE_MAP[tone] || TONE_MAP.blue;
+  return (
+    <div className={`rounded-lg border ${t.bg} p-3.5 flex flex-col gap-1`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wide ${t.text}`}>{label}</p>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-xl font-bold font-mono-num leading-none">{fmt(value)}</span>
+        {unit && <span className="text-[10px] text-muted-foreground">{unit}</span>}
+      </div>
+      {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
     </div>
   );
 }
