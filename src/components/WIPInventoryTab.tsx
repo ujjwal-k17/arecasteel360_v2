@@ -405,22 +405,23 @@ export default function WIPInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                         <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{(() => { const a = calcAgeingDays(item.created_at); return a != null ? `${a} D` : '-'; })()}</TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
+                          <div className="grid grid-cols-2 gap-1 max-w-[180px]">
                             {canProcess && (
-                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }} title="Process (CTL)">CTL</Button>
                             )}
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
-                              <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
+                              <ArrowRightCircle className="h-3 w-3" /> FG
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }} title="Mark as defective">
-                              <AlertTriangle className="h-3.5 w-3.5" /> Defective
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }} title="Mark as defective">
+                              <AlertTriangle className="h-3 w-3" /> Def
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
-                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
+                              <Pencil className="h-3 w-3" />
                             </Button>
                             {isAdmin && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-warning" onClick={async (e) => {
                                 e.stopPropagation();
                                 if (!confirm(`Request to move this WIP item (${availQty.toFixed(2)} Kg) back to Coil Inventory?`)) return;
                                 try {
@@ -434,16 +435,15 @@ export default function WIPInventoryTab() {
                                   toast.success('Move-back request submitted for approval');
                                 } catch { toast.error('Failed to submit request'); }
                               }} title="Move back to Coil Inventory" disabled={submitApproval.isPending}>
-                                <Undo2 className="h-3.5 w-3.5" /> Move Back
+                                <Undo2 className="h-3 w-3" />
                               </Button>
                             )}
                             {isAdmin && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-destructive" onClick={async (e) => {
                                 e.stopPropagation();
                                 if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)? Quantity will be restored to the source coil.`)) return;
                                 try {
                                   const procRecId = item.processing_record_id;
-                                  // Delete related defectives first (FK constraint)
                                   await supabase.from('wip_defectives' as any).delete().eq('wip_item_id', item.id);
                                   const { error } = await supabase.from('wip_items').delete().eq('id', item.id);
                                   if (error) throw error;
@@ -475,7 +475,7 @@ export default function WIPInventoryTab() {
                                   toast.error(err.message || 'Failed to delete');
                                 }
                               }} title="Delete WIP item">
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             )}
                           </div>
