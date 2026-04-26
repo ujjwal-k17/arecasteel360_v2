@@ -467,10 +467,10 @@ export default function CoilsInventoryTab() {
 
       {/* SKU Summary */}
       <div className="overflow-x-auto rounded-md border bg-card">
-        <Table>
+        <Table className="[&_td]:px-2 [&_th]:px-2">
           <TableHeader>
             <TableRow className="bg-[hsl(var(--sku-row))]">
-              {skuCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+              {skuCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-normal break-words leading-tight px-2">{c}</TableHead>)}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -487,7 +487,7 @@ export default function CoilsInventoryTab() {
                   <TableCell className="text-sm font-mono-num">{g.width ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
                   <TableCell className="text-sm">
-                    <div className="leading-tight"><div>{g.coating || '-'}</div><div className="text-xs text-muted-foreground">{g.grade || '-'}</div></div>
+                    <div className="leading-tight"><div>{g.coating || '-'}</div><div className="text-muted-foreground">{g.grade || '-'}</div></div>
                   </TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalNetWeight)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
@@ -497,13 +497,13 @@ export default function CoilsInventoryTab() {
                   <TableRow key={`${g.key}-detail`}>
                     <TableCell colSpan={skuCols.length} className="p-0">
                       <div className="bg-[hsl(var(--batch-row))] p-3">
-                        <Table>
+                        <Table className="[&_td]:px-2 [&_th]:px-2">
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-10">
                                 <Checkbox checked={g.batches.length > 0 && g.batches.every(b => selectedBatchIds.has(b.id))} onCheckedChange={() => toggleSelectAllInSKU(g)} />
                               </TableHead>
-                              {batchCols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+                              {batchCols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-normal break-words leading-tight px-2">{c}</TableHead>)}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -534,10 +534,10 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
                                     <TableCell className="text-sm">
-                                      <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-xs text-muted-foreground">{b.grade || '-'}</div></div>
+                                      <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-muted-foreground">{b.grade || '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm font-mono-num">
-                                      <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-xs text-muted-foreground">{b.net_weight ?? '-'}</div></div>
+                                      <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-muted-foreground">{b.net_weight ?? '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm">
                                       {editingCoilNumber === b.id ? (
@@ -569,7 +569,7 @@ export default function CoilsInventoryTab() {
                                       )}
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                      <div className="leading-tight"><div>{b.purchase_from || '-'}</div><div className="text-xs text-muted-foreground">{b.purchase_date || '-'}</div></div>
+                                      <div className="leading-tight"><div>{b.purchase_from || '-'}</div><div className="text-muted-foreground">{b.purchase_date || '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm font-mono-num">{(() => { const a = calcAgeingDays(b.purchase_date); return a != null ? `${a} days` : '-'; })()}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
