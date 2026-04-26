@@ -132,12 +132,26 @@ export default function DashboardTab() {
     for (const d of (wipDefectives || [])) {
       wipDefByItem.set(d.wip_item_id, (wipDefByItem.get(d.wip_item_id) || 0) + (d.quantity || 0));
     }
-    const enriched = items.map((i: any) => ({
-      material: i.material || '—',
-      qty: Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0)),
-    })).filter(i => i.qty > 0);
-    const byMat = groupByMaterial(enriched, i => i.material, i => i.qty);
-    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: enriched.length };
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
+    for (const i of items as any[]) {
+      const qty = Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0));
+      if (qty <= 0) continue;
+      const mat = i.material || '—';
+      const age = ageingDays(i.created_at);
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      const g = map.get(mat)!;
+      g.qty += qty; g.count++; grandQty += qty; totalCount++;
+      if (age != null) {
+        g.ageWeighted += age * qty; g.ageBase += qty;
+        grandAgeW += age * qty; grandAgeBase += qty;
+      }
+    }
+    const byMat = Array.from(map.values())
+      .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
+      .sort((a, b) => b.qty - a.qty);
+    const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
+    return { byMat, total: grandQty, totalCount, totalAvgAge };
   }, [wipItems, wipDefectives]);
 
   // ---------- FG by Material (qty - sold - defective) ----------
@@ -151,12 +165,26 @@ export default function DashboardTab() {
     for (const d of (fgDefectives || [])) {
       defByItem.set(d.fg_item_id, (defByItem.get(d.fg_item_id) || 0) + (d.quantity || 0));
     }
-    const enriched = items.map((i: any) => ({
-      material: i.material || '—',
-      qty: Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0)),
-    })).filter(i => i.qty > 0);
-    const byMat = groupByMaterial(enriched, i => i.material, i => i.qty);
-    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: enriched.length };
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
+    for (const i of items as any[]) {
+      const qty = Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0));
+      if (qty <= 0) continue;
+      const mat = i.material || '—';
+      const age = ageingDays(i.created_at);
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      const g = map.get(mat)!;
+      g.qty += qty; g.count++; grandQty += qty; totalCount++;
+      if (age != null) {
+        g.ageWeighted += age * qty; g.ageBase += qty;
+        grandAgeW += age * qty; grandAgeBase += qty;
+      }
+    }
+    const byMat = Array.from(map.values())
+      .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
+      .sort((a, b) => b.qty - a.qty);
+    const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
+    return { byMat, total: grandQty, totalCount, totalAvgAge };
   }, [fgItems, fgSales, fgDefectives]);
 
   // ---------- Scrap by Material (unsold) ----------
