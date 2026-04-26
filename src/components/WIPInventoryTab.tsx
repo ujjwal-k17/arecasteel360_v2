@@ -132,17 +132,38 @@ export default function WIPInventoryTab() {
     return uniqueCaseInsensitive(items.map(i => i.material || '').filter(Boolean)).sort();
   }, [items]);
 
+  const calcAgeingDays = (dateStr: string | null | undefined): number | null => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const ms = Date.now() - d.getTime();
+    return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+  };
+
   const skuGroups = useMemo(() => {
-    const map = new Map<string, SKUGroup & { totalOriginalQty: number }>();
+    const map = new Map<string, SKUGroup & { totalOriginalQty: number; weightedAvgAgeing: number }>();
+    const ageingAccum = new Map<string, { wSum: number; wTotal: number }>();
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalOriginalQty: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', make: item.make || '-', process: item.process || '-', thickness: item.thickness, width: item.width, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalOriginalQty: 0, weightedAvgAgeing: 0, items: [] });
+        ageingAccum.set(key, { wSum: 0, wTotal: 0 });
       }
       const g = map.get(key)!;
-      g.totalQty += getAvailableQty(item);
+      const av = getAvailableQty(item);
+      g.totalQty += av;
       g.totalOriginalQty += item.qty || 0;
       g.items.push(item);
+      const ag = calcAgeingDays(item.created_at);
+      if (ag != null && av > 0) {
+        const acc = ageingAccum.get(key)!;
+        acc.wSum += ag * av;
+        acc.wTotal += av;
+      }
+    }
+    for (const [k, g] of map) {
+      const acc = ageingAccum.get(k)!;
+      g.weightedAvgAgeing = acc.wTotal > 0 ? acc.wSum / acc.wTotal : 0;
     }
     return Array.from(map.values());
   }, [filteredItems, defectiveByItem]);
@@ -289,18 +310,19 @@ export default function WIPInventoryTab() {
       </div>
 
       <div className="overflow-x-auto rounded-md border bg-card">
-        <Table>
+        <Table className="[&_td]:px-2 [&_th]:px-2">
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold w-8" />
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Process</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Dimensions</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Action</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Material</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Process</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Dimensions</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Coating</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Grade</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Qty (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Ageing</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Action</TableHead>
             </TableRow>
             <TableRow className="bg-muted/20">
               <TableHead />
@@ -312,11 +334,13 @@ export default function WIPInventoryTab() {
               <TableHead><FilterSelect value={filterGrade} onChange={setFilterGrade} options={uniqueVals.grade} placeholder="Grade" /></TableHead>
               <TableHead />
               <TableHead />
+              <TableHead />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {displayedSkuGroups.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No WIP items found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No WIP items found.</TableCell></TableRow>
             )}
             {displayedSkuGroups.map(g => {
               const isOpen = expanded.has(g.key);
@@ -331,6 +355,7 @@ export default function WIPInventoryTab() {
                     <TableCell className="text-sm">{g.coating}</TableCell>
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{(g as any).weightedAvgAgeing > 0 ? `${Math.round((g as any).weightedAvgAgeing)} D` : '-'}</TableCell>
                     <TableCell><span className="text-xs text-muted-foreground">{g.items.length} item{g.items.length !== 1 ? 's' : ''}</span></TableCell>
                   </TableRow>
                   {isOpen && g.items.map((item: any) => {
@@ -380,22 +405,23 @@ export default function WIPInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground">{item.coating || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                         <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{(() => { const a = calcAgeingDays(item.created_at); return a != null ? `${a} D` : '-'; })()}</TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
+                          <div className="grid grid-cols-2 gap-1 max-w-[180px]">
                             {canProcess && (
-                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }}>Process (CTL)</Button>
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }} title="Process (CTL)">CTL</Button>
                             )}
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
-                              <ArrowRightCircle className="h-3.5 w-3.5" /> Move to FG
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5" onClick={(e) => { e.stopPropagation(); handleMoveToFG(); }} title="Move to FG without processing">
+                              <ArrowRightCircle className="h-3 w-3" /> FG
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }} title="Mark as defective">
-                              <AlertTriangle className="h-3.5 w-3.5" /> Defective
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }} title="Mark as defective">
+                              <AlertTriangle className="h-3 w-3" /> Def
                             </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 gap-1" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
-                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
+                              <Pencil className="h-3 w-3" />
                             </Button>
                             {isAdmin && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-warning" onClick={async (e) => {
                                 e.stopPropagation();
                                 if (!confirm(`Request to move this WIP item (${availQty.toFixed(2)} Kg) back to Coil Inventory?`)) return;
                                 try {
@@ -409,16 +435,15 @@ export default function WIPInventoryTab() {
                                   toast.success('Move-back request submitted for approval');
                                 } catch { toast.error('Failed to submit request'); }
                               }} title="Move back to Coil Inventory" disabled={submitApproval.isPending}>
-                                <Undo2 className="h-3.5 w-3.5" /> Move Back
+                                <Undo2 className="h-3 w-3" />
                               </Button>
                             )}
                             {isAdmin && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 gap-1 text-destructive hover:bg-destructive/10" onClick={async (e) => {
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-destructive" onClick={async (e) => {
                                 e.stopPropagation();
                                 if (!confirm(`Delete this WIP item (${item.qty?.toFixed(2)} Kg)? Quantity will be restored to the source coil.`)) return;
                                 try {
                                   const procRecId = item.processing_record_id;
-                                  // Delete related defectives first (FK constraint)
                                   await supabase.from('wip_defectives' as any).delete().eq('wip_item_id', item.id);
                                   const { error } = await supabase.from('wip_items').delete().eq('id', item.id);
                                   if (error) throw error;
@@ -450,7 +475,7 @@ export default function WIPInventoryTab() {
                                   toast.error(err.message || 'Failed to delete');
                                 }
                               }} title="Delete WIP item">
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             )}
                           </div>
