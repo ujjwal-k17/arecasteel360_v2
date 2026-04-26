@@ -371,9 +371,9 @@ export default function CoilsInventoryTab() {
   };
 
   const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
-  // SKU summary: removed Form column
-  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Usable Qty (Kg)', 'Total Inv (Kg)', 'Avg Ageing'];
-  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Ageing', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  // SKU summary: Total Net Weight replaces Usable Qty
+  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating / Grade', 'Total Net Wt (Kg)', 'Total Inv (Kg)', 'Avg Ageing'];
+  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating / Grade', 'Gross / Net Wt', 'Coil No', 'Purchase From / Date', 'Ageing', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
