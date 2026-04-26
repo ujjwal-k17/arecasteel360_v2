@@ -470,7 +470,7 @@ export default function CoilsInventoryTab() {
         <Table>
           <TableHeader>
             <TableRow className="bg-[hsl(var(--sku-row))]">
-              {skuCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+              {skuCols.map(c => <TableHead key={c} className="text-xs font-semibold whitespace-normal break-words leading-tight px-2">{c}</TableHead>)}
             </TableRow>
           </TableHeader>
           <TableBody>
