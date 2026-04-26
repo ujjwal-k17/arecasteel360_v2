@@ -491,7 +491,7 @@ export default function CoilsInventoryTab() {
                   </TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalNetWeight)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} days` : '-'}</TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} D` : '-'}</TableCell>
                 </TableRow>
                 {expandedSKU === g.key && (
                   <TableRow key={`${g.key}-detail`}>
@@ -571,7 +571,7 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm">
                                       <div className="leading-tight"><div>{b.purchase_from || '-'}</div><div className="text-muted-foreground">{b.purchase_date ? (() => { const d = new Date(b.purchase_date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getFullYear()).slice(-2)}`; })() : '-'}</div></div>
                                     </TableCell>
-                                    <TableCell className="text-sm font-mono-num">{(() => { const a = calcAgeingDays(b.purchase_date); return a != null ? `${a} days` : '-'; })()}</TableCell>
+                                    <TableCell className="text-sm font-mono-num">{(() => { const a = calcAgeingDays(b.purchase_date); return a != null ? `${a} D` : '-'; })()}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
