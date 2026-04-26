@@ -259,40 +259,10 @@ export default function DashboardTab() {
 
   return (
     <div className="space-y-6">
-      {/* === Executive Summary Header === */}
-      <div className="rounded-xl border bg-gradient-to-br from-card to-muted/20 p-5 shadow-sm">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <div>
-            <h2 className="text-lg font-bold tracking-tight">Inventory Snapshot</h2>
-            <p className="text-xs text-muted-foreground">As of {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-          </div>
-          <div className="flex items-center gap-3 text-xs flex-wrap">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Coils:</span>
-              <span className="font-bold font-mono-num">{Math.round(coils.totalAvgAge)} D</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">WIP:</span>
-              <span className="font-bold font-mono-num">{Math.round(wip.totalAvgAge)} D</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">FG:</span>
-              <span className="font-bold font-mono-num">{Math.round(fg.totalAvgAge)} D</span>
-            </div>
-            <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </Button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard icon={<Package className="h-4 w-4" />} label="In-Transit" value={fmt(inTransit.total)} unit="Kg" sub={`${inTransit.totalCount} coils`} tone="blue" />
-          <KpiCard icon={<Warehouse className="h-4 w-4" />} label="Coils Inventory" value={fmt(coils.total)} unit="Kg" sub={`${coils.byMat.reduce((s, g) => s + g.count, 0)} coils`} tone="indigo" />
-          <KpiCard icon={<Layers className="h-4 w-4" />} label="WIP" value={fmt(wip.total)} unit="Kg" sub={`${wip.totalCount} items`} tone="amber" />
-          <KpiCard icon={<CheckCircle className="h-4 w-4" />} label="Finished Goods" value={fmt(fg.total)} unit="Kg" sub={`${fg.totalCount} items`} tone="emerald" />
-        </div>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={refreshAll} className="gap-2 h-8">
+          <RefreshCw className="h-3.5 w-3.5" /> Refresh
+        </Button>
       </div>
 
       {/* === Inventory by Material — 4 panels === */}
@@ -305,18 +275,21 @@ export default function DashboardTab() {
           />
           <MaterialPanel
             icon={<Warehouse className="h-4 w-4" />} title="Coils Inventory" tone="indigo"
-            rows={coils.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} coils` }))}
+            rows={coils.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} coils`, age: g.avgAge }))}
             total={coils.total} totalLabel={`${coils.byMat.reduce((s, g) => s + g.count, 0)} coils`}
+            avgAge={coils.totalAvgAge}
           />
           <MaterialPanel
             icon={<Layers className="h-4 w-4" />} title="WIP" tone="amber"
-            rows={wip.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items` }))}
+            rows={wip.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items`, age: g.avgAge }))}
             total={wip.total} totalLabel={`${wip.totalCount} items`}
+            avgAge={wip.totalAvgAge}
           />
           <MaterialPanel
             icon={<CheckCircle className="h-4 w-4" />} title="Finished Goods" tone="emerald"
-            rows={fg.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items` }))}
+            rows={fg.byMat.map(g => ({ label: g.material, qty: g.qty, extra: `${g.count} items`, age: g.avgAge }))}
             total={fg.total} totalLabel={`${fg.totalCount} items`}
+            avgAge={fg.totalAvgAge}
           />
         </div>
       </Section>
