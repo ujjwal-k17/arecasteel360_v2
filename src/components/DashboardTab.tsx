@@ -92,6 +92,8 @@ export default function DashboardTab() {
     toast.success('Dashboard refreshed');
   };
 
+  const [drill, setDrill] = useState<{ stage: string; material: string; bucket: AgeBucket; items: DrillItem[] } | null>(null);
+
   const allBatches = batches || [];
   const allActions = (actions || []) as any[];
   const allActionsTyped = allActions as InventoryAction[];
