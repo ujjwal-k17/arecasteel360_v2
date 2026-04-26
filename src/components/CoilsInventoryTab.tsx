@@ -372,8 +372,8 @@ export default function CoilsInventoryTab() {
 
   const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
   // SKU summary: Total Net Weight replaces Usable Qty
-  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating / Grade', 'Total Balance Qty', 'Avg Ageing'];
-  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating / Grade', 'Net / Gross Wt', 'Coil No', 'Purchase From / Date', 'Ageing', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Total Balance Qty', 'Avg Ageing'];
+  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Net / Gross Wt', 'Coil No', 'Purchase From / Date', 'Ageing', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
@@ -486,9 +486,8 @@ export default function CoilsInventoryTab() {
                   <TableCell className="text-sm font-mono-num">{g.thickness ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.width ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
-                  <TableCell className="text-sm">
-                    <div className="leading-tight"><div>{g.coating || '-'}</div><div className="text-muted-foreground">{g.grade || '-'}</div></div>
-                  </TableCell>
+                  <TableCell className="text-sm">{g.coating || '-'}</TableCell>
+                  <TableCell className="text-sm">{g.grade || '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} D` : '-'}</TableCell>
                 </TableRow>
@@ -532,9 +531,8 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
-                                    <TableCell className="text-sm">
-                                      <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-muted-foreground">{b.grade || '-'}</div></div>
-                                    </TableCell>
+                                    <TableCell className="text-sm">{b.coating || '-'}</TableCell>
+                                    <TableCell className="text-sm">{b.grade || '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">
                                       <div className="leading-tight"><div>{b.net_weight ?? '-'}</div><div className="text-muted-foreground">{b.gross_weight ?? '-'}</div></div>
                                     </TableCell>
