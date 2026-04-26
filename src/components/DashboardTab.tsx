@@ -518,7 +518,7 @@ export default function DashboardTab() {
       </Section>
 
       {/* === Production Summary (current month) === */}
-      <Section title="Production Summary · This Month" subtitle="Input quantity processed split by process type">
+      <Section title={`Production Summary · ${monthLabel}`} subtitle="Input quantity processed split by process type">
         <div className="rounded-lg border bg-card overflow-hidden">
           <Table>
             <TableHeader>
