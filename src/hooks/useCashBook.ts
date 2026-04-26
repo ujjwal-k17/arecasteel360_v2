@@ -61,21 +61,32 @@ export function useUpdateCashEntry() {
   });
 }
 
-export function useCashCategories() {
+export function useCashCategories(direction: 'in' | 'out' = 'in') {
+  const catCategory = direction === 'in' ? 'cash_in_category' : 'cash_out_category';
+  const subCategory = direction === 'in' ? 'cash_in_subcategory' : 'cash_out_subcategory';
+  // Include legacy categories as fallback so existing data still works
+  const legacyCat = 'cash_category';
+  const legacySub = 'cash_subcategory';
   return useQuery({
-    queryKey: ['dropdown_options', 'cash'],
+    queryKey: ['dropdown_options', 'cash', direction],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dropdown_options')
         .select('*')
-        .in('category', ['cash_category', 'cash_subcategory'])
+        .in('category', [catCategory, subCategory, legacyCat, legacySub])
         .eq('is_active', true)
         .order('sort_order')
         .order('value');
       if (error) throw error;
-      const categories = (data || []).filter((o: any) => o.category === 'cash_category').map((o: any) => o.value);
+      const rows = data || [];
+      let categories = rows.filter((o: any) => o.category === catCategory).map((o: any) => o.value);
+      if (categories.length === 0) {
+        categories = rows.filter((o: any) => o.category === legacyCat).map((o: any) => o.value);
+      }
       const subByParent: Record<string, string[]> = {};
-      (data || []).filter((o: any) => o.category === 'cash_subcategory').forEach((o: any) => {
+      const subRows = rows.filter((o: any) => o.category === subCategory);
+      const useSubRows = subRows.length > 0 ? subRows : rows.filter((o: any) => o.category === legacySub);
+      useSubRows.forEach((o: any) => {
         const key = o.parent_value || '_';
         if (!subByParent[key]) subByParent[key] = [];
         subByParent[key].push(o.value);
