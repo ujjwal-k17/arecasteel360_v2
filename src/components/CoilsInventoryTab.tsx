@@ -575,7 +575,8 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <div className="flex gap-1">
+                                      <div className="flex flex-col gap-1 items-stretch min-w-[110px]">
+                                        <div className="flex flex-col gap-1">
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
                                             <Button
