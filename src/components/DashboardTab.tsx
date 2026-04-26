@@ -97,7 +97,7 @@ export default function DashboardTab() {
   // ---------- Coils by Material (with weighted avg ageing) ----------
   const coils = useMemo(() => {
     const received = allBatches.filter(b => b.status === 'received');
-    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0;
 
     for (const b of received) {
@@ -105,7 +105,7 @@ export default function DashboardTab() {
       const usable = calcUsableBalanceQty(b, allActionsTyped, allProcRecords);
       if (usable <= 0) continue;
       const age = ageingDays(b.purchase_date);
-      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0, b0: 0, b1: 0, b2: 0, b3: 0 });
       const g = map.get(mat)!;
       g.qty += usable;
       g.count++;
@@ -115,6 +115,10 @@ export default function DashboardTab() {
         g.ageBase += usable;
         grandAgeW += age * usable;
         grandAgeBase += usable;
+        if (age <= 30) g.b0 += usable;
+        else if (age <= 60) g.b1 += usable;
+        else if (age <= 90) g.b2 += usable;
+        else g.b3 += usable;
       }
     }
 
@@ -132,19 +136,23 @@ export default function DashboardTab() {
     for (const d of (wipDefectives || [])) {
       wipDefByItem.set(d.wip_item_id, (wipDefByItem.get(d.wip_item_id) || 0) + (d.quantity || 0));
     }
-    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
     for (const i of items as any[]) {
       const qty = Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0));
       if (qty <= 0) continue;
       const mat = i.material || '—';
       const age = ageingDays(i.created_at);
-      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0, b0: 0, b1: 0, b2: 0, b3: 0 });
       const g = map.get(mat)!;
       g.qty += qty; g.count++; grandQty += qty; totalCount++;
       if (age != null) {
         g.ageWeighted += age * qty; g.ageBase += qty;
         grandAgeW += age * qty; grandAgeBase += qty;
+        if (age <= 30) g.b0 += qty;
+        else if (age <= 60) g.b1 += qty;
+        else if (age <= 90) g.b2 += qty;
+        else g.b3 += qty;
       }
     }
     const byMat = Array.from(map.values())
@@ -165,19 +173,23 @@ export default function DashboardTab() {
     for (const d of (fgDefectives || [])) {
       defByItem.set(d.fg_item_id, (defByItem.get(d.fg_item_id) || 0) + (d.quantity || 0));
     }
-    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
     for (const i of items as any[]) {
       const qty = Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0));
       if (qty <= 0) continue;
       const mat = i.material || '—';
       const age = ageingDays(i.created_at);
-      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0, b0: 0, b1: 0, b2: 0, b3: 0 });
       const g = map.get(mat)!;
       g.qty += qty; g.count++; grandQty += qty; totalCount++;
       if (age != null) {
         g.ageWeighted += age * qty; g.ageBase += qty;
         grandAgeW += age * qty; grandAgeBase += qty;
+        if (age <= 30) g.b0 += qty;
+        else if (age <= 60) g.b1 += qty;
+        else if (age <= 90) g.b2 += qty;
+        else g.b3 += qty;
       }
     }
     const byMat = Array.from(map.values())
@@ -468,12 +480,16 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
   title: string;
   qtyLabel: string;
   countLabel: string;
-  rows: { material: string; qty: number; count: number; avgAge: number }[];
+  rows: { material: string; qty: number; count: number; avgAge: number; b0: number; b1: number; b2: number; b3: number }[];
   total: number;
   totalAvgAge: number;
   emptyMsg: string;
 }) {
   const totalCount = rows.reduce((s, g) => s + g.count, 0);
+  const tot = rows.reduce(
+    (s, g) => ({ b0: s.b0 + g.b0, b1: s.b1 + g.b1, b2: s.b2 + g.b2, b3: s.b3 + g.b3 }),
+    { b0: 0, b1: 0, b2: 0, b3: 0 }
+  );
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-3 py-2 bg-muted/40 border-b">
@@ -486,37 +502,38 @@ function AgeingTable({ title, qtyLabel, countLabel, rows, total, totalAvgAge, em
             <TableHead className="text-[11px] font-semibold text-right">{qtyLabel}</TableHead>
             <TableHead className="text-[11px] font-semibold text-right">{countLabel}</TableHead>
             <TableHead className="text-[11px] font-semibold text-right">Avg Ageing</TableHead>
-            <TableHead className="text-[11px] font-semibold w-24">Profile</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">≤30 D</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">31–60 D</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">61–90 D</TableHead>
+            <TableHead className="text-[11px] font-semibold text-right">&gt;90 D</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length === 0 && (
-            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-6">{emptyMsg}</TableCell></TableRow>
+            <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground text-xs py-6">{emptyMsg}</TableCell></TableRow>
           )}
-          {rows.map(g => {
-            const tone = g.avgAge > 90 ? 'bg-destructive' : g.avgAge > 60 ? 'bg-amber-500' : g.avgAge > 30 ? 'bg-yellow-400' : 'bg-emerald-500';
-            const widthPct = Math.min(100, (g.avgAge / 120) * 100);
-            return (
-              <TableRow key={g.material}>
-                <TableCell className="text-xs font-medium">{g.material}</TableCell>
-                <TableCell className="text-xs font-mono-num text-right">{fmtNum(g.qty)}</TableCell>
-                <TableCell className="text-xs font-mono-num text-right">{g.count}</TableCell>
-                <TableCell className="text-xs font-mono-num font-semibold text-right">{Math.round(g.avgAge)} D</TableCell>
-                <TableCell>
-                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full ${tone}`} style={{ width: `${widthPct}%` }} />
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
+          {rows.map(g => (
+            <TableRow key={g.material}>
+              <TableCell className="text-xs font-medium">{g.material}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{fmtNum(g.qty)}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{g.count}</TableCell>
+              <TableCell className="text-xs font-mono-num font-semibold text-right">{Math.round(g.avgAge)} D</TableCell>
+              <TableCell className="text-xs font-mono-num text-right text-emerald-600 dark:text-emerald-400">{g.b0 > 0 ? fmtNum(g.b0) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right text-yellow-600 dark:text-yellow-400">{g.b1 > 0 ? fmtNum(g.b1) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right text-amber-600 dark:text-amber-400">{g.b2 > 0 ? fmtNum(g.b2) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right text-destructive">{g.b3 > 0 ? fmtNum(g.b3) : '—'}</TableCell>
+            </TableRow>
+          ))}
           {rows.length > 0 && (
             <TableRow className="bg-muted/30 font-bold border-t-2">
               <TableCell className="text-xs">Total</TableCell>
               <TableCell className="text-xs font-mono-num text-right">{fmtNum(total)}</TableCell>
               <TableCell className="text-xs font-mono-num text-right">{totalCount}</TableCell>
               <TableCell className="text-xs font-mono-num text-right">{Math.round(totalAvgAge)} D</TableCell>
-              <TableCell />
+              <TableCell className="text-xs font-mono-num text-right">{tot.b0 > 0 ? fmtNum(tot.b0) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{tot.b1 > 0 ? fmtNum(tot.b1) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{tot.b2 > 0 ? fmtNum(tot.b2) : '—'}</TableCell>
+              <TableCell className="text-xs font-mono-num text-right">{tot.b3 > 0 ? fmtNum(tot.b3) : '—'}</TableCell>
             </TableRow>
           )}
         </TableBody>
