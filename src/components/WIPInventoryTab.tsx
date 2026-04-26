@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { RefreshCw, ChevronRight, ChevronDown, Trash2, Undo2, ArrowRightCircle, AlertTriangle, Pencil } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, Trash2, Undo2, ArrowRightCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import WIPProcessingDialog from './WIPProcessingDialog';
 import BulkWIPProcessingDialog from './BulkWIPProcessingDialog';
