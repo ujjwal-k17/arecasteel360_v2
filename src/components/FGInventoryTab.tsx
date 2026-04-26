@@ -479,20 +479,20 @@ export default function FGInventoryTab() {
       </div>
 
       <div className="overflow-x-auto rounded-md border bg-card">
-        <Table>
+        <Table className="[&_td]:px-2 [&_th]:px-2">
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold w-8" />
               <TableHead className="text-xs font-semibold w-8" />
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Material</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Process</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Dimensions</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Coating</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Grade</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Qty (Kg)</TableHead>
-              
-              <TableHead className="text-xs font-semibold whitespace-nowrap"># Pallets</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-nowrap">Actions</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Material</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Process</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Dimensions</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Coating</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Grade</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Qty (Kg)</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Ageing</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight"># Pallets</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Actions</TableHead>
             </TableRow>
             <TableRow className="bg-muted/20">
               <TableHead />
