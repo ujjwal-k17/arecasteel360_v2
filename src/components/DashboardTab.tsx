@@ -88,7 +88,7 @@ export default function DashboardTab() {
   });
   const { data: ordersData } = useQuery({
     queryKey: ['dashboard_orders'],
-    queryFn: async () => ((await supabase.from('orders').select('*, customers(customer_type), order_items(net_weight)')).data || []) as any[],
+    queryFn: async () => ((await supabase.from('orders').select('*, customers(customer_type), order_items(id, net_weight)')).data || []) as any[],
   });
   const { data: dispatchesData } = useQuery({
     queryKey: ['dashboard_dispatches'],
@@ -329,19 +329,34 @@ export default function DashboardTab() {
     };
     const orderQty = (o: any) => (o.order_items || []).reduce((s: number, it: any) => s + (Number(it.net_weight) || 0), 0);
 
+    // Dispatched qty per order_item_id
+    const dispatchedByItem = new Map<string, number>();
+    for (const d of (dispatchesData || [])) {
+      const k = (d as any).order_item_id;
+      if (!k) continue;
+      dispatchedByItem.set(k, (dispatchedByItem.get(k) || 0) + (Number((d as any).dispatch_qty) || 0));
+    }
+    const orderBalanceQty = (o: any) => (o.order_items || []).reduce((s: number, it: any) => {
+      const ordered = Number(it.net_weight) || 0;
+      const dispatched = dispatchedByItem.get(it.id) || 0;
+      return s + Math.max(0, ordered - dispatched);
+    }, 0);
+
     let openOEMQty = 0, openOEMCount = 0;
     let openTradeQty = 0, openTradeCount = 0;
     let monthOrderQty = 0, monthOrderCount = 0;
 
     for (const o of (ordersData || [])) {
-      const qty = orderQty(o);
       if ((o.status || 'open') === 'open') {
-        const type = (o.customers?.customer_type || '').toLowerCase();
-        if (type === 'oem') { openOEMQty += qty; openOEMCount++; }
-        else { openTradeQty += qty; openTradeCount++; }
+        const balQty = orderBalanceQty(o);
+        if (balQty > 0) {
+          const type = (o.customers?.customer_type || '').toLowerCase();
+          if (type === 'oem') { openOEMQty += balQty; openOEMCount++; }
+          else { openTradeQty += balQty; openTradeCount++; }
+        }
       }
       if (inMonth(o.order_date)) {
-        monthOrderQty += qty; monthOrderCount++;
+        monthOrderQty += orderQty(o); monthOrderCount++;
       }
     }
 
