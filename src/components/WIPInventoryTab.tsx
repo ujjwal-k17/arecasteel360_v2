@@ -417,9 +417,6 @@ export default function WIPInventoryTab() {
                             <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5 text-destructive" onClick={(e) => { e.stopPropagation(); setDefectDialog(item); }} title="Mark as defective">
                               <AlertTriangle className="h-3 w-3" /> Def
                             </Button>
-                            <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setEditItem(item); }} title="Edit item">
-                              <Pencil className="h-3 w-3" />
-                            </Button>
                             {isAdmin && (
                               <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 text-warning" onClick={async (e) => {
                                 e.stopPropagation();
