@@ -110,6 +110,7 @@ export default function DashboardTab() {
   const coils = useMemo(() => {
     const received = allBatches.filter(b => b.status === 'received');
     const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
+    const items: DrillItem[] = [];
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0;
 
     for (const b of received) {
@@ -131,6 +132,14 @@ export default function DashboardTab() {
         else if (age <= 60) g.b1 += usable;
         else if (age <= 90) g.b2 += usable;
         else g.b3 += usable;
+        items.push({
+          id: b.id,
+          ref: b.batch_number || b.coil_number || '—',
+          material: mat,
+          spec: [b.thickness && `${b.thickness}mm`, b.width && `${b.width}mm`, b.coating, b.grade].filter(Boolean).join(' · '),
+          qty: usable,
+          age,
+        });
       }
     }
 
@@ -138,7 +147,7 @@ export default function DashboardTab() {
       .map(g => ({ ...g, avgAge: g.ageBase > 0 ? g.ageWeighted / g.ageBase : 0 }))
       .sort((a, b) => b.qty - a.qty);
     const totalAvgAge = grandAgeBase > 0 ? grandAgeW / grandAgeBase : 0;
-    return { byMat, total: grandQty, totalAvgAge };
+    return { byMat, total: grandQty, totalAvgAge, items };
   }, [allBatches, allActionsTyped, allProcRecords]);
 
   // ---------- WIP by Material (qty - defectives, active only) ----------
