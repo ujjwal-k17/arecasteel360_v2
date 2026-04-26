@@ -86,6 +86,14 @@ export default function DashboardTab() {
     queryKey: ['defective_sales'],
     queryFn: async () => ((await supabase.from('defective_sales').select('*')).data || []) as any[],
   });
+  const { data: ordersData } = useQuery({
+    queryKey: ['dashboard_orders'],
+    queryFn: async () => ((await supabase.from('orders').select('*, customers(customer_type), order_items(net_weight)')).data || []) as any[],
+  });
+  const { data: dispatchesData } = useQuery({
+    queryKey: ['dashboard_dispatches'],
+    queryFn: async () => ((await supabase.from('order_dispatches').select('*')).data || []) as any[],
+  });
 
   const refreshAll = () => {
     queryClient.invalidateQueries();
