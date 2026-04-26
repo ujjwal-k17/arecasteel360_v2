@@ -407,7 +407,7 @@ export default function WIPInventoryTab() {
                         <TableCell className="text-xs font-mono-num">{availQty.toFixed(2)}</TableCell>
                         <TableCell className="text-xs font-mono-num">{(() => { const a = calcAgeingDays(item.created_at); return a != null ? `${a} D` : '-'; })()}</TableCell>
                         <TableCell>
-                          <div className="grid grid-cols-2 gap-1 max-w-[180px]">
+                          <div className="grid grid-cols-3 gap-1 max-w-[200px]">
                             {canProcess && (
                               <Button size="sm" variant="outline" className="text-[10px] h-6 px-1" onClick={(e) => { e.stopPropagation(); setProcessingItem(item); }} title="Process (CTL)">CTL</Button>
                             )}
