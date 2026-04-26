@@ -371,9 +371,9 @@ export default function CoilsInventoryTab() {
   };
 
   const filterFields = ['material', 'make', 'thickness', 'width', 'coating', 'grade'];
-  // SKU summary: removed Form column
-  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating', 'Grade', 'Usable Qty (Kg)', 'Total Inv (Kg)', 'Avg Ageing'];
-  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating', 'Grade', 'Gross Wt', 'Net Wt', 'Coil No', 'Purchase Date', 'Ageing', 'Purchase From', 'Balance Qty', 'Usable Bal Qty', 'Action'];
+  // SKU summary: Total Net Weight replaces Usable Qty
+  const skuCols = ['', 'Material', 'Make', 'Thickness', 'Width', 'Length', 'Coating / Grade', 'Total Net Wt (Kg)', 'Total Inv (Kg)', 'Avg Ageing'];
+  const batchCols = ['', 'Material', 'Make', 'Status', 'Batch No', 'Thickness', 'Width', 'Coating / Grade', 'Gross / Net Wt', 'Coil No', 'Purchase From / Date', 'Ageing', 'Balance Qty', 'Usable Bal Qty', 'Action'];
 
   return (
     <div className="space-y-4">
@@ -486,9 +486,10 @@ export default function CoilsInventoryTab() {
                   <TableCell className="text-sm font-mono-num">{g.thickness ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.width ?? '-'}</TableCell>
                   <TableCell className="text-sm font-mono-num">{g.length ?? '-'}</TableCell>
-                  <TableCell className="text-sm">{g.coating || '-'}</TableCell>
-                  <TableCell className="text-sm">{g.grade || '-'}</TableCell>
-                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalUsableQty)}</TableCell>
+                  <TableCell className="text-sm">
+                    <div className="leading-tight"><div>{g.coating || '-'}</div><div className="text-xs text-muted-foreground">{g.grade || '-'}</div></div>
+                  </TableCell>
+                  <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalNetWeight)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalBalanceQty)}</TableCell>
                   <TableCell className="text-sm font-mono-num font-semibold">{g.weightedAvgAgeing > 0 ? `${Math.round(g.weightedAvgAgeing)} days` : '-'}</TableCell>
                 </TableRow>
@@ -532,10 +533,12 @@ export default function CoilsInventoryTab() {
                                     <TableCell className="text-sm font-semibold">{b.batch_number}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.thickness ?? '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num">{b.width ?? '-'}</TableCell>
-                                    <TableCell className="text-sm">{b.coating || '-'}</TableCell>
-                                    <TableCell className="text-sm">{b.grade || '-'}</TableCell>
-                                    <TableCell className="text-sm font-mono-num">{b.gross_weight ?? '-'}</TableCell>
-                                    <TableCell className="text-sm font-mono-num">{b.net_weight ?? '-'}</TableCell>
+                                    <TableCell className="text-sm">
+                                      <div className="leading-tight"><div>{b.coating || '-'}</div><div className="text-xs text-muted-foreground">{b.grade || '-'}</div></div>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-mono-num">
+                                      <div className="leading-tight"><div>{b.gross_weight ?? '-'}</div><div className="text-xs text-muted-foreground">{b.net_weight ?? '-'}</div></div>
+                                    </TableCell>
                                     <TableCell className="text-sm">
                                       {editingCoilNumber === b.id ? (
                                         <Input
@@ -565,9 +568,10 @@ export default function CoilsInventoryTab() {
                                         </span>
                                       )}
                                     </TableCell>
-                                    <TableCell className="text-sm">{b.purchase_date || '-'}</TableCell>
+                                    <TableCell className="text-sm">
+                                      <div className="leading-tight"><div>{b.purchase_from || '-'}</div><div className="text-xs text-muted-foreground">{b.purchase_date || '-'}</div></div>
+                                    </TableCell>
                                     <TableCell className="text-sm font-mono-num">{(() => { const a = calcAgeingDays(b.purchase_date); return a != null ? `${a} days` : '-'; })()}</TableCell>
-                                    <TableCell className="text-sm">{b.purchase_from || '-'}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{usableQty.toFixed(2)}</TableCell>
                                     <TableCell>
