@@ -569,7 +569,7 @@ export default function CoilsInventoryTab() {
                                       )}
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                      <div className="leading-tight"><div>{b.purchase_from || '-'}</div><div className="text-muted-foreground">{b.purchase_date || '-'}</div></div>
+                                      <div className="leading-tight"><div>{b.purchase_from || '-'}</div><div className="text-muted-foreground">{b.purchase_date ? (() => { const d = new Date(b.purchase_date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getFullYear()).slice(-2)}`; })() : '-'}</div></div>
                                     </TableCell>
                                     <TableCell className="text-sm font-mono-num">{(() => { const a = calcAgeingDays(b.purchase_date); return a != null ? `${a} days` : '-'; })()}</TableCell>
                                     <TableCell className="text-sm font-mono-num font-semibold">{balanceQty.toFixed(2)}</TableCell>
