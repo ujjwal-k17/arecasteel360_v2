@@ -355,6 +355,18 @@ const TONE_MAP: Record<string, { bg: string; ring: string; text: string; bar: st
   slate:   { bg: 'bg-slate-50 dark:bg-slate-950/30',     ring: 'ring-slate-200 dark:ring-slate-800',     text: 'text-slate-700 dark:text-slate-300',     bar: 'bg-slate-500' },
 };
 
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className="mb-3">
+        <h3 className="text-base font-bold tracking-tight">{title}</h3>
+        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function MaterialPanel({ icon, title, tone, rows, total, totalLabel, avgAge }: {
   icon: React.ReactNode; title: string; tone: string;
   rows: { label: string; qty: number; extra?: string; age?: number }[];
