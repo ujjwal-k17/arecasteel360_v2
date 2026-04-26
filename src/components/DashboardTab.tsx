@@ -97,7 +97,7 @@ export default function DashboardTab() {
   // ---------- Coils by Material (with weighted avg ageing) ----------
   const coils = useMemo(() => {
     const received = allBatches.filter(b => b.status === 'received');
-    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0;
 
     for (const b of received) {
@@ -105,7 +105,7 @@ export default function DashboardTab() {
       const usable = calcUsableBalanceQty(b, allActionsTyped, allProcRecords);
       if (usable <= 0) continue;
       const age = ageingDays(b.purchase_date);
-      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0, b0: 0, b1: 0, b2: 0, b3: 0 });
       const g = map.get(mat)!;
       g.qty += usable;
       g.count++;
@@ -115,6 +115,10 @@ export default function DashboardTab() {
         g.ageBase += usable;
         grandAgeW += age * usable;
         grandAgeBase += usable;
+        if (age <= 30) g.b0 += usable;
+        else if (age <= 60) g.b1 += usable;
+        else if (age <= 90) g.b2 += usable;
+        else g.b3 += usable;
       }
     }
 
@@ -132,19 +136,23 @@ export default function DashboardTab() {
     for (const d of (wipDefectives || [])) {
       wipDefByItem.set(d.wip_item_id, (wipDefByItem.get(d.wip_item_id) || 0) + (d.quantity || 0));
     }
-    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
     for (const i of items as any[]) {
       const qty = Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0));
       if (qty <= 0) continue;
       const mat = i.material || '—';
       const age = ageingDays(i.created_at);
-      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0, b0: 0, b1: 0, b2: 0, b3: 0 });
       const g = map.get(mat)!;
       g.qty += qty; g.count++; grandQty += qty; totalCount++;
       if (age != null) {
         g.ageWeighted += age * qty; g.ageBase += qty;
         grandAgeW += age * qty; grandAgeBase += qty;
+        if (age <= 30) g.b0 += qty;
+        else if (age <= 60) g.b1 += qty;
+        else if (age <= 90) g.b2 += qty;
+        else g.b3 += qty;
       }
     }
     const byMat = Array.from(map.values())
@@ -165,19 +173,23 @@ export default function DashboardTab() {
     for (const d of (fgDefectives || [])) {
       defByItem.set(d.fg_item_id, (defByItem.get(d.fg_item_id) || 0) + (d.quantity || 0));
     }
-    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number }>();
+    const map = new Map<string, { material: string; qty: number; count: number; ageWeighted: number; ageBase: number; b0: number; b1: number; b2: number; b3: number }>();
     let grandQty = 0, grandAgeW = 0, grandAgeBase = 0, totalCount = 0;
     for (const i of items as any[]) {
       const qty = Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0));
       if (qty <= 0) continue;
       const mat = i.material || '—';
       const age = ageingDays(i.created_at);
-      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0 });
+      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0, ageWeighted: 0, ageBase: 0, b0: 0, b1: 0, b2: 0, b3: 0 });
       const g = map.get(mat)!;
       g.qty += qty; g.count++; grandQty += qty; totalCount++;
       if (age != null) {
         g.ageWeighted += age * qty; g.ageBase += qty;
         grandAgeW += age * qty; grandAgeBase += qty;
+        if (age <= 30) g.b0 += qty;
+        else if (age <= 60) g.b1 += qty;
+        else if (age <= 90) g.b2 += qty;
+        else g.b3 += qty;
       }
     }
     const byMat = Array.from(map.values())
