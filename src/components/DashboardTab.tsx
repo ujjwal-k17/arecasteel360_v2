@@ -417,12 +417,13 @@ export default function DashboardTab() {
   return (
     <div className="space-y-6">
       {/* === Order Summary === */}
-      <Section title="Order Summary" subtitle="Snapshot of open orders & current-month activity">
+      {(() => null)()}
+      <Section title="Order Summary" subtitle={`Snapshot of open orders & ${monthLabel} activity`}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <StatCard tone="indigo" label="Open Orders · OEM" value={orderSummary.openOEMQty} unit="Kg" sub={`${orderSummary.openOEMCount} orders`} />
           <StatCard tone="blue" label="Open Orders · Trade" value={orderSummary.openTradeQty} unit="Kg" sub={`${orderSummary.openTradeCount} orders`} />
-          <StatCard tone="amber" label="Orders · This Month" value={orderSummary.monthOrderQty} unit="Kg" sub={`${orderSummary.monthOrderCount} orders`} />
-          <StatCard tone="emerald" label="Dispatches · This Month" value={orderSummary.monthDispatchQty} unit="Kg" sub={`${orderSummary.monthDispatchCount} dispatches`} />
+          <StatCard tone="amber" label={`Orders · ${monthLabel}`} value={orderSummary.monthOrderQty} unit="Kg" sub={`${orderSummary.monthOrderCount} orders`} />
+          <StatCard tone="emerald" label={`Dispatches · ${monthLabel}`} value={orderSummary.monthDispatchQty} unit="Kg" sub={`${orderSummary.monthDispatchCount} dispatches`} />
         </div>
       </Section>
 
