@@ -125,19 +125,39 @@ export default function DashboardTab() {
     return { byMat, total: grandQty, totalAvgAge };
   }, [allBatches, allActionsTyped, allProcRecords]);
 
-  // ---------- WIP by Material ----------
+  // ---------- WIP by Material (qty - defectives, active only) ----------
   const wip = useMemo(() => {
-    const items = wipItems || [];
-    const byMat = groupByMaterial(items, i => i.material || '', i => i.qty || 0);
-    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: items.length };
-  }, [wipItems]);
+    const items = (wipItems || []).filter((i: any) => (i.status || 'active') === 'active');
+    const wipDefByItem = new Map<string, number>();
+    for (const d of (wipDefectives || [])) {
+      wipDefByItem.set(d.wip_item_id, (wipDefByItem.get(d.wip_item_id) || 0) + (d.quantity || 0));
+    }
+    const enriched = items.map((i: any) => ({
+      material: i.material || '—',
+      qty: Math.max(0, (i.qty || 0) - (wipDefByItem.get(i.id) || 0)),
+    })).filter(i => i.qty > 0);
+    const byMat = groupByMaterial(enriched, i => i.material, i => i.qty);
+    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: enriched.length };
+  }, [wipItems, wipDefectives]);
 
-  // ---------- FG by Material ----------
+  // ---------- FG by Material (qty - sold - defective) ----------
   const fg = useMemo(() => {
     const items = fgItems || [];
-    const byMat = groupByMaterial(items, i => i.material || '', i => i.qty || 0);
-    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: items.length };
-  }, [fgItems]);
+    const soldByItem = new Map<string, number>();
+    for (const s of (fgSales || [])) {
+      soldByItem.set(s.fg_item_id, (soldByItem.get(s.fg_item_id) || 0) + (s.quantity || 0));
+    }
+    const defByItem = new Map<string, number>();
+    for (const d of (fgDefectives || [])) {
+      defByItem.set(d.fg_item_id, (defByItem.get(d.fg_item_id) || 0) + (d.quantity || 0));
+    }
+    const enriched = items.map((i: any) => ({
+      material: i.material || '—',
+      qty: Math.max(0, (i.qty || 0) - (soldByItem.get(i.id) || 0) - (defByItem.get(i.id) || 0)),
+    })).filter(i => i.qty > 0);
+    const byMat = groupByMaterial(enriched, i => i.material, i => i.qty);
+    return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0), totalCount: enriched.length };
+  }, [fgItems, fgSales, fgDefectives]);
 
   // ---------- Scrap by Material (unsold) ----------
   const scrap = useMemo(() => {
@@ -158,20 +178,41 @@ export default function DashboardTab() {
     return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0) };
   }, [allActions, scrapSales]);
 
-  // ---------- Defective by Material ----------
+  // ---------- Defective by Material (Coil + WIP + FG defectives, minus defective sales) ----------
   const defective = useMemo(() => {
-    const defActions = allActions.filter((a: any) => a.action_type === 'defective');
     const map = new Map<string, { material: string; qty: number; count: number }>();
-    for (const a of defActions) {
-      const mat = (a as any).batches?.material || '—';
-      if (!map.has(mat)) map.set(mat, { material: mat, qty: 0, count: 0 });
-      const g = map.get(mat)!;
-      g.qty += a.net_weight || 0;
+    const add = (mat: string, qty: number) => {
+      const m = mat || '—';
+      if (!map.has(m)) map.set(m, { material: m, qty: 0, count: 0 });
+      const g = map.get(m)!;
+      g.qty += qty;
       g.count++;
+    };
+    // Coil-level defectives
+    const defActions = allActions.filter((a: any) => a.action_type === 'defective');
+    for (const a of defActions) add((a as any).batches?.material || '—', a.net_weight || 0);
+    // WIP defectives
+    const wipById = new Map((wipItems || []).map((w: any) => [w.id, w]));
+    for (const d of (wipDefectives || [])) {
+      const w: any = wipById.get(d.wip_item_id);
+      if (w) add(w.material || '—', d.quantity || 0);
+    }
+    // FG defectives
+    const fgById = new Map((fgItems || []).map((f: any) => [f.id, f]));
+    for (const d of (fgDefectives || [])) {
+      const f: any = fgById.get(d.fg_item_id);
+      if (f) add(f.material || '—', d.quantity || 0);
+    }
+    // Subtract defective sales (matched by batch -> material)
+    const batchById = new Map((batches || []).map((b: any) => [b.id, b]));
+    for (const s of (defectiveSales || [])) {
+      const b: any = batchById.get(s.batch_id);
+      const mat = b?.material || '—';
+      if (map.has(mat)) map.get(mat)!.qty -= s.quantity || 0;
     }
     const byMat = Array.from(map.values()).filter(r => r.qty > 0).sort((a, b) => b.qty - a.qty);
     return { byMat, total: byMat.reduce((s, g) => s + g.qty, 0) };
-  }, [allActions]);
+  }, [allActions, wipDefectives, fgDefectives, wipItems, fgItems, defectiveSales, batches]);
 
   // ---------- Consumables (Pallets) ----------
   const consumables = useMemo(() => {
