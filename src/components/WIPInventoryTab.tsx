@@ -334,6 +334,8 @@ export default function WIPInventoryTab() {
               <TableHead><FilterSelect value={filterGrade} onChange={setFilterGrade} options={uniqueVals.grade} placeholder="Grade" /></TableHead>
               <TableHead />
               <TableHead />
+              <TableHead />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
