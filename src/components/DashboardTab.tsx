@@ -414,15 +414,20 @@ export default function DashboardTab() {
     return { rows, total, totalCount };
   }, [allProcRecords]);
 
+  const monthLabel = useMemo(() => {
+    const d = new Date();
+    return `${d.toLocaleString('en-US', { month: 'long' })} '${String(d.getFullYear()).slice(-2)}`;
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* === Order Summary === */}
-      <Section title="Order Summary" subtitle="Snapshot of open orders & current-month activity">
+      <Section title="Order Summary" subtitle={`Snapshot of open orders & ${monthLabel} activity`}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <StatCard tone="indigo" label="Open Orders · OEM" value={orderSummary.openOEMQty} unit="Kg" sub={`${orderSummary.openOEMCount} orders`} />
           <StatCard tone="blue" label="Open Orders · Trade" value={orderSummary.openTradeQty} unit="Kg" sub={`${orderSummary.openTradeCount} orders`} />
-          <StatCard tone="amber" label="Orders · This Month" value={orderSummary.monthOrderQty} unit="Kg" sub={`${orderSummary.monthOrderCount} orders`} />
-          <StatCard tone="emerald" label="Dispatches · This Month" value={orderSummary.monthDispatchQty} unit="Kg" sub={`${orderSummary.monthDispatchCount} dispatches`} />
+          <StatCard tone="amber" label={`Orders · ${monthLabel}`} value={orderSummary.monthOrderQty} unit="Kg" sub={`${orderSummary.monthOrderCount} orders`} />
+          <StatCard tone="emerald" label={`Dispatches · ${monthLabel}`} value={orderSummary.monthDispatchQty} unit="Kg" sub={`${orderSummary.monthDispatchCount} dispatches`} />
         </div>
       </Section>
 
@@ -513,7 +518,7 @@ export default function DashboardTab() {
       </Section>
 
       {/* === Production Summary (current month) === */}
-      <Section title="Production Summary · This Month" subtitle="Input quantity processed split by process type">
+      <Section title={`Production Summary · ${monthLabel}`} subtitle="Input quantity processed split by process type">
         <div className="rounded-lg border bg-card overflow-hidden">
           <Table>
             <TableHeader>
