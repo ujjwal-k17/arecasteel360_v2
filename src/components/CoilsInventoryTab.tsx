@@ -503,7 +503,7 @@ export default function CoilsInventoryTab() {
                               <TableHead className="w-10">
                                 <Checkbox checked={g.batches.length > 0 && g.batches.every(b => selectedBatchIds.has(b.id))} onCheckedChange={() => toggleSelectAllInSKU(g)} />
                               </TableHead>
-                              {batchCols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-nowrap">{c}</TableHead>)}
+                              {batchCols.slice(1).map(c => <TableHead key={c} className="text-xs font-semibold whitespace-normal break-words leading-tight px-2">{c}</TableHead>)}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
