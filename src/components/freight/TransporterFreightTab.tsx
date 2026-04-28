@@ -171,7 +171,7 @@ export function TransporterFreightTab() {
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No transporter freight records found.
                 </TableCell>
               </TableRow>
@@ -180,6 +180,7 @@ export function TransporterFreightTab() {
               <TableRow key={r.id}>
                 <TableCell className="text-sm text-muted-foreground">{idx + 1}</TableCell>
                 <TableCell className="text-sm font-medium">{r.invoice_number}</TableCell>
+                <TableCell className="text-sm">{r.lr_number || '-'}</TableCell>
                 <TableCell className="text-sm">{r.transporters?.name || '-'}</TableCell>
                 <TableCell className="text-sm font-mono-num">₹{(r.total_freight || 0).toLocaleString('en-IN')}</TableCell>
                 <TableCell className="text-sm">
