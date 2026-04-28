@@ -1403,11 +1403,17 @@ function TransporterDispatchTable({
                     <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
                     <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
                     <TableCell className="text-sm">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        s.source_type === 'purchase' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {s.source_type === 'purchase' ? 'Purchase' : 'Sales'}
-                      </span>
+                      {(() => {
+                        const label = s.source_type === 'manual'
+                          ? (s.trip_type || 'Sales')
+                          : (s.source_type === 'purchase' ? 'Purchase' : 'Sales');
+                        const cls = label === 'Purchase'
+                          ? 'bg-blue-100 text-blue-700'
+                          : label === 'Job Work'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-emerald-100 text-emerald-700';
+                        return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cls}`}>{label}</span>;
+                      })()}
                     </TableCell>
                     <TableCell className="text-sm">{freightData?.transporters?.name || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-sm">{freightData?.lr_number || <span className="text-muted-foreground">-</span>}</TableCell>
