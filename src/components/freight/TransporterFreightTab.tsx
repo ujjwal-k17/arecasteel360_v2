@@ -107,6 +107,7 @@ export function TransporterFreightTab() {
     const rows = filtered.map((r: any, i: number) => ({
       '#': i + 1,
       'Invoice Number': r.invoice_number,
+      'LR #': r.lr_number || '-',
       'Transporter': (r as any).transporters?.name || '-',
       'Total Freight (₹)': r.total_freight || 0,
       'Status': r.status,
