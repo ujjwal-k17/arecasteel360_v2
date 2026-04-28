@@ -1477,7 +1477,7 @@ function TransporterDispatchTable({
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
-                      <TableCell colSpan={11} className="bg-muted/30 p-4">
+                      <TableCell colSpan={12} className="bg-muted/30 p-4">
                         <div className="space-y-3">
                           {freightData?.lr_number && (
                             <div className="text-sm">
