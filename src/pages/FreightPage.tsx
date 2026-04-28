@@ -678,7 +678,7 @@ function FreightPage() {
               const { error } = await supabase.from('truck_trips').insert({
                 trip_id: tripId,
                 truck_number: 'Transporter',
-                trip_type: 'Sales',
+                trip_type: d.trip_type,
                 trip_date: d.trip_date,
                 document_number: docClean,
                 source_destination: d.source_destination,
