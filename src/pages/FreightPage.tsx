@@ -11,7 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, Download, Truck, ChevronDown, ChevronUp, Plus, IndianRupee } from 'lucide-react';
+import { RefreshCw, Download, Truck, ChevronDown, ChevronUp, Plus, IndianRupee, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { FreightDetailsDialog } from '@/components/freight/FreightDetailsDialog';
@@ -688,6 +689,17 @@ function FreightPage() {
               toast.success('Trip added');
               queryClient.invalidateQueries({ queryKey: ['manual_transporter_trips'] });
             }}
+            onDeleteManualTrip={async (documentNumber) => {
+              if (!isAdmin) { toast.error('Admin access required'); return; }
+              const { error } = await supabase
+                .from('truck_trips')
+                .delete()
+                .eq('truck_number', 'Transporter')
+                .eq('document_number', documentNumber);
+              if (error) { toast.error('Failed to delete trip'); return; }
+              toast.success('Trip deleted');
+              queryClient.invalidateQueries({ queryKey: ['manual_transporter_trips'] });
+            }}
           />
         </TabsContent>
 
@@ -1064,6 +1076,7 @@ function TransporterDispatchTable({
   onAddPayment,
   onDownload,
   onAddManualTrip,
+  onDeleteManualTrip,
 }: {
   data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   isAdmin: boolean;
@@ -1078,6 +1091,7 @@ function TransporterDispatchTable({
   onAddPayment: (freightId: string, invoiceNumber: string) => void;
   onDownload: () => void;
   onAddManualTrip: (data: { trip_type: string; trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
+  onDeleteManualTrip: (documentNumber: string) => Promise<void> | void;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [addTripOpen, setAddTripOpen] = useState(false);
@@ -1495,6 +1509,37 @@ function TransporterDispatchTable({
                           <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5 text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
                             ←
                           </Button>
+                          {isAdmin && s.source_type === 'manual' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete trip (admin only)"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete this trip?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove the manual transporter trip for document <span className="font-semibold">{s.invoice_number}</span>. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => onDeleteManualTrip(s.invoice_number)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </div>
                     </TableCell>
