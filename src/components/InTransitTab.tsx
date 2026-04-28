@@ -36,7 +36,10 @@ interface SKUGroup {
 }
 
 function getInTransitSKUKey(b: any): string {
-  return [b.material, b.make, b.form, b.thickness, b.width, b.length, b.coating, b.grade].map(v => String(v ?? '').toLowerCase()).join('|');
+  // Normalize: lowercase + collapse all whitespace so "GP 250" and "GP250",
+  // or "Pack Coil" and "Pack coil", group together.
+  const norm = (v: any) => String(v ?? '').toLowerCase().replace(/\s+/g, '');
+  return [b.material, b.make, b.form, b.thickness, b.width, b.length, b.coating, b.grade].map(norm).join('|');
 }
 
 export default function InTransitTab() {
