@@ -32,6 +32,7 @@ interface SKUGroup {
   totalQty: number;
   totalPcs: number;
   totalPallets: number;
+  palletTypes: Set<string>;
   items: any[];
 }
 
