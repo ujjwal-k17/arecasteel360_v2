@@ -1498,6 +1498,37 @@ function TransporterDispatchTable({
                           <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5 text-muted-foreground hover:text-foreground" onClick={() => onMoveBack(s.invoice_number)}>
                             ←
                           </Button>
+                          {isAdmin && s.source_type === 'manual' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete trip (admin only)"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete this trip?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove the manual transporter trip for document <span className="font-semibold">{s.invoice_number}</span>. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => onDeleteManualTrip(s.invoice_number)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </div>
                     </TableCell>
