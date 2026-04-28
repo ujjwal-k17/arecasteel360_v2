@@ -295,7 +295,7 @@ export default function FGInventoryTab() {
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, totalOriginalQty: 0, weightedAvgAgeing: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, palletTypes: new Set<string>(), totalOriginalQty: 0, weightedAvgAgeing: 0, items: [] });
         ageAcc.set(key, { wSum: 0, wTotal: 0 });
       }
       const g = map.get(key)!;
@@ -303,7 +303,11 @@ export default function FGInventoryTab() {
       g.totalQty += av;
       g.totalOriginalQty += item.qty || 0;
       g.totalPcs += item.num_pcs || 0;
-      g.totalPallets += palletsByProcId.get(item.processing_record_id) || 0;
+      const pallet = palletsByProcId.get(item.processing_record_id);
+      if (pallet) {
+        g.totalPallets += pallet.count;
+        pallet.types.forEach(t => g.palletTypes.add(t));
+      }
       g.items.push(item);
       const ag = calcAgeingDays(item.created_at);
       if (ag != null && av > 0) {
