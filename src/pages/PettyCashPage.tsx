@@ -276,6 +276,24 @@ export default function PettyCashPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={o => setDeleteDialog(p => ({ ...p, open: o }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete cash entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialog.entry && (
+                <>This will permanently delete the {deleteDialog.entry.direction === 'in' ? 'Cash In' : 'Cash Out'} entry of ₹{fmt(Number(deleteDialog.entry.amount))} on {deleteDialog.entry.entry_date}. This cannot be undone.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleteEntry.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
