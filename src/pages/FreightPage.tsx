@@ -1082,6 +1082,7 @@ function TransporterDispatchTable({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [addTripOpen, setAddTripOpen] = useState(false);
   const [tripForm, setTripForm] = useState({
+    trip_type: 'Sales',
     trip_date: new Date().toISOString().slice(0, 10),
     document_number: '',
     source_destination: '',
