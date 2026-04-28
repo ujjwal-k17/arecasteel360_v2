@@ -66,7 +66,7 @@ export default function FGInventoryTab() {
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
-  // Fetch pallet consumptions by processing_record_id for pallet count
+  // Fetch pallet consumptions (wooden + steel) by processing_record_id for pallet count and type
   const { data: palletConsumptions } = useQuery({
     queryKey: ['pallet_consumptions_fg'],
     queryFn: async () => {
@@ -79,15 +79,39 @@ export default function FGInventoryTab() {
     },
   });
 
+  const { data: steelPalletConsumptions } = useQuery({
+    queryKey: ['steel_pallet_consumptions_fg'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('steel_pallet_consumptions' as any)
+        .select('processing_record_id, num_pcs')
+        .not('processing_record_id', 'is', null);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
   const palletsByProcId = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; types: Set<string> }>();
     (palletConsumptions || []).forEach((pc: any) => {
       if (pc.processing_record_id) {
-        map.set(pc.processing_record_id, (map.get(pc.processing_record_id) || 0) + (pc.num_pcs || 0));
+        const cur = map.get(pc.processing_record_id) || { count: 0, types: new Set<string>() };
+        cur.count += pc.num_pcs || 0;
+        if ((pc.num_pcs || 0) > 0) cur.types.add('Wooden');
+        map.set(pc.processing_record_id, cur);
+      }
+    });
+    (steelPalletConsumptions || []).forEach((pc: any) => {
+      if (pc.processing_record_id) {
+        const cur = map.get(pc.processing_record_id) || { count: 0, types: new Set<string>() };
+        cur.count += pc.num_pcs || 0;
+        if ((pc.num_pcs || 0) > 0) cur.types.add('Steel');
+        map.set(pc.processing_record_id, cur);
       }
     });
     return map;
-  }, [palletConsumptions]);
+  }, [palletConsumptions, steelPalletConsumptions]);
+
 
 
   const { data: customers } = useCustomers();
