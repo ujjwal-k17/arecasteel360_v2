@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react';
+import { Plus, Check, ArrowDownCircle, ArrowUpCircle, Wallet, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCashEntries, useInsertCashEntry, useUpdateCashEntry, useCashCategories, type CashEntry } from '@/hooks/useCashBook';
+import { useCashEntries, useInsertCashEntry, useUpdateCashEntry, useDeleteCashEntry, useCashCategories, type CashEntry } from '@/hooks/useCashBook';
+import { useAuth } from '@/contexts/AuthContext';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type Direction = 'in' | 'out';
 
@@ -20,8 +22,12 @@ export default function PettyCashPage() {
   const { data: entries = [] } = useCashEntries();
   const insertEntry = useInsertCashEntry();
   const updateEntry = useUpdateCashEntry();
+  const deleteEntry = useDeleteCashEntry();
+  const { isAdmin } = useAuth();
   const { data: catIn } = useCashCategories('in');
   const { data: catOut } = useCashCategories('out');
+
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; entry: CashEntry | null }>({ open: false, entry: null });
 
   const [addDialog, setAddDialog] = useState<{ open: boolean; direction: Direction }>({ open: false, direction: 'in' });
   const [form, setForm] = useState({ entry_date: new Date().toISOString().slice(0, 10), amount: '', category: '', sub_category: '', comments: '' });
@@ -72,6 +78,14 @@ export default function PettyCashPage() {
     toast.success('Marked as received');
     setReceiveDialog({ open: false, entry: null, received_date: new Date().toISOString().slice(0, 10) });
   };
+
+  const handleDelete = async () => {
+    if (!deleteDialog.entry) return;
+    await deleteEntry.mutateAsync(deleteDialog.entry.id);
+    toast.success('Entry deleted');
+    setDeleteDialog({ open: false, entry: null });
+  };
+
 
   const subOptions = form.category ? (subByParent[form.category] || subByParent['_'] || []) : [];
 
@@ -140,9 +154,10 @@ export default function PettyCashPage() {
                     <TableHead className="text-xs font-semibold">Sub Category</TableHead>
                     <TableHead className="text-xs font-semibold">Comments</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Amount (₹)</TableHead>
+                    {isAdmin && <TableHead className="text-xs font-semibold w-16"></TableHead>}
                   </TableRow></TableHeader>
                   <TableBody>
-                    {received.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No entries.</TableCell></TableRow>}
+                    {received.length === 0 && <TableRow><TableCell colSpan={isAdmin ? 6 : 5} className="text-center text-muted-foreground py-6">No entries.</TableCell></TableRow>}
                     {received.map(e => (
                       <TableRow key={e.id}>
                         <TableCell className="text-xs">{e.entry_date}</TableCell>
@@ -150,6 +165,13 @@ export default function PettyCashPage() {
                         <TableCell className="text-xs">{e.sub_category || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{e.comments || '-'}{e.debtor_name ? ` (${e.debtor_name})` : ''}</TableCell>
                         <TableCell className="text-xs font-mono-num text-right text-emerald-600 font-semibold">{fmt(Number(e.amount))}</TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteDialog({ open: true, entry: e })}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -173,9 +195,10 @@ export default function PettyCashPage() {
                 <TableHead className="text-xs font-semibold">Comments</TableHead>
                 <TableHead className="text-xs font-semibold">Source</TableHead>
                 <TableHead className="text-xs font-semibold text-right">Amount (₹)</TableHead>
+                {isAdmin && <TableHead className="text-xs font-semibold w-16"></TableHead>}
               </TableRow></TableHeader>
               <TableBody>
-                {cashOut.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No entries.</TableCell></TableRow>}
+                {cashOut.length === 0 && <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-6">No entries.</TableCell></TableRow>}
                 {cashOut.map(e => (
                   <TableRow key={e.id}>
                     <TableCell className="text-xs">{e.entry_date}</TableCell>
@@ -184,6 +207,13 @@ export default function PettyCashPage() {
                     <TableCell className="text-xs text-muted-foreground">{e.comments || '-'}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{e.source_type || 'manual'}</TableCell>
                     <TableCell className="text-xs font-mono-num text-right text-destructive font-semibold">{fmt(Number(e.amount))}</TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteDialog({ open: true, entry: e })}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -246,6 +276,24 @@ export default function PettyCashPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={o => setDeleteDialog(p => ({ ...p, open: o }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete cash entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialog.entry && (
+                <>This will permanently delete the {deleteDialog.entry.direction === 'in' ? 'Cash In' : 'Cash Out'} entry of ₹{fmt(Number(deleteDialog.entry.amount))} on {deleteDialog.entry.entry_date}. This cannot be undone.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleteEntry.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
