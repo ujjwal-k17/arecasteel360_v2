@@ -1392,6 +1392,7 @@ function TransporterDispatchTable({
                       </span>
                     </TableCell>
                     <TableCell className="text-sm">{freightData?.transporters?.name || <span className="text-muted-foreground">-</span>}</TableCell>
+                    <TableCell className="text-sm">{freightData?.lr_number || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-sm">
                       {totalAmount > 0 ? (
                         <span className="font-mono-num">₹{totalAmount.toLocaleString('en-IN')}</span>
