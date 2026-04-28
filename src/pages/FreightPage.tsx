@@ -689,6 +689,17 @@ function FreightPage() {
               toast.success('Trip added');
               queryClient.invalidateQueries({ queryKey: ['manual_transporter_trips'] });
             }}
+            onDeleteManualTrip={async (documentNumber) => {
+              if (!isAdmin) { toast.error('Admin access required'); return; }
+              const { error } = await supabase
+                .from('truck_trips')
+                .delete()
+                .eq('truck_number', 'Transporter')
+                .eq('document_number', documentNumber);
+              if (error) { toast.error('Failed to delete trip'); return; }
+              toast.success('Trip deleted');
+              queryClient.invalidateQueries({ queryKey: ['manual_transporter_trips'] });
+            }}
           />
         </TabsContent>
 
