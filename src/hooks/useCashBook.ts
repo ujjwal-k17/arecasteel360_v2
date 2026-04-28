@@ -61,6 +61,18 @@ export function useUpdateCashEntry() {
   });
 }
 
+export function useDeleteCashEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await sb.from('cash_entries').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cash_entries'] }),
+    onError: (e: any) => toast.error(e.message || 'Failed to delete'),
+  });
+}
+
 export function useCashCategories(direction: 'in' | 'out' = 'in') {
   const catCategory = direction === 'in' ? 'cash_in_category' : 'cash_out_category';
   const subCategory = direction === 'in' ? 'cash_in_subcategory' : 'cash_out_subcategory';
