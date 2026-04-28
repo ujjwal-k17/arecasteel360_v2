@@ -161,6 +161,7 @@ export function TransporterFreightTab() {
             <TableRow className="bg-muted/50">
               <TableHead className="text-xs font-semibold">#</TableHead>
               <TableHead className="text-xs font-semibold">Invoice Number</TableHead>
+              <TableHead className="text-xs font-semibold">LR #</TableHead>
               <TableHead className="text-xs font-semibold">Transporter</TableHead>
               <TableHead className="text-xs font-semibold">Total Freight (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Status</TableHead>
