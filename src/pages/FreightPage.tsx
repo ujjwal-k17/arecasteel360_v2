@@ -1160,7 +1160,9 @@ function TransporterDispatchTable({
         if (filterPaymentStatus !== ps) return false;
       }
       if (filterSource) {
-        const src = s.source_type === 'purchase' ? 'Purchase' : 'Sales';
+        const src = s.source_type === 'manual'
+          ? (s.trip_type || 'Sales')
+          : (s.source_type === 'purchase' ? 'Purchase' : 'Sales');
         if (filterSource !== src) return false;
       }
       return true;
