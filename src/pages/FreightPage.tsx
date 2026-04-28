@@ -1328,6 +1328,7 @@ function TransporterDispatchTable({
                     <SelectItem value="__all__">All</SelectItem>
                     <SelectItem value="Purchase">Purchase</SelectItem>
                     <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Job Work">Job Work</SelectItem>
                   </SelectContent>
                 </Select>
               </TableHead>
