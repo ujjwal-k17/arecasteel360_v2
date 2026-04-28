@@ -590,7 +590,7 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                         <TableCell className="text-xs font-mono-num whitespace-nowrap">{availQty.toFixed(2)}{item.num_pcs ? <span className="text-muted-foreground"> ({fmtInt(item.num_pcs)} pcs)</span> : null}</TableCell>
                         <TableCell className="text-xs font-mono-num">{(() => { const a = calcAgeingDays(item.created_at); return a != null ? `${a} D` : '-'; })()}</TableCell>
-                        <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{(() => { const p = palletsByProcId.get(item.processing_record_id); if (!p || p.count <= 0) return '-'; const types = Array.from(p.types).sort().join(' + '); return `${p.count}${types ? ` (${types})` : ''}`; })()}</TableCell>
                         <TableCell>
                           <div className="grid grid-cols-3 gap-1 max-w-[200px]">
                             <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }} title="Record Sale">
