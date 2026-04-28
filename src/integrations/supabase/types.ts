@@ -1044,6 +1044,7 @@ export type Database = {
           num_pcs: number
           order_id: string | null
           pallet_sku_id: string
+          processing_record_id: string | null
           weight_kg: number
         }
         Insert: {
@@ -1053,6 +1054,7 @@ export type Database = {
           num_pcs?: number
           order_id?: string | null
           pallet_sku_id: string
+          processing_record_id?: string | null
           weight_kg?: number
         }
         Update: {
@@ -1062,6 +1064,7 @@ export type Database = {
           num_pcs?: number
           order_id?: string | null
           pallet_sku_id?: string
+          processing_record_id?: string | null
           weight_kg?: number
         }
         Relationships: [

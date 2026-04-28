@@ -1,0 +1,1 @@
+ALTER TABLE public.steel_pallet_consumptions ADD COLUMN IF NOT EXISTS processing_record_id uuid;
