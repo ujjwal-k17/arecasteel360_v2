@@ -1077,7 +1077,7 @@ function TransporterDispatchTable({
   onAddComment: (freightId: string) => void;
   onAddPayment: (freightId: string, invoiceNumber: string) => void;
   onDownload: () => void;
-  onAddManualTrip: (data: { trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
+  onAddManualTrip: (data: { trip_type: string; trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [addTripOpen, setAddTripOpen] = useState(false);
