@@ -38,7 +38,8 @@ interface InvoiceSummary {
   customer_name: string | null;
   total_qty: number;
   dispatch_type: string | null;
-  source_type: string; // 'sales' | 'purchase'
+  source_type: string; // 'sales' | 'purchase' | 'manual'
+  trip_type?: string | null; // 'Purchase' | 'Sales' | 'Job Work' (manual trips only)
 }
 
 interface PurchaseSummary {
@@ -357,6 +358,7 @@ function FreightPage() {
       total_qty: t.quantity || 0,
       dispatch_type: 'Transporter',
       source_type: 'manual',
+      trip_type: t.trip_type || 'Sales',
     }));
 
     return [...salesItems, ...purchaseItems, ...intransitItems, ...manualItems];
@@ -676,7 +678,7 @@ function FreightPage() {
               const { error } = await supabase.from('truck_trips').insert({
                 trip_id: tripId,
                 truck_number: 'Transporter',
-                trip_type: 'Sales',
+                trip_type: d.trip_type,
                 trip_date: d.trip_date,
                 document_number: docClean,
                 source_destination: d.source_destination,
@@ -1075,11 +1077,12 @@ function TransporterDispatchTable({
   onAddComment: (freightId: string) => void;
   onAddPayment: (freightId: string, invoiceNumber: string) => void;
   onDownload: () => void;
-  onAddManualTrip: (data: { trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
+  onAddManualTrip: (data: { trip_type: string; trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [addTripOpen, setAddTripOpen] = useState(false);
   const [tripForm, setTripForm] = useState({
+    trip_type: 'Sales',
     trip_date: new Date().toISOString().slice(0, 10),
     document_number: '',
     source_destination: '',
@@ -1157,7 +1160,9 @@ function TransporterDispatchTable({
         if (filterPaymentStatus !== ps) return false;
       }
       if (filterSource) {
-        const src = s.source_type === 'purchase' ? 'Purchase' : 'Sales';
+        const src = s.source_type === 'manual'
+          ? (s.trip_type || 'Sales')
+          : (s.source_type === 'purchase' ? 'Purchase' : 'Sales');
         if (filterSource !== src) return false;
       }
       return true;
@@ -1208,10 +1213,21 @@ function TransporterDispatchTable({
       </div>
 
       {/* Add Manual Transporter Trip Dialog */}
-      <Dialog open={addTripOpen} onOpenChange={(o) => { setAddTripOpen(o); if (!o) setTripForm({ trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' }); }}>
+      <Dialog open={addTripOpen} onOpenChange={(o) => { setAddTripOpen(o); if (!o) setTripForm({ trip_type: 'Sales', trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' }); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Add Trip — Transporter</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Trip Type <span className="text-destructive">*</span></Label>
+              <Select value={tripForm.trip_type} onValueChange={v => setTripForm(f => ({ ...f, trip_type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Purchase">Purchase</SelectItem>
+                  <SelectItem value="Sales">Sales</SelectItem>
+                  <SelectItem value="Job Work">Job Work</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Trip Date <span className="text-destructive">*</span></Label>
               <Input type="date" value={tripForm.trip_date} onChange={e => setTripForm(f => ({ ...f, trip_date: e.target.value }))} />
@@ -1221,7 +1237,7 @@ function TransporterDispatchTable({
               <Input value={tripForm.document_number} onChange={e => setTripForm(f => ({ ...f, document_number: e.target.value }))} placeholder="Enter invoice / challan #" maxLength={100} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Source / Destination <span className="text-destructive">*</span></Label>
+              <Label className="text-xs">{tripForm.trip_type === 'Purchase' ? 'Source' : 'Destination'} <span className="text-destructive">*</span></Label>
               <Input value={tripForm.source_destination} onChange={e => setTripForm(f => ({ ...f, source_destination: e.target.value }))} placeholder="From / To" maxLength={200} />
             </div>
             <div className="space-y-1.5">
@@ -1232,18 +1248,19 @@ function TransporterDispatchTable({
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddTripOpen(false)} disabled={submitting}>Cancel</Button>
             <Button
-              disabled={submitting || !tripForm.trip_date || !tripForm.document_number.trim() || !tripForm.source_destination.trim() || !tripForm.quantity || Number(tripForm.quantity) <= 0}
+              disabled={submitting || !tripForm.trip_type || !tripForm.trip_date || !tripForm.document_number.trim() || !tripForm.source_destination.trim() || !tripForm.quantity || Number(tripForm.quantity) <= 0}
               onClick={async () => {
                 setSubmitting(true);
                 try {
                   await onAddManualTrip({
+                    trip_type: tripForm.trip_type,
                     trip_date: tripForm.trip_date,
                     document_number: tripForm.document_number.trim(),
                     source_destination: tripForm.source_destination.trim(),
                     quantity: Number(tripForm.quantity),
                   });
                   setAddTripOpen(false);
-                  setTripForm({ trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
+                  setTripForm({ trip_type: 'Sales', trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
                 } finally {
                   setSubmitting(false);
                 }
@@ -1311,6 +1328,7 @@ function TransporterDispatchTable({
                     <SelectItem value="__all__">All</SelectItem>
                     <SelectItem value="Purchase">Purchase</SelectItem>
                     <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Job Work">Job Work</SelectItem>
                   </SelectContent>
                 </Select>
               </TableHead>
@@ -1385,11 +1403,17 @@ function TransporterDispatchTable({
                     <TableCell className="text-sm">{s.customer_name || '-'}</TableCell>
                     <TableCell className="text-sm font-mono-num">{s.total_qty.toFixed(2)}</TableCell>
                     <TableCell className="text-sm">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        s.source_type === 'purchase' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {s.source_type === 'purchase' ? 'Purchase' : 'Sales'}
-                      </span>
+                      {(() => {
+                        const label = s.source_type === 'manual'
+                          ? (s.trip_type || 'Sales')
+                          : (s.source_type === 'purchase' ? 'Purchase' : 'Sales');
+                        const cls = label === 'Purchase'
+                          ? 'bg-blue-100 text-blue-700'
+                          : label === 'Job Work'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-emerald-100 text-emerald-700';
+                        return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cls}`}>{label}</span>;
+                      })()}
                     </TableCell>
                     <TableCell className="text-sm">{freightData?.transporters?.name || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-sm">{freightData?.lr_number || <span className="text-muted-foreground">-</span>}</TableCell>
