@@ -1266,6 +1266,7 @@ function TransporterDispatchTable({
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold">Purchase / Sales</TableHead>
               <TableHead className="text-xs font-semibold">Transporter Name</TableHead>
+              <TableHead className="text-xs font-semibold">LR #</TableHead>
               <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Paid Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Approval / Payment</TableHead>
