@@ -1065,6 +1065,7 @@ function TransporterDispatchTable({
   onAddPayment,
   onDownload,
   onAddManualTrip,
+  onDeleteManualTrip,
 }: {
   data: (InvoiceSummary & { purchaseBatches?: PurchaseSummary[] })[];
   isAdmin: boolean;
@@ -1079,6 +1080,7 @@ function TransporterDispatchTable({
   onAddPayment: (freightId: string, invoiceNumber: string) => void;
   onDownload: () => void;
   onAddManualTrip: (data: { trip_type: string; trip_date: string; document_number: string; source_destination: string; quantity: number }) => Promise<void> | void;
+  onDeleteManualTrip: (documentNumber: string) => Promise<void> | void;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [addTripOpen, setAddTripOpen] = useState(false);
