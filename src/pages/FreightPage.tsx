@@ -358,6 +358,7 @@ function FreightPage() {
       total_qty: t.quantity || 0,
       dispatch_type: 'Transporter',
       source_type: 'manual',
+      trip_type: t.trip_type || 'Sales',
     }));
 
     return [...salesItems, ...purchaseItems, ...intransitItems, ...manualItems];
