@@ -163,6 +163,7 @@ export default function WIPProcessingDialog({ wipItem, open, onClose }: Props) {
               order_id: null,
               weight_kg: totalWt,
               num_pcs: Number(entry.pcs),
+              processing_record_id: processingRecordId,
             } as any);
           } else {
             await supabase.from('pallet_consumptions').insert({

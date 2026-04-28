@@ -32,6 +32,7 @@ interface SKUGroup {
   totalQty: number;
   totalPcs: number;
   totalPallets: number;
+  palletTypes: Set<string>;
   items: any[];
 }
 
@@ -65,7 +66,7 @@ export default function FGInventoryTab() {
   const [saleForm, setSaleForm] = useState({ invoice_number: '', order_id: '', quantity: '', sales_date: '' });
   const [defectForm, setDefectForm] = useState({ defect_type: '', quantity: '', num_pcs: '' });
 
-  // Fetch pallet consumptions by processing_record_id for pallet count
+  // Fetch pallet consumptions (wooden + steel) by processing_record_id for pallet count and type
   const { data: palletConsumptions } = useQuery({
     queryKey: ['pallet_consumptions_fg'],
     queryFn: async () => {
@@ -78,15 +79,39 @@ export default function FGInventoryTab() {
     },
   });
 
+  const { data: steelPalletConsumptions } = useQuery({
+    queryKey: ['steel_pallet_consumptions_fg'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('steel_pallet_consumptions' as any)
+        .select('processing_record_id, num_pcs')
+        .not('processing_record_id', 'is', null);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
   const palletsByProcId = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; types: Set<string> }>();
     (palletConsumptions || []).forEach((pc: any) => {
       if (pc.processing_record_id) {
-        map.set(pc.processing_record_id, (map.get(pc.processing_record_id) || 0) + (pc.num_pcs || 0));
+        const cur = map.get(pc.processing_record_id) || { count: 0, types: new Set<string>() };
+        cur.count += pc.num_pcs || 0;
+        if ((pc.num_pcs || 0) > 0) cur.types.add('Wooden');
+        map.set(pc.processing_record_id, cur);
+      }
+    });
+    (steelPalletConsumptions || []).forEach((pc: any) => {
+      if (pc.processing_record_id) {
+        const cur = map.get(pc.processing_record_id) || { count: 0, types: new Set<string>() };
+        cur.count += pc.num_pcs || 0;
+        if ((pc.num_pcs || 0) > 0) cur.types.add('Steel');
+        map.set(pc.processing_record_id, cur);
       }
     });
     return map;
-  }, [palletConsumptions]);
+  }, [palletConsumptions, steelPalletConsumptions]);
+
 
 
   const { data: customers } = useCustomers();
@@ -270,7 +295,7 @@ export default function FGInventoryTab() {
     for (const item of filteredItems) {
       const key = [item.material || '', item.process || '', item.thickness ?? '', item.width ?? '', item.length ?? '', item.coating || '', item.grade || ''].map(v => String(v).toLowerCase()).join('|');
       if (!map.has(key)) {
-        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, totalOriginalQty: 0, weightedAvgAgeing: 0, items: [] });
+        map.set(key, { key, material: item.material || '-', process: item.process || '-', thickness: item.thickness, width: item.width, length: item.length, coating: item.coating || '-', grade: item.grade || '-', totalQty: 0, totalPcs: 0, totalPallets: 0, palletTypes: new Set<string>(), totalOriginalQty: 0, weightedAvgAgeing: 0, items: [] });
         ageAcc.set(key, { wSum: 0, wTotal: 0 });
       }
       const g = map.get(key)!;
@@ -278,7 +303,11 @@ export default function FGInventoryTab() {
       g.totalQty += av;
       g.totalOriginalQty += item.qty || 0;
       g.totalPcs += item.num_pcs || 0;
-      g.totalPallets += palletsByProcId.get(item.processing_record_id) || 0;
+      const pallet = palletsByProcId.get(item.processing_record_id);
+      if (pallet) {
+        g.totalPallets += pallet.count;
+        pallet.types.forEach(t => g.palletTypes.add(t));
+      }
       g.items.push(item);
       const ag = calcAgeingDays(item.created_at);
       if (ag != null && av > 0) {
@@ -491,7 +520,7 @@ export default function FGInventoryTab() {
               <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Grade</TableHead>
               <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Ageing</TableHead>
-              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight"># Pallets</TableHead>
+              <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight"># Pallets (Type)</TableHead>
               <TableHead className="text-xs font-semibold whitespace-normal break-words leading-tight">Actions</TableHead>
             </TableRow>
             <TableRow className="bg-muted/20">
@@ -537,7 +566,7 @@ export default function FGInventoryTab() {
                     <TableCell className="text-sm">{g.grade}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{fmtNum(g.totalQty)}</TableCell>
                     <TableCell className="text-sm font-mono-num font-semibold">{(g as any).weightedAvgAgeing > 0 ? `${Math.round((g as any).weightedAvgAgeing)} D` : '-'}</TableCell>
-                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalPallets > 0 ? fmtInt(g.totalPallets) : '-'}</TableCell>
+                    <TableCell className="text-sm font-mono-num font-semibold">{g.totalPallets > 0 ? `${fmtInt(g.totalPallets)}${g.palletTypes.size ? ` (${Array.from(g.palletTypes).sort().join(' + ')})` : ''}` : '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="outline" className="text-xs h-7 gap-1 px-2" onClick={() => setSalesHistoryGroup(g)}>
                         <History className="h-3 w-3" /> Sales
@@ -561,7 +590,7 @@ export default function FGInventoryTab() {
                         <TableCell className="text-xs text-muted-foreground">{item.grade || '-'}</TableCell>
                         <TableCell className="text-xs font-mono-num whitespace-nowrap">{availQty.toFixed(2)}{item.num_pcs ? <span className="text-muted-foreground"> ({fmtInt(item.num_pcs)} pcs)</span> : null}</TableCell>
                         <TableCell className="text-xs font-mono-num">{(() => { const a = calcAgeingDays(item.created_at); return a != null ? `${a} D` : '-'; })()}</TableCell>
-                        <TableCell className="text-xs font-mono-num">{(palletsByProcId.get(item.processing_record_id) || 0) > 0 ? palletsByProcId.get(item.processing_record_id) : '-'}</TableCell>
+                        <TableCell className="text-xs font-mono-num">{(() => { const p = palletsByProcId.get(item.processing_record_id); if (!p || p.count <= 0) return '-'; const types = Array.from(p.types).sort().join(' + '); return `${p.count}${types ? ` (${types})` : ''}`; })()}</TableCell>
                         <TableCell>
                           <div className="grid grid-cols-3 gap-1 max-w-[200px]">
                             <Button size="sm" variant="outline" className="text-[10px] h-6 px-1 gap-0.5" onClick={(e) => { e.stopPropagation(); setSaleDialog(item); }} title="Record Sale">
