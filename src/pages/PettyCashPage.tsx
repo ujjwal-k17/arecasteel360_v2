@@ -22,8 +22,12 @@ export default function PettyCashPage() {
   const { data: entries = [] } = useCashEntries();
   const insertEntry = useInsertCashEntry();
   const updateEntry = useUpdateCashEntry();
+  const deleteEntry = useDeleteCashEntry();
+  const { isAdmin } = useAuth();
   const { data: catIn } = useCashCategories('in');
   const { data: catOut } = useCashCategories('out');
+
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; entry: CashEntry | null }>({ open: false, entry: null });
 
   const [addDialog, setAddDialog] = useState<{ open: boolean; direction: Direction }>({ open: false, direction: 'in' });
   const [form, setForm] = useState({ entry_date: new Date().toISOString().slice(0, 10), amount: '', category: '', sub_category: '', comments: '' });
