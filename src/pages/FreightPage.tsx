@@ -38,7 +38,8 @@ interface InvoiceSummary {
   customer_name: string | null;
   total_qty: number;
   dispatch_type: string | null;
-  source_type: string; // 'sales' | 'purchase'
+  source_type: string; // 'sales' | 'purchase' | 'manual'
+  trip_type?: string | null; // 'Purchase' | 'Sales' | 'Job Work' (manual trips only)
 }
 
 interface PurchaseSummary {
