@@ -1266,6 +1266,7 @@ function TransporterDispatchTable({
               <TableHead className="text-xs font-semibold">Total Qty (Kg)</TableHead>
               <TableHead className="text-xs font-semibold">Purchase / Sales</TableHead>
               <TableHead className="text-xs font-semibold">Transporter Name</TableHead>
+              <TableHead className="text-xs font-semibold">LR #</TableHead>
               <TableHead className="text-xs font-semibold">Total Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Paid Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Approval / Payment</TableHead>
@@ -1324,6 +1325,7 @@ function TransporterDispatchTable({
               </TableHead>
               <TableHead></TableHead>
               <TableHead></TableHead>
+              <TableHead></TableHead>
               <TableHead>
                 <div className="flex flex-col gap-1">
                   <Select value={filterApproval} onValueChange={v => setFilterApproval(v === '__all__' ? '' : v)}>
@@ -1352,7 +1354,7 @@ function TransporterDispatchTable({
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                   No transporter dispatches found.
                 </TableCell>
               </TableRow>
@@ -1390,6 +1392,7 @@ function TransporterDispatchTable({
                       </span>
                     </TableCell>
                     <TableCell className="text-sm">{freightData?.transporters?.name || <span className="text-muted-foreground">-</span>}</TableCell>
+                    <TableCell className="text-sm">{freightData?.lr_number || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-sm">
                       {totalAmount > 0 ? (
                         <span className="font-mono-num">₹{totalAmount.toLocaleString('en-IN')}</span>
@@ -1474,7 +1477,7 @@ function TransporterDispatchTable({
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${s.invoice_number}-detail`}>
-                      <TableCell colSpan={11} className="bg-muted/30 p-4">
+                      <TableCell colSpan={12} className="bg-muted/30 p-4">
                         <div className="space-y-3">
                           {freightData?.lr_number && (
                             <div className="text-sm">
