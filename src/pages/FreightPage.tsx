@@ -1211,10 +1211,21 @@ function TransporterDispatchTable({
       </div>
 
       {/* Add Manual Transporter Trip Dialog */}
-      <Dialog open={addTripOpen} onOpenChange={(o) => { setAddTripOpen(o); if (!o) setTripForm({ trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' }); }}>
+      <Dialog open={addTripOpen} onOpenChange={(o) => { setAddTripOpen(o); if (!o) setTripForm({ trip_type: 'Sales', trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' }); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Add Trip — Transporter</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Trip Type <span className="text-destructive">*</span></Label>
+              <Select value={tripForm.trip_type} onValueChange={v => setTripForm(f => ({ ...f, trip_type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Purchase">Purchase</SelectItem>
+                  <SelectItem value="Sales">Sales</SelectItem>
+                  <SelectItem value="Job Work">Job Work</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Trip Date <span className="text-destructive">*</span></Label>
               <Input type="date" value={tripForm.trip_date} onChange={e => setTripForm(f => ({ ...f, trip_date: e.target.value }))} />
@@ -1224,7 +1235,7 @@ function TransporterDispatchTable({
               <Input value={tripForm.document_number} onChange={e => setTripForm(f => ({ ...f, document_number: e.target.value }))} placeholder="Enter invoice / challan #" maxLength={100} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Source / Destination <span className="text-destructive">*</span></Label>
+              <Label className="text-xs">{tripForm.trip_type === 'Purchase' ? 'Source' : 'Destination'} <span className="text-destructive">*</span></Label>
               <Input value={tripForm.source_destination} onChange={e => setTripForm(f => ({ ...f, source_destination: e.target.value }))} placeholder="From / To" maxLength={200} />
             </div>
             <div className="space-y-1.5">
@@ -1235,18 +1246,19 @@ function TransporterDispatchTable({
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddTripOpen(false)} disabled={submitting}>Cancel</Button>
             <Button
-              disabled={submitting || !tripForm.trip_date || !tripForm.document_number.trim() || !tripForm.source_destination.trim() || !tripForm.quantity || Number(tripForm.quantity) <= 0}
+              disabled={submitting || !tripForm.trip_type || !tripForm.trip_date || !tripForm.document_number.trim() || !tripForm.source_destination.trim() || !tripForm.quantity || Number(tripForm.quantity) <= 0}
               onClick={async () => {
                 setSubmitting(true);
                 try {
                   await onAddManualTrip({
+                    trip_type: tripForm.trip_type,
                     trip_date: tripForm.trip_date,
                     document_number: tripForm.document_number.trim(),
                     source_destination: tripForm.source_destination.trim(),
                     quantity: Number(tripForm.quantity),
                   });
                   setAddTripOpen(false);
-                  setTripForm({ trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
+                  setTripForm({ trip_type: 'Sales', trip_date: new Date().toISOString().slice(0, 10), document_number: '', source_destination: '', quantity: '' });
                 } finally {
                   setSubmitting(false);
                 }
