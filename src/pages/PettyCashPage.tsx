@@ -79,6 +79,19 @@ export default function PettyCashPage() {
     setReceiveDialog({ open: false, entry: null, received_date: new Date().toISOString().slice(0, 10) });
   };
 
+  const handleDelete = async () => {
+    if (!deleteDialog.entry) return;
+    await deleteEntry.mutateAsync(deleteDialog.entry.id);
+    toast.success('Entry deleted');
+    setDeleteDialog({ open: false, entry: null });
+  };
+      received_date: receiveDialog.received_date,
+      entry_date: receiveDialog.received_date,
+    });
+    toast.success('Marked as received');
+    setReceiveDialog({ open: false, entry: null, received_date: new Date().toISOString().slice(0, 10) });
+  };
+
   const subOptions = form.category ? (subByParent[form.category] || subByParent['_'] || []) : [];
 
   return (
