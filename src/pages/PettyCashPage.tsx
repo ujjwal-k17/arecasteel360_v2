@@ -154,9 +154,10 @@ export default function PettyCashPage() {
                     <TableHead className="text-xs font-semibold">Sub Category</TableHead>
                     <TableHead className="text-xs font-semibold">Comments</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Amount (₹)</TableHead>
+                    {isAdmin && <TableHead className="text-xs font-semibold w-16"></TableHead>}
                   </TableRow></TableHeader>
                   <TableBody>
-                    {received.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No entries.</TableCell></TableRow>}
+                    {received.length === 0 && <TableRow><TableCell colSpan={isAdmin ? 6 : 5} className="text-center text-muted-foreground py-6">No entries.</TableCell></TableRow>}
                     {received.map(e => (
                       <TableRow key={e.id}>
                         <TableCell className="text-xs">{e.entry_date}</TableCell>
@@ -164,6 +165,13 @@ export default function PettyCashPage() {
                         <TableCell className="text-xs">{e.sub_category || '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{e.comments || '-'}{e.debtor_name ? ` (${e.debtor_name})` : ''}</TableCell>
                         <TableCell className="text-xs font-mono-num text-right text-emerald-600 font-semibold">{fmt(Number(e.amount))}</TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteDialog({ open: true, entry: e })}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
