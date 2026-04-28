@@ -1325,6 +1325,7 @@ function TransporterDispatchTable({
               </TableHead>
               <TableHead></TableHead>
               <TableHead></TableHead>
+              <TableHead></TableHead>
               <TableHead>
                 <div className="flex flex-col gap-1">
                   <Select value={filterApproval} onValueChange={v => setFilterApproval(v === '__all__' ? '' : v)}>
