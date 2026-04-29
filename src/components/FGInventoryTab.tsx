@@ -350,6 +350,10 @@ export default function FGInventoryTab() {
   }, [allOrders, bulkSaleCustomerId]);
 
   const handleBulkSaleSubmit = async () => {
+    if (!bulkSaleCustomerId) { toast.error('Select a customer'); return; }
+    if (!bulkSaleForm.order_id) { toast.error('Select an order'); return; }
+    if (!bulkSaleForm.invoice_number.trim()) { toast.error('Enter invoice number'); return; }
+    if (!bulkSaleForm.sales_date) { toast.error('Select invoice date'); return; }
     const itemsToSell = selectedFGItems.filter(i => {
       const qty = Number(bulkQuantities[i.id]) || 0;
       return qty > 0;
@@ -392,6 +396,10 @@ export default function FGInventoryTab() {
   const handleSaleSubmit = async () => {
     if (!saleDialog) return;
     const qty = Number(saleForm.quantity) || 0;
+    if (!saleCustomerId) { toast.error('Select a customer'); return; }
+    if (!saleForm.order_id) { toast.error('Select an order'); return; }
+    if (!saleForm.invoice_number.trim()) { toast.error('Enter invoice number'); return; }
+    if (!saleForm.sales_date) { toast.error('Select invoice date'); return; }
     if (qty <= 0) { toast.error('Enter a valid quantity'); return; }
     try {
       await insertFGSale.mutateAsync({
