@@ -1,0 +1,365 @@
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle } from 'lucide-react';
+import { fmtNum } from '@/lib/utils';
+import { toast } from 'sonner';
+
+const ALL = '__all__';
+
+type Debtor = { company: string; partyName: string; outstanding: number; overdue: number };
+type Bank = { company: string; accountName: string; balance: number };
+type Voucher = {
+  company: string;
+  date: string;
+  voucherNumber: string;
+  voucherType: string;
+  party?: string;
+  supplier?: string;
+  amount: number;
+  totalQty: number;
+  itemsSummary: string;
+  items: { name: string; qty: number; rate: number; amount: number }[];
+};
+
+type TallyResponse = {
+  debtors: Debtor[];
+  banks: Bank[];
+  dispatches: Voucher[];
+  purchases: Voucher[];
+  errors: { company: string; dataset: string; error: string }[];
+  fetchedAt: string;
+  fromDate: string;
+  toDate: string;
+  companies: string[];
+};
+
+const fmtINR = (n: number) =>
+  '₹ ' + Math.round(n).toLocaleString('en-IN');
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const monthStartIso = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+};
+
+export default function BusinessOverviewPage() {
+  const [companyFilter, setCompanyFilter] = useState<string>(ALL);
+  const [fromDate, setFromDate] = useState<string>(monthStartIso());
+  const [toDate, setToDate] = useState<string>(todayIso());
+
+  const { data, isFetching, refetch, error } = useQuery<TallyResponse>({
+    queryKey: ['tally-fetch', fromDate, toDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('tally-fetch', {
+        body: { dataset: 'all', fromDate, toDate },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as TallyResponse;
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const handleSync = async () => {
+    const t = toast.loading('Syncing from Tally...');
+    try {
+      await refetch();
+      toast.success('Synced from Tally', { id: t });
+    } catch (e: any) {
+      toast.error(e?.message || 'Sync failed', { id: t });
+    }
+  };
+
+  const companies = data?.companies || [];
+
+  const filterByCompany = <T extends { company: string }>(arr: T[] | undefined): T[] =>
+    (arr || []).filter(r => companyFilter === ALL || r.company === companyFilter);
+
+  const debtors = filterByCompany(data?.debtors);
+  const banks = filterByCompany(data?.banks);
+  const dispatches = filterByCompany(data?.dispatches);
+  const purchases = filterByCompany(data?.purchases);
+
+  const totalDebtors = useMemo(() => debtors.reduce((s, d) => s + (d.outstanding || 0), 0), [debtors]);
+  const totalBank = useMemo(() => banks.reduce((s, b) => s + (b.balance || 0), 0), [banks]);
+  const totalDispatch = useMemo(() => dispatches.reduce((s, v) => s + (v.amount || 0), 0), [dispatches]);
+  const totalPurchase = useMemo(() => purchases.reduce((s, v) => s + (v.amount || 0), 0), [purchases]);
+
+  return (
+    <div className="container py-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Business Overview</h1>
+          {data?.fetchedAt && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Last synced: {new Date(data.fetchedAt).toLocaleString('en-IN')}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Company</Label>
+            <Select value={companyFilter} onValueChange={setCompanyFilter}>
+              <SelectTrigger className="w-[260px]">
+                <SelectValue placeholder="All companies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All companies</SelectItem>
+                {companies.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleSync} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Sync from Tally
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+          <div>
+            <div className="font-medium">Failed to fetch from Tally</div>
+            <div className="text-muted-foreground">{(error as Error).message}</div>
+          </div>
+        </div>
+      )}
+
+      {data?.errors && data.errors.length > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+          <div className="font-medium mb-1 flex items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5" />
+            Some companies/datasets returned warnings
+          </div>
+          <ul className="list-disc pl-5 space-y-0.5 text-muted-foreground">
+            {data.errors.map((e, i) => (
+              <li key={i}>
+                <span className="font-medium">{e.company}</span> · {e.dataset}: {e.error}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <SummaryCard
+          icon={<Users className="h-4 w-4" />}
+          label="Total Debtors Outstanding"
+          value={fmtINR(totalDebtors)}
+          sub={`${debtors.length} parties`}
+        />
+        <SummaryCard
+          icon={<Landmark className="h-4 w-4" />}
+          label="Total Bank Balance"
+          value={fmtINR(totalBank)}
+          sub={`${banks.length} accounts`}
+        />
+        <SummaryCard
+          icon={<Truck className="h-4 w-4" />}
+          label="Dispatches in Range"
+          value={fmtINR(totalDispatch)}
+          sub={`${dispatches.length} vouchers`}
+        />
+        <SummaryCard
+          icon={<ShoppingCart className="h-4 w-4" />}
+          label="Purchases in Range"
+          value={fmtINR(totalPurchase)}
+          sub={`${purchases.length} vouchers`}
+        />
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="debtors">
+        <TabsList>
+          <TabsTrigger value="debtors">Debtors</TabsTrigger>
+          <TabsTrigger value="banks">Banks</TabsTrigger>
+          <TabsTrigger value="dispatches">Dispatches</TabsTrigger>
+          <TabsTrigger value="purchases">Purchases</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="debtors">
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Debtor Balances</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Party Name</TableHead>
+                      <TableHead className="text-right">Outstanding</TableHead>
+                      <TableHead className="text-right">Overdue</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {debtors.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No data</TableCell></TableRow>
+                    ) : (
+                      [...debtors].sort((a, b) => b.outstanding - a.outstanding).map((d, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Badge variant="outline">{d.company}</Badge></TableCell>
+                          <TableCell>{d.partyName}</TableCell>
+                          <TableCell className="text-right font-medium">{fmtINR(d.outstanding)}</TableCell>
+                          <TableCell className="text-right">{fmtINR(d.overdue)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="banks">
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Bank Balances</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {banks.length === 0 ? (
+                      <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No data</TableCell></TableRow>
+                    ) : (
+                      [...banks].sort((a, b) => b.balance - a.balance).map((b, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Badge variant="outline">{b.company}</Badge></TableCell>
+                          <TableCell>{b.accountName}</TableCell>
+                          <TableCell className="text-right font-medium">{fmtINR(b.balance)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="dispatches">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <CardTitle className="text-lg">Dispatch / Sales Vouchers</CardTitle>
+                <DateRange fromDate={fromDate} toDate={toDate} setFromDate={setFromDate} setToDate={setToDate} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <VoucherTable rows={dispatches} partyLabel="Party" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="purchases">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <CardTitle className="text-lg">Purchase Vouchers</CardTitle>
+                <DateRange fromDate={fromDate} toDate={toDate} setFromDate={setFromDate} setToDate={setToDate} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <VoucherTable rows={purchases} partyLabel="Supplier" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function SummaryCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+          <div className="text-muted-foreground">{icon}</div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-semibold tracking-tight">{value}</div>
+        {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DateRange({
+  fromDate, toDate, setFromDate, setToDate,
+}: {
+  fromDate: string; toDate: string;
+  setFromDate: (s: string) => void; setToDate: (s: string) => void;
+}) {
+  return (
+    <div className="flex items-end gap-2">
+      <div className="space-y-1">
+        <Label className="text-xs">From</Label>
+        <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-[150px]" />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">To</Label>
+        <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-[150px]" />
+      </div>
+    </div>
+  );
+}
+
+function VoucherTable({ rows, partyLabel }: { rows: Voucher[]; partyLabel: string }) {
+  return (
+    <div className="overflow-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Company</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Voucher #</TableHead>
+            <TableHead>{partyLabel}</TableHead>
+            <TableHead>Items</TableHead>
+            <TableHead className="text-right">Qty</TableHead>
+            <TableHead className="text-right">Value</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
+            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No data</TableCell></TableRow>
+          ) : (
+            [...rows].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((v, i) => (
+              <TableRow key={i}>
+                <TableCell><Badge variant="outline">{v.company}</Badge></TableCell>
+                <TableCell>{v.date}</TableCell>
+                <TableCell>{v.voucherNumber}</TableCell>
+                <TableCell>{v.party || v.supplier}</TableCell>
+                <TableCell className="max-w-[320px] truncate" title={v.itemsSummary}>{v.itemsSummary || '—'}</TableCell>
+                <TableCell className="text-right">{fmtNum(v.totalQty || 0)}</TableCell>
+                <TableCell className="text-right font-medium">{fmtINR(v.amount)}</TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
