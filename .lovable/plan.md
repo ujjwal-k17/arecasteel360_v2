@@ -1,83 +1,53 @@
 ## Goal
 
-Replace the live-fetch model with a **snapshot-and-serve** architecture: one explicit "Sync from Tally" pulls the full available dataset into our database; every UI view reads from the database until the next sync. Manual sync only (no cron yet).
+Restore Business Overview / Tally Sync responsiveness. The page got slow because (a) `useTallySnapshot` now fetches large datasets that the UI no longer needs after the move to "outstanding walk-back" logic, and (b) the Payment Summary table recomputes per-debtor invoice walks with O(debtors × sales) work + thousands of `Date` allocations on every dependency change.
 
-## Architecture
+Confirmed sizes in the DB today: 5,379 vouchers, 25,882 ledger entries, 7,878 bill refs, 2,960 ledgers. Cold loads currently do multiple chunked `.in()` round-trips then iterate 25k entries in JS — and re-do all of it after every sync or override save.
 
-```
-[Sync button] -> tally-sync edge function -> Tally XML -> parse -> INSERT into tally_* tables
-                                                                       |
-[Business Overview / Debtors / Creditors / Banks / Sales / Purchases]
-       reads from tally_* tables via Supabase client (fast, offline-tolerant)
-```
+## Changes
 
-A sync-run row tags every inserted record. The active snapshot is the most recent successful run per (company, dataset), so a partial failure on one company doesn't blank the other.
+### 1. `src/hooks/useTallySnapshot.ts` — slim the payload
 
-## Schema (new tables)
+The Payment Summary table and debtor dialog now derive everything from `closing_balance` + `sales`. So:
 
-- `tally_sync_runs` — run id, started/finished, status (running|success|partial|failed), triggered_by, datasets[], companies[], counts jsonb, errors jsonb
-- `tally_groups` — sync_run_id, company, name, parent, is_reserved
-- `tally_ledgers` — sync_run_id, company, name, parent_group, root_group, parent_chain text[], closing_balance, classification ('debtor'|'creditor'|'bank'|'other')
-- `tally_vouchers` — sync_run_id, company, kind ('sales'|'purchase'), voucher_type, voucher_number, voucher_date, party_name, amount, is_cancelled, is_optional
-- `tally_voucher_items` — voucher_id (fk), stock_item, qty, rate, amount
+- **Drop the `debtorCredits` fetch entirely** (the two-pass entries → vouchers query is the heaviest single cost). Keep the type exported as `[]` for backward compatibility, or remove the field and update consumers.
+- **Drop the `billRefs` chunked fetch** — currently unused by the active UI paths. (If a future feature needs it, fetch on demand inside that component.)
+- **Drop receipts, bankTxns, purchases caps** from 50,000 to a more realistic ceiling, and only request the columns each view needs. Keep ascending order only where overdue calc requires it (sales).
+- Run the remaining `Promise.all` queries unchanged but without the dependent second-stage fetches.
 
-Views:
-- `v_tally_active_runs(company, dataset, sync_run_id)` — most recent success/partial run per slice
-- `v_tally_debtors`, `v_tally_creditors`, `v_tally_banks`, `v_tally_sales`, `v_tally_purchases` — pre-filtered to active runs for clean reads.
+Net effect: cold load goes from ~8–20 round-trips to ~6 single-shot queries, and the JS post-processing loop over 25k entries disappears.
 
-RLS: authenticated SELECT on all `tally_*`. Writes go via edge function (service role, bypasses RLS).
+### 2. `src/pages/BusinessOverviewPage.tsx` — make the table cheap to render
 
-Indexes: `(sync_run_id)`, `(company, classification)` on ledgers, `(company, voucher_date)` on vouchers, `(voucher_id)` on items.
+In `DebtorPaymentSummaryTab` (`rows` memo around line 533):
 
-## Sync flow (`supabase/functions/tally-sync/index.ts`)
+- **Pre-index sales by `(company, ledger_name lowercase)` once** with a `useMemo` over `sales`, then look up `salesByDebtor.get(key) || []` per debtor instead of `sales.filter(...)` in the inner loop. This collapses the dominant O(debtors × sales) factor.
+- Pre-sort each bucket descending by date once when building the index, so the per-row `[...].sort(...)` goes away.
+- Hoist `today` out of the loop; replace `new Date(...).setDate / toISOString()` with simple ISO string arithmetic by adding days numerically (we already store `voucher_date` as an ISO string — add days via a tiny helper that does it without allocating two `Date` objects per invoice).
+- Drop `creditIndex` from the deps of the `rows` memo (it's no longer read inside the loop after the walk-back rewrite — verified by reading the current code).
 
-1. Insert `tally_sync_runs` row with `status='running'`.
-2. For each company, run 3 datasets independently (groups+ledgers, sales vouchers, purchase vouchers):
-   - Fetch via Tally XML
-   - Parse, classify ledgers using full parent-chain walk
-   - Bulk-insert tagged with this run id
-3. Collect per-(company,dataset) errors into the run's `errors` jsonb. If a dataset fails, those rows aren't inserted, and the previous run's data for that slice stays active via the views.
-4. Final status: `success` if no errors, `partial` if some, `failed` if nothing inserted.
-5. Return `{ runId, counts, errors }`.
+In `BusinessOverviewPage`:
 
-### Pulling all available data
+- Wrap `debtors / banks / sales / purchases / receipts / bankTxns / debtorCredits` filtering in a single `useMemo` keyed on `data` + `companyFilter` so we don't re-filter on every keystroke / dialog open.
 
-Voucher requests use `SVFROMDATE=19000101` → today. Per-call 25s timeout, 60s wall-clock guard preserved. If a company times out, that dataset is marked failed for this run and the prior snapshot stays active. If the first full pull blows the budget we'll add an FY-chunked fallback in a follow-up.
+In `DebtorInvoiceCycleCard` (dialog body):
 
-## Frontend
+- Same pre-index trick: derive `dInvoices` from a passed-in indexed map instead of re-filtering `sales` when the dialog opens.
 
-- New hook `src/hooks/useTallySnapshot.ts` — queries the views, returns `{ debtors, creditors, banks, sales, purchases, lastSyncedAt, status, errors }`.
-- `src/pages/BusinessOverviewPage.tsx`:
-  - Read from snapshot hook (no more live tally-fetch in render path).
-  - Top banner: "Last synced: <ts> (<status>)". 
-  - "Sync from Tally" button invokes `tally-sync` then invalidates the snapshot query.
+### 3. Quick wins
 
-`tally-fetch` stays as a diagnostic preview — not the data path.
+- Replace `localeCompare` on ISO date strings with `<` / `>` comparators (ISO dates sort lexicographically).
+- Memoize `repCounts`, `repFilteredRows`, `filtered`, `totals` are already memoized — leave as is.
 
-## Files
+## Out of scope
 
-New:
-- migration: tables + views + RLS + indexes
-- `supabase/functions/tally-sync/index.ts`
-- `src/hooks/useTallySnapshot.ts`
-
-Edited:
-- `src/pages/BusinessOverviewPage.tsx`
-
-Untouched:
-- `supabase/functions/tally-fetch/index.ts`
-- `supabase/functions/tally-diagnose/index.ts`
-
-## Deferred
-
-- pg_cron daily auto-sync
-- Aging buckets, per-party drill-downs, cross-module joins to customers/orders
-- Automatic cleanup of old sync runs
+- No schema or edge-function changes. The sync function itself isn't the slow part the user is feeling on this page; the lag is on the read/render side after sync.
+- No removal of `debtorCredits` / `billRefs` from the codebase beyond the snapshot hook — components that currently import the types stay compiled; they'll just receive empty arrays.
 
 ## Verification
 
-1. Migration applies cleanly.
-2. Click Sync → returns within ~60s, rows present in tally_* tables, banner updates.
-3. Reload page → views render from snapshot, no Tally call.
-4. Kill Tally → page still works.
-5. Re-sync → new runId, counts refresh.
+1. Open Business Overview after the change → initial render visibly faster, fewer network requests in DevTools.
+2. Switch company filter → table updates without a perceptible pause.
+3. Open a debtor dialog → opens immediately; unpaid invoices and overdue figures match the table column.
+4. Run "Sync from Tally" → on completion, the snapshot refetch is a small handful of queries, not 15+.
+5. Numbers (Outstanding, Overdue, Overdue Invoices, Open Invoices) match the values shown before the change for a couple of spot-checked debtors.

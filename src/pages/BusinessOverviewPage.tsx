@@ -97,18 +97,29 @@ export default function BusinessOverviewPage() {
   };
 
   const companies = data?.companies || [];
-  const filterCo = <T extends { company: string }>(arr: T[] | undefined): T[] =>
-    (arr || []).filter(r => companyFilter === ALL || r.company === companyFilter);
 
-  const debtors = filterCo(data?.debtors);
-  const banks = filterCo(data?.banks);
-  const sales = filterCo(data?.sales);
-  const purchases = filterCo(data?.purchases);
-  const receipts = filterCo(data?.receipts);
-  const bankTxns = filterCo(data?.bankTxns);
-  const billRefs = data?.billRefs || [];
-  const debtorCredits = (data?.debtorCredits || []).filter(c => companyFilter === ALL || c.company === companyFilter);
-  const overrides = data?.overrides || [];
+  // Memoize the company-filtered slices so they don't rebuild on every render
+  // (e.g. on every search keystroke or dialog open). Filtering large arrays
+  // unconditionally was a meaningful render-time cost.
+  const {
+    debtors, banks, sales, purchases, receipts, bankTxns, billRefs, debtorCredits, overrides,
+  } = useMemo(() => {
+    const match = <T extends { company: string }>(arr: T[] | undefined): T[] =>
+      companyFilter === ALL ? (arr || []) : (arr || []).filter(r => r.company === companyFilter);
+    return {
+      debtors: match(data?.debtors),
+      banks: match(data?.banks),
+      sales: match(data?.sales),
+      purchases: match(data?.purchases),
+      receipts: match(data?.receipts),
+      bankTxns: match(data?.bankTxns),
+      billRefs: data?.billRefs || [],
+      debtorCredits: companyFilter === ALL
+        ? (data?.debtorCredits || [])
+        : (data?.debtorCredits || []).filter(c => c.company === companyFilter),
+      overrides: data?.overrides || [],
+    };
+  }, [data, companyFilter]);
 
   const inRange = (d: string | null) => !!d && d >= fromDate && d <= toDate;
 
@@ -515,42 +526,50 @@ function DebtorPaymentSummaryTab({
     return m;
   }, [overrides]);
 
-  // Index debtor credits by (company, ledger_name lowercase) for fast FIFO lookup.
-  // These represent every banking / journal / contra entry that credits the debtor's
-  // ledger across all voucher kinds — i.e. all payment inflows or adjustments
-  // reducing the receivable.
-  const creditIndex = useMemo(() => {
-    const m = new Map<string, SnapshotDebtorCredit[]>();
-    for (const c of debtorCredits) {
-      const key = `${c.company}__${c.ledger_name.toLowerCase()}`;
+
+
+  // Pre-index sales by (company, ledger lowercase), pre-sorted descending by date.
+  // This collapses what was an O(debtors × sales) `sales.filter(...)` + per-row
+  // `sort()` into a single O(sales) build + O(1) lookup per debtor.
+  const salesByDebtor = useMemo(() => {
+    const m = new Map<string, SnapshotVoucher[]>();
+    for (const v of sales) {
+      const party = (v.party_name || '').toLowerCase();
+      if (!party) continue;
+      const key = `${v.company}__${party}`;
       const arr = m.get(key);
-      if (arr) arr.push(c); else m.set(key, [c]);
+      if (arr) arr.push(v); else m.set(key, [v]);
+    }
+    // ISO date strings sort lexicographically — descending = b vs a.
+    for (const arr of m.values()) {
+      arr.sort((a, b) => (b.voucher_date || '').localeCompare(a.voucher_date || ''));
     }
     return m;
-  }, [debtorCredits]);
+  }, [sales]);
 
-  // Compute per-debtor overdue from FIFO matches; outstanding = Tally ledger closing balance
+  // Compute per-debtor overdue using outstanding walk-back; outstanding = Tally closing balance
   const rows = useMemo(() => {
     const today = todayIso();
+    // Add `days` to an ISO date string (yyyy-mm-dd) without allocating two Date
+    // objects per invoice.
+    const addDaysIso = (iso: string, days: number): string => {
+      const d = new Date(iso + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
     return debtors.map(d => {
       const k = dkey(d.company, d.name);
       const ov = overrideMap.get(k);
       const cp = ov?.credit_period_days ?? null;
       const salesRep = ov?.sales_rep ?? null;
-      const ledgerLow = d.name.toLowerCase();
-      const dInvoices = sales.filter(v => v.company === d.company && (v.party_name || '').toLowerCase() === ledgerLow);
-      // Outstanding from Tally ledger (Cr-side, stored negative). Walk invoices
-      // newest -> oldest, accumulating amounts until they cover outstanding.
-      // The oldest invoice in that set may be partially paid.
+      const dInvoices = salesByDebtor.get(`${d.company}__${d.name.toLowerCase()}`) || [];
       const outstandingAbs = Math.abs(Number(d.closing_balance) || 0);
-      const sortedDesc = [...dInvoices].sort((a, b) =>
-        (b.voucher_date || '').localeCompare(a.voucher_date || '')
-      );
       let remaining = outstandingAbs;
       let overdue = 0;
       let overdueCount = 0;
       let unpaidInvoiceCount = 0;
-      for (const v of sortedDesc) {
+      // dInvoices is already sorted descending by date.
+      for (const v of dInvoices) {
         if (remaining <= 0.0001) break;
         const amt = Number(v.amount) || 0;
         if (amt <= 0) continue;
@@ -558,9 +577,7 @@ function DebtorPaymentSummaryTab({
         remaining -= unpaidPortion;
         unpaidInvoiceCount += 1;
         if (v.voucher_date && cp != null) {
-          const due = new Date(v.voucher_date);
-          due.setDate(due.getDate() + cp);
-          const dueIso = due.toISOString().slice(0, 10);
+          const dueIso = addDaysIso(v.voucher_date, cp);
           if (dueIso < today) {
             overdue += unpaidPortion;
             overdueCount += 1;
@@ -569,14 +586,14 @@ function DebtorPaymentSummaryTab({
       }
       return {
         debtor: d, key: k, cp, salesRep,
-        outstanding: d.closing_balance, // direct from Tally ledger balance
+        outstanding: d.closing_balance,
         overdue, overdueCount, invoiceCount: unpaidInvoiceCount,
       };
     }).filter(r =>
-      r.salesRep !== 'IntraCompany' &&            // exclude intra-company debtors
-      Math.abs(r.outstanding) > 0.5               // active = has a non-zero ledger balance
+      r.salesRep !== 'IntraCompany' &&
+      Math.abs(r.outstanding) > 0.5
     );
-  }, [debtors, sales, creditIndex, overrideMap]);
+  }, [debtors, salesByDebtor, overrideMap]);
 
   // Sales-rep sub-tab
   const [repTab, setRepTab] = useState<string>('__all__');
