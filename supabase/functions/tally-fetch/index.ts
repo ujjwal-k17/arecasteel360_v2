@@ -11,6 +11,7 @@ const TALLY_URL = 'http://103.239.89.153:9000';
 const COMPANIES = [
   'Areca Indocorp LLP (Delhi) - FY-2022-23',
   'Areca Indocorp LLP (Gzb.) FY-2022-23',
+  'RUKMINI ISPAT GZB',
 ];
 
 // ----------------- helpers -----------------
