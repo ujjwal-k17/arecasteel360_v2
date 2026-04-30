@@ -343,6 +343,12 @@ function DebtorSummaryModule({
     ? debtors.find(d => dkey(d.company, d.name) === selectedKey)
     : null;
 
+  useEffect(() => {
+    if (selectedDebtor && detailRef.current) {
+      detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedKey]);
+
   return (
     <div className="space-y-4">
       <Card>
