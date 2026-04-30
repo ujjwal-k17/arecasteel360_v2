@@ -219,16 +219,21 @@ type VoucherRow = {
 
 function parseLedgerEntries(inner: string): LedgerEntry[] {
   const entries: LedgerEntry[] = [];
-  const re = /<ALLLEDGERENTRIES\.LIST>([\s\S]*?)<\/ALLLEDGERENTRIES\.LIST>/gi;
+  // Match BOTH <ALLLEDGERENTRIES.LIST> (sales/purchase invoices) and
+  // <LEDGERENTRIES.LIST> (receipt/payment/contra/journal vouchers — Tally uses
+  // the non-"ALL" variant for non-inventory vouchers).
+  const re = /<(ALLLEDGERENTRIES|LEDGERENTRIES)\.LIST>([\s\S]*?)<\/\1\.LIST>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(inner)) !== null) {
-    const blk = m[1];
+    const blk = m[2];
     const ledgerName = tag(blk, 'LEDGERNAME') || '';
     const amountRaw = tag(blk, 'AMOUNT') || '';
-    const isDeemedPositive = /Yes/i.test(tag(blk, 'ISDEEMEDPOSITIVE') || '');
     const isPartyLedger = /Yes/i.test(tag(blk, 'ISPARTYLEDGER') || '');
-    const amt = parseAmount(amountRaw); // Cr -> negative
-    const isDebit = isDeemedPositive || amt > 0;
+    const amt = parseAmount(amountRaw); // Cr / "-" prefix -> negative; Dr / plain -> positive
+    // Sign of <AMOUNT> alone determines Dr vs Cr. ISDEEMEDPOSITIVE is the
+    // ledger's *natural* side (Cr for assets/debtors, Dr for expenses) and
+    // does NOT indicate the direction of this particular entry.
+    const isDebit = amt > 0;
 
     const billRefs: LedgerEntry['billRefs'] = [];
     const brRe = /<BILLALLOCATIONS\.LIST>([\s\S]*?)<\/BILLALLOCATIONS\.LIST>/gi;
