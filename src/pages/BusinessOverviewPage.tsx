@@ -126,32 +126,44 @@ export default function BusinessOverviewPage() {
     }
   };
 
-  const companies = data?.companies || [];
+  const companies = useMemo(() => {
+    const set = new Set<string>([
+      ...(ledgersData?.companies || []),
+      ...(vouchersData?.companies || []),
+    ]);
+    return Array.from(set);
+  }, [ledgersData, vouchersData]);
 
   const filterByCompany = <T extends { company: string }>(arr: T[] | undefined): T[] =>
     (arr || []).filter(r => companyFilter === ALL || r.company === companyFilter);
 
-  const debtors = filterByCompany(data?.debtors);
-  const banks = filterByCompany(data?.banks);
-  const dispatches = filterByCompany(data?.dispatches);
-  const purchases = filterByCompany(data?.purchases);
+  const debtors = filterByCompany<Debtor>(ledgersData?.debtors);
+  const banks = filterByCompany<Bank>(ledgersData?.banks);
+  const dispatches = filterByCompany<Voucher>(vouchersData?.dispatches);
+  const purchases = filterByCompany<Voucher>(vouchersData?.purchases);
 
   const totalDebtors = useMemo(() => debtors.reduce((s, d) => s + (d.outstanding || 0), 0), [debtors]);
   const totalBank = useMemo(() => banks.reduce((s, b) => s + (b.balance || 0), 0), [banks]);
   const totalDispatch = useMemo(() => dispatches.reduce((s, v) => s + (v.amount || 0), 0), [dispatches]);
   const totalPurchase = useMemo(() => purchases.reduce((s, v) => s + (v.amount || 0), 0), [purchases]);
 
+  const fmtTime = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString('en-IN') : 'not yet';
+
+  const combinedErrors = [
+    ...(ledgersData?.errors || []),
+    ...(vouchersData?.errors || []),
+  ];
+
   return (
     <div className="container py-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Business Overview</h1>
-          {data?.fetchedAt && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Last synced: {new Date(data.fetchedAt).toLocaleString('en-IN')}
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            Debtors & Creditors: {fmtTime(ledgersData?.fetchedAt)} · Dispatches & Purchases: {fmtTime(vouchersData?.fetchedAt)}
+          </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
@@ -172,9 +184,13 @@ export default function BusinessOverviewPage() {
             <Stethoscope className={`h-4 w-4 mr-2 ${diagLoading ? 'animate-pulse' : ''}`} />
             Test Connection
           </Button>
-          <Button onClick={handleSync} disabled={isFetching}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            Sync from Tally
+          <Button onClick={handleSyncLedgers} disabled={ledgersLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${ledgersLoading ? 'animate-spin' : ''}`} />
+            Sync Debtors & Creditors
+          </Button>
+          <Button onClick={handleSyncVouchers} disabled={vouchersLoading} variant="secondary">
+            <RefreshCw className={`h-4 w-4 mr-2 ${vouchersLoading ? 'animate-spin' : ''}`} />
+            Sync Dispatches & Purchases
           </Button>
         </div>
       </div>
@@ -197,24 +213,25 @@ export default function BusinessOverviewPage() {
         </DialogContent>
       </Dialog>
 
-      {error && (
+      {(ledgersError || vouchersError) && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm flex items-start gap-2">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
-          <div>
+          <div className="space-y-1">
             <div className="font-medium">Failed to fetch from Tally</div>
-            <div className="text-muted-foreground">{(error as Error).message}</div>
+            {ledgersError && <div className="text-muted-foreground">Debtors & Creditors: {ledgersError}</div>}
+            {vouchersError && <div className="text-muted-foreground">Dispatches & Purchases: {vouchersError}</div>}
           </div>
         </div>
       )}
 
-      {data?.errors && data.errors.length > 0 && (
+      {combinedErrors.length > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
           <div className="font-medium mb-1 flex items-center gap-2">
             <AlertCircle className="h-3.5 w-3.5" />
             Some companies/datasets returned warnings
           </div>
           <ul className="list-disc pl-5 space-y-0.5 text-muted-foreground">
-            {data.errors.map((e, i) => (
+            {combinedErrors.map((e, i) => (
               <li key={i}>
                 <span className="font-medium">{e.company}</span> · {e.dataset}: {e.error}
               </li>
@@ -222,6 +239,7 @@ export default function BusinessOverviewPage() {
           </ul>
         </div>
       )}
+
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
