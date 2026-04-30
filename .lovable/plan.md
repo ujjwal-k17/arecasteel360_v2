@@ -1,60 +1,25 @@
-## Why Debtors are empty
+## Goal
+Make the Tally sync diagnostics visible in the UI (no DevTools needed) and surface per-company HTTP status, raw response sample, and errors so we can pinpoint why debtors are empty.
 
-The sync says "synced" because Tally responded successfully — but `result.debtors` is empty. Two reasons:
+## Changes
 
-**1. The `<COMPUTE>` block in our XML doesn't actually work the way we hoped.**
-We added `<COMPUTE>IsDebtor : $$IsLedOfGrp:$Name:"Sundry Debtors"</COMPUTE>` inside the `<COLLECTION>`, but Tally's XML export does **not** emit COMPUTE fields as `<ISDEBTOR>` tags in the response unless they're declared as proper `<TDLMESSAGE><FUNCTION>`/`<PART>` constructs. So `tag(inner, 'ISDEBTOR')` is always `null` → `isDebtor` is always `false`.
+### 1. `supabase/functions/tally-fetch/index.ts`
+- Initialize `_debug.companies[company]` early in the ledger job and write **HTTP status + response byte count + first 600 chars of raw XML** for both Group and Ledger calls *before* parsing.
+- In the catch block, write `exception: <message>` into `_debug.companies[company]` so failures are visible.
+- Always include `result.errors` inside `_debug` when `debug:true`.
 
-**2. The keyword fallback is also failing.**
-Our fallback only checks the **immediate parent** name returned in `<PARENT>`. In your Tally, debtors are filed under sub-groups (e.g. *Domestic Debtors*, *Trade Receivables – North*) whose own parent is *Sundry Debtors*. The ledger's `<PARENT>` tag returns only that immediate sub-group name (e.g. "Domestic Debtors"), which **does** contain the word "debtor" — so this should match. But if your sub-groups are named without those keywords (e.g. "North Zone Parties", "GZB Customers"), nothing matches and the list is empty.
+### 2. `src/pages/BusinessOverviewPage.tsx`
+- Add a collapsible **"Sync diagnostics"** panel (shown after a sync runs) that displays, per company:
+  - HTTP status / bytes for ledger + group fetch
+  - Ledger count, Group count, Debtor/Creditor/Bank counts
+  - First 5 sample ledgers with `name → parent → resolved root group → closing balance`
+  - Any exception message
+- Panel auto-expands when zero parties were matched or any error occurred.
 
-The previous "Sync Debtors & Creditors" worked when ledgers sat directly under *Sundry Debtors*; once they were re-organised under custom sub-groups, the filter stopped matching.
+## Expected outcome
+Click **Sync Debtors & Creditors** once, then expand the diagnostics panel. The output will tell us exactly which scenario we're in:
+- **`exception: "error sending request"` / timeout** → Lovable's servers cannot reach `103.239.89.153:9000`. Fix on the Tally/router side (port-forward, firewall, public IP).
+- **HTTP 200 but `ledgerCount: 0`** → Tally reachable but company name mismatch or company not loaded.
+- **`ledgerCount > 0` but `debtors: 0`** → sample will reveal the actual parent group names so we extend the classifier.
 
-## The fix — walk the group hierarchy ourselves
-
-Instead of relying on Tally's `$$IsLedOfGrp` (which doesn't survive collection XML export), fetch **both** ledgers and groups, then resolve each ledger's ultimate primary group inside the edge function.
-
-### Edge function changes (`supabase/functions/tally-fetch/index.ts`)
-
-1. **Add a second Tally request: a Group collection.** Builds a map of `groupName → parentName` for all groups in the company (small, fast).
-2. **Drop the COMPUTE fields** from the ledger XML — they don't help.
-3. **In code, for each ledger:** walk up the group chain (`parent → parent → …`) until we hit one of Tally's reserved primary groups: `Sundry Debtors`, `Sundry Creditors`, `Bank Accounts`, `Bank OD A/c`, `Cash-in-Hand`. Whichever we land on classifies the ledger.
-4. **Add a `debug` flag** to the request body. When `debug: true`, return a `_debug` object containing: ledger count, sample of 5 raw ledger names + parents, group-chain resolution for each, and counts per classification. This lets us see exactly what Tally is returning if anything is still off.
-5. **Keep the keyword fallback** as a last resort for safety.
-6. **Filter out zero-balance debtors** only on the UI side, not the edge function — so the debug count reflects all parties.
-
-### Data flow
-
-```text
-Tally
-  ├── Ledgers (Name, Parent, ClosingBalance)
-  └── Groups  (Name, Parent)
-         │
-         ▼
-   Edge function builds parentMap
-         │
-         ▼
-   For each ledger: walk parent chain
-         │
-   ┌─────┴──────┐
-   ▼            ▼
- Sundry      Bank Accounts → banks[]
- Debtors  → debtors[]
- Sundry
- Creditors → (new) creditors[]
-```
-
-### Optional UI follow-up
-
-The current page shows "Total Debtors Outstanding" but no Creditors panel. While we're here, surface creditors too (the data is already being parsed) — small addition: one stat card and a tab. Confirm if you want this included.
-
-## Files to change
-
-- `supabase/functions/tally-fetch/index.ts` — add Group XML builder, parser, parent-walk classifier, debug payload.
-- `src/pages/BusinessOverviewPage.tsx` — pass `debug: true` on first sync after deploy so we can verify; optional creditors UI.
-
-## How we'll verify
-
-After deploy, click **Sync Debtors & Creditors** once. The toast will show counts; if still 0, the `_debug` payload will tell us the actual parent names Tally returned, and we can adjust the reserved-group list (e.g. some Indian Tally installs use "Sundry Debtors (Domestic)" as a primary group).
-
-Want me to also add the Creditors stat card + tab in the same change?
+No UI redesign, no schema changes, no new dependencies.
