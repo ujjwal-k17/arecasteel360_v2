@@ -250,7 +250,53 @@ export default function BusinessOverviewPage() {
       )}
 
 
-      {/* Summary cards */}
+      {(ledgersData as any)?._debug && (
+        <details
+          className="rounded-md border bg-muted/30 px-3 py-2 text-xs"
+          open={(ledgersData?.debtors?.length || 0) === 0 || combinedErrors.length > 0}
+        >
+          <summary className="cursor-pointer font-medium">
+            Sync diagnostics ({Object.keys((ledgersData as any)._debug.companies || {}).length} companies)
+          </summary>
+          <div className="mt-2 space-y-3">
+            {Object.entries((ledgersData as any)._debug.companies || {}).map(([company, info]: [string, any]) => (
+              <div key={company} className="rounded border bg-background p-2 space-y-1">
+                <div className="font-medium">{company}</div>
+                {info.exception && (
+                  <div className="text-destructive">Exception: {info.exception}</div>
+                )}
+                {info.ledgerHttp && <div>Ledger HTTP: {info.ledgerHttp}</div>}
+                {info.groupHttp && <div>Group HTTP: {info.groupHttp}</div>}
+                {typeof info.ledgerCount === 'number' && (
+                  <div>
+                    Ledgers: {info.ledgerCount} · Groups: {info.groupCount} · Debtors: {info.debtors} · Creditors: {info.creditors} · Banks: {info.banks}
+                  </div>
+                )}
+                {Array.isArray(info.sampleLedgers) && info.sampleLedgers.length > 0 && (
+                  <div>
+                    <div className="font-medium mt-1">Sample ledgers:</div>
+                    <ul className="list-disc pl-5 text-muted-foreground">
+                      {info.sampleLedgers.slice(0, 5).map((s: any, i: number) => (
+                        <li key={i}>
+                          <span className="font-medium">{s.name}</span> — parent: <em>{s.parent || '(none)'}</em> → root: <em>{s.root || '(none)'}</em> · {s.closing}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {info.ledgerSample && !info.ledgerCount && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-muted-foreground">Raw ledger response (first 600 chars)</summary>
+                    <pre className="mt-1 whitespace-pre-wrap break-all text-[10px] bg-muted p-2 rounded">{info.ledgerSample}</pre>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
           icon={<Users className="h-4 w-4" />}
