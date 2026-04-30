@@ -1,53 +1,83 @@
 ## Goal
 
-Make Debtors & Creditors classification rely strictly on the **ancestor chain** rolling up to the reserved primary groups **"Sundry Debtors"** or **"Sundry Creditors"**. This correctly captures any custom sub-group (e.g. "Delhi Debtors", "Local Parties", "Overdue > 90 days") that the user has created under those primaries, and excludes ledgers that just happen to have the words "debtor"/"creditor"/"payable"/"receivable" in their immediate parent name.
+Replace the live-fetch model with a **snapshot-and-serve** architecture: one explicit "Sync from Tally" pulls the full available dataset into our database; every UI view reads from the database until the next sync. Manual sync only (no cron yet).
 
-## Current behaviour (problem)
-
-In `supabase/functions/tally-fetch/index.ts`, the classifier checks:
+## Architecture
 
 ```
-isDebtor   = root === 'sundry debtors'   OR parent contains 'debtor'/'receivable'
-isCreditor = root === 'sundry creditors' OR parent contains 'creditor'/'payable'
+[Sync button] -> tally-sync edge function -> Tally XML -> parse -> INSERT into tally_* tables
+                                                                       |
+[Business Overview / Debtors / Creditors / Banks / Sales / Purchases]
+       reads from tally_* tables via Supabase client (fast, offline-tolerant)
 ```
 
-The substring fallbacks on the immediate parent are noisy:
-- They miss ledgers whose immediate parent doesn't contain the word but which roll up correctly (e.g. parent = "Delhi Parties" → "Sundry Debtors").
-- They wrongly include ledgers under unrelated parents that happen to share a substring.
+A sync-run row tags every inserted record. The active snapshot is the most recent successful run per (company, dataset), so a partial failure on one company doesn't blank the other.
 
-## Change
+## Schema (new tables)
 
-In `supabase/functions/tally-fetch/index.ts`, replace the classification block inside the ledgers job with a strict root-group check:
+- `tally_sync_runs` — run id, started/finished, status (running|success|partial|failed), triggered_by, datasets[], companies[], counts jsonb, errors jsonb
+- `tally_groups` — sync_run_id, company, name, parent, is_reserved
+- `tally_ledgers` — sync_run_id, company, name, parent_group, root_group, parent_chain text[], closing_balance, classification ('debtor'|'creditor'|'bank'|'other')
+- `tally_vouchers` — sync_run_id, company, kind ('sales'|'purchase'), voucher_type, voucher_number, voucher_date, party_name, amount, is_cancelled, is_optional
+- `tally_voucher_items` — voucher_id (fk), stock_item, qty, rate, amount
 
-```ts
-const root = rootGroupOf(l.parent, groupMap); // already lowercase
+Views:
+- `v_tally_active_runs(company, dataset, sync_run_id)` — most recent success/partial run per slice
+- `v_tally_debtors`, `v_tally_creditors`, `v_tally_banks`, `v_tally_sales`, `v_tally_purchases` — pre-filtered to active runs for clean reads.
 
-const isDebtor   = root === 'sundry debtors';
-const isCreditor = root === 'sundry creditors';
-const isBank     = root === 'bank accounts'
-                || root === 'bank od a/c'
-                || root === 'bank occ a/c';
-```
+RLS: authenticated SELECT on all `tally_*`. Writes go via edge function (service role, bypasses RLS).
 
-`rootGroupOf` already walks the full parent chain via the Group collection until it hits a top-level (reserved) primary, so any ledger whose chain terminates at "Sundry Debtors" / "Sundry Creditors" will be picked up regardless of how many intermediate user-defined sub-groups exist.
+Indexes: `(sync_run_id)`, `(company, classification)` on ledgers, `(company, voucher_date)` on vouchers, `(voucher_id)` on items.
 
-### Edge cases handled by the existing walker
+## Sync flow (`supabase/functions/tally-sync/index.ts`)
 
-- The function detects cycles via a `seen` set.
-- It returns the immediate parent if no further parent is found in `groupMap` — so for the walk to terminate at "Sundry Debtors", that primary must appear in the Group collection. The current `buildGroupXml` fetches **all** groups (including reserved ones via `NATIVEMETHOD IsReserved`), so the chain resolves correctly. No XML change needed.
+1. Insert `tally_sync_runs` row with `status='running'`.
+2. For each company, run 3 datasets independently (groups+ledgers, sales vouchers, purchase vouchers):
+   - Fetch via Tally XML
+   - Parse, classify ledgers using full parent-chain walk
+   - Bulk-insert tagged with this run id
+3. Collect per-(company,dataset) errors into the run's `errors` jsonb. If a dataset fails, those rows aren't inserted, and the previous run's data for that slice stays active via the views.
+4. Final status: `success` if no errors, `partial` if some, `failed` if nothing inserted.
+5. Return `{ runId, counts, errors }`.
 
-### Defensive note
+### Pulling all available data
 
-If the Group collection comes back empty (e.g. partial Tally response), the walker returns the immediate parent name. In that degenerate case we'd classify nothing as debtor/creditor rather than misclassify — acceptable, and the diagnostics panel already surfaces `groupCount: 0` when this happens.
+Voucher requests use `SVFROMDATE=19000101` → today. Per-call 25s timeout, 60s wall-clock guard preserved. If a company times out, that dataset is marked failed for this run and the prior snapshot stays active. If the first full pull blows the budget we'll add an FY-chunked fallback in a follow-up.
+
+## Frontend
+
+- New hook `src/hooks/useTallySnapshot.ts` — queries the views, returns `{ debtors, creditors, banks, sales, purchases, lastSyncedAt, status, errors }`.
+- `src/pages/BusinessOverviewPage.tsx`:
+  - Read from snapshot hook (no more live tally-fetch in render path).
+  - Top banner: "Last synced: <ts> (<status>)". 
+  - "Sync from Tally" button invokes `tally-sync` then invalidates the snapshot query.
+
+`tally-fetch` stays as a diagnostic preview — not the data path.
 
 ## Files
 
-- `supabase/functions/tally-fetch/index.ts` — tighten `isDebtor` / `isCreditor` / `isBank` to root-only checks (remove substring fallbacks on `parent`).
+New:
+- migration: tables + views + RLS + indexes
+- `supabase/functions/tally-sync/index.ts`
+- `src/hooks/useTallySnapshot.ts`
 
-No frontend, schema, or RLS changes. No new dependencies.
+Edited:
+- `src/pages/BusinessOverviewPage.tsx`
 
-## Verification after deploy
+Untouched:
+- `supabase/functions/tally-fetch/index.ts`
+- `supabase/functions/tally-diagnose/index.ts`
 
-1. Sync Debtors & Creditors.
-2. Open the diagnostics panel — `sampleLedgers` shows `{ name, parent, root, closing }`. Confirm every row in `result.debtors` has `root === "sundry debtors"` and every row in `result.creditors` has `root === "sundry creditors"`.
-3. Spot-check a known ledger nested 2+ levels deep under a custom sub-group of Sundry Debtors — it should now appear.
+## Deferred
+
+- pg_cron daily auto-sync
+- Aging buckets, per-party drill-downs, cross-module joins to customers/orders
+- Automatic cleanup of old sync runs
+
+## Verification
+
+1. Migration applies cleanly.
+2. Click Sync → returns within ~60s, rows present in tally_* tables, banner updates.
+3. Reload page → views render from snapshot, no Tally call.
+4. Kill Tally → page still works.
+5. Re-sync → new runId, counts refresh.
