@@ -66,10 +66,6 @@ function parseQty(s: string | null): number {
 
 // ----------------- XML builders -----------------
 function buildLedgerXml(company: string): string {
-  // Use COMPUTE fields with $$IsLedOfGrp so Tally walks the full group
-  // hierarchy and tells us whether each ledger ultimately belongs to
-  // Sundry Debtors / Creditors / Bank — independent of sub-group naming
-  // (Domestic Debtors, Trade Receivables, Bank OD A/c, etc.).
   return `<ENVELOPE>
   <HEADER>
     <VERSION>1</VERSION>
@@ -90,10 +86,35 @@ function buildLedgerXml(company: string): string {
             <NATIVEMETHOD>Name</NATIVEMETHOD>
             <NATIVEMETHOD>Parent</NATIVEMETHOD>
             <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
-            <COMPUTE>IsDebtor : $$IsLedOfGrp:$Name:"Sundry Debtors"</COMPUTE>
-            <COMPUTE>IsCreditor : $$IsLedOfGrp:$Name:"Sundry Creditors"</COMPUTE>
-            <COMPUTE>IsBank : $$IsLedOfGrp:$Name:"Bank Accounts"</COMPUTE>
-            <COMPUTE>IsBankOD : $$IsLedOfGrp:$Name:"Bank OD A/c"</COMPUTE>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
+function buildGroupXml(company: string): string {
+  return `<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>ArecaGroupSync</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="ArecaGroupSync" ISMODIFY="No">
+            <TYPE>Group</TYPE>
+            <NATIVEMETHOD>Name</NATIVEMETHOD>
+            <NATIVEMETHOD>Parent</NATIVEMETHOD>
+            <NATIVEMETHOD>IsReserved</NATIVEMETHOD>
           </COLLECTION>
         </TDLMESSAGE>
       </TDL>
