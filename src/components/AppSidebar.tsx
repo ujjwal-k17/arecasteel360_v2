@@ -19,13 +19,13 @@ import { Button } from '@/components/ui/button';
 
 const modules = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, page: 'dashboard' },
+  { title: 'Tally Sync', url: '/business-overview', icon: BarChart3, page: 'business-overview' },
   { title: 'Inventory', url: '/inventory', icon: Package, page: 'inventory' },
   { title: 'Consumables', url: '/consumables', icon: Wrench, page: 'consumables' },
   { title: 'Order Book', url: '/order-book', icon: ClipboardList, page: 'order-book' },
   
   { title: 'Petty Cash', url: '/petty-cash', icon: Wallet, page: 'petty-cash' },
   { title: 'Transportation', url: '/freight', icon: Truck, page: 'freight' },
-  { title: 'Business Overview', url: '/business-overview', icon: BarChart3, page: 'business-overview' },
 ];
 
 export function AppSidebar() {
