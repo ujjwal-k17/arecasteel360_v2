@@ -17,8 +17,9 @@ const APP_PAGES = [
   { key: 'consumables', label: 'Consumables' },
   { key: 'order-book', label: 'Order Book' },
   { key: 'working-capital', label: 'Working Capital' },
-  { key: 'petty-cash', label: 'Cash Book' },
-  { key: 'freight', label: 'Freight' },
+  { key: 'petty-cash', label: 'Petty Cash' },
+  { key: 'freight', label: 'Transportation' },
+  { key: 'admin', label: 'Admin (View Only)' },
 ];
 
 export default function UserManagementTab() {

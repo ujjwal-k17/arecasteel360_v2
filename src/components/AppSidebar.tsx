@@ -77,7 +77,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-sidebar-border">
-        {isAdmin && (
+        {(isAdmin || canView('admin')) && (
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton

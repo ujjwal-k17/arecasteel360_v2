@@ -47,7 +47,7 @@ const App = () => (
               
               <Route path="/petty-cash" element={<ProtectedRoute page="petty-cash"><PettyCashPage /></ProtectedRoute>} />
               <Route path="/freight" element={<ProtectedRoute page="freight"><FreightPage /></ProtectedRoute>} />
-              <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute page="admin"><AdminPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
