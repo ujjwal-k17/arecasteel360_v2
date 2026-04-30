@@ -595,12 +595,6 @@ function DebtorPaymentSummaryTab({
 
   const selectedRow = selectedKey ? rows.find(r => r.key === selectedKey) : null;
 
-  useEffect(() => {
-    if (selectedRow && detailRef.current) {
-      detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [selectedKey]);
-
   const missingCp = filtered.some(r => r.cp == null);
 
   // Build the list of rep tabs from dropdown options + any reps actually used
