@@ -258,7 +258,9 @@ function parseVouchers(xml: string): VoucherRow[] {
 }
 
 // ----------------- Tally call -----------------
-async function callTally(xml: string, timeoutMs = 90000): Promise<{ ok: boolean; text: string; status: number }> {
+type TallyCallResult = { ok: boolean; text: string; status: number; error?: string };
+
+async function callTally(xml: string, timeoutMs = 25000): Promise<TallyCallResult> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -270,6 +272,17 @@ async function callTally(xml: string, timeoutMs = 90000): Promise<{ ok: boolean;
     });
     const text = await resp.text();
     return { ok: resp.ok, text, status: resp.status };
+  } catch (e: any) {
+    let msg: string;
+    if (e?.name === 'AbortError') {
+      msg = `Tally timed out after ${Math.round(timeoutMs / 1000)}s`;
+    } else if (e instanceof TypeError) {
+      // Deno fetch raises TypeError for DNS / refused / unreachable
+      msg = `Cannot reach Tally at ${TALLY_URL} (${e.message || 'connection failed'})`;
+    } else {
+      msg = e?.message || String(e);
+    }
+    return { ok: false, text: '', status: 0, error: msg };
   } finally {
     clearTimeout(t);
   }
@@ -353,7 +366,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await Promise.all(jobs.map(async (job) => {
+    const allJobs = Promise.all(jobs.map(async (job) => {
       const ensureDbg = () => {
         if (!debug) return null;
         debugInfo.companies[job.company] = debugInfo.companies[job.company] || {};
@@ -375,7 +388,9 @@ Deno.serve(async (req) => {
           }
 
           if (!lResp.ok) {
-            result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${lResp.status}` });
+            const errMsg = lResp.error || `HTTP ${lResp.status}`;
+            result.errors.push({ company: job.company, dataset: 'ledgers', error: errMsg });
+            if (dbg) dbg.ledgerError = errMsg;
             return;
           }
           const groups = gResp.ok ? parseGroups(gResp.text) : [];
@@ -439,7 +454,8 @@ Deno.serve(async (req) => {
           const r = await callTally(buildVoucherXml(job.company, fromTally, toTally, filter));
           const dsName = filter === 'sales' ? 'dispatches' : 'purchases';
           if (!r.ok) {
-            result.errors.push({ company: job.company, dataset: dsName, error: `HTTP ${r.status}` });
+            const errMsg = r.error || `HTTP ${r.status}`;
+            result.errors.push({ company: job.company, dataset: dsName, error: errMsg });
             return;
           }
           const vs = parseVouchers(r.text);
@@ -471,6 +487,21 @@ Deno.serve(async (req) => {
         if (dbg) dbg.exception = msg;
       }
     }));
+
+    // Hard wall-clock guard: never let the worker get killed by the platform.
+    // If jobs don't all finish within 60s, return whatever we have so far.
+    let timedOut = false;
+    await Promise.race([
+      allJobs,
+      new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 60000)),
+    ]);
+    if (timedOut) {
+      result.errors.push({
+        company: '*',
+        dataset: 'all',
+        error: 'Backend wall-clock timeout (60s). Tally is likely unreachable; returning partial results.',
+      });
+    }
 
     if (debug) {
       debugInfo.errors = result.errors;
