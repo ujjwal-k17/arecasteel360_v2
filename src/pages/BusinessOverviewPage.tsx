@@ -754,28 +754,68 @@ function DebtorInvoiceCycleCard({
     v.company === debtor.company &&
     (v.party_name || '').toLowerCase() === ledgerLow
   );
-  const dPayments = debtorCredits.filter(c =>
-    c.company === debtor.company && c.ledger_name.toLowerCase() === ledgerLow
-  );
 
-  const matches = useMemo(
-    () => fifoMatch(dInvoices, dPayments, creditPeriod),
-    [dInvoices, dPayments, creditPeriod]
-  );
+  // Outstanding from Tally closing balance (positive = receivable).
+  const outstanding = Math.max(0, Number(debtor.closing_balance) || 0);
 
-  const totalInv = matches.reduce((s, m) => s + m.amount, 0);
-  const totalPaid = matches.reduce((s, m) => s + m.paid, 0);
-  const overdueCount = matches.filter(m => m.status === 'overdue').length;
+  // Identify unpaid invoices: walk from most recent backward, summing invoice amounts
+  // until they cover the outstanding. The oldest invoice in this set may be partially paid.
+  type UnpaidRow = {
+    voucher: SnapshotVoucher;
+    amount: number;
+    unpaid: number;
+    paid: number;
+    dueDate: string | null;
+    overdueDays: number | null;
+    status: 'partial' | 'open' | 'overdue';
+  };
+
+  const unpaidRows = useMemo<UnpaidRow[]>(() => {
+    const sortedDesc = [...dInvoices].sort((a, b) =>
+      (b.voucher_date || '').localeCompare(a.voucher_date || '')
+    );
+    const today = todayIso();
+    const picked: UnpaidRow[] = [];
+    let remaining = outstanding;
+    for (const v of sortedDesc) {
+      if (remaining <= 0.0001) break;
+      const amt = Number(v.amount) || 0;
+      if (amt <= 0) continue;
+      const unpaidPortion = Math.min(amt, remaining);
+      const paidPortion = amt - unpaidPortion;
+      remaining -= unpaidPortion;
+
+      let dueDate: string | null = null;
+      let overdueDays: number | null = null;
+      if (v.voucher_date && creditPeriod != null) {
+        const due = new Date(v.voucher_date);
+        due.setDate(due.getDate() + creditPeriod);
+        dueDate = due.toISOString().slice(0, 10);
+        const od = daysBetween(dueDate, today);
+        overdueDays = od > 0 ? od : 0;
+      }
+      const isOverdue = (overdueDays || 0) > 0;
+      const status: UnpaidRow['status'] =
+        paidPortion > 0.0001 ? 'partial' : (isOverdue ? 'overdue' : 'open');
+      picked.push({
+        voucher: v, amount: amt, unpaid: unpaidPortion, paid: paidPortion,
+        dueDate, overdueDays, status,
+      });
+    }
+    return picked;
+  }, [dInvoices, outstanding, creditPeriod]);
+
+  const totalUnpaid = unpaidRows.reduce((s, m) => s + m.unpaid, 0);
+  const overdueCount = unpaidRows.filter(m => (m.overdueDays || 0) > 0).length;
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">{debtor.name}</CardTitle>
         <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
-          <span>Invoices: <strong className="text-foreground">{matches.length}</strong></span>
-          <span>Total billed: <strong className="text-foreground">{fmtINR(totalInv)}</strong></span>
-          <span>Total received (FIFO): <strong className="text-foreground">{fmtINR(totalPaid)}</strong></span>
-          <span>Outstanding: <strong className="text-foreground">{fmtINR(totalInv - totalPaid)}</strong></span>
+          <span>Outstanding: <strong className="text-foreground">{fmtINR(outstanding)}</strong></span>
+          <span>Unpaid invoices: <strong className="text-foreground">{unpaidRows.length}</strong></span>
+          <span>Sum (unpaid): <strong className="text-foreground">{fmtINR(totalUnpaid)}</strong></span>
           {overdueCount > 0 && <span className="text-destructive">Overdue: <strong>{overdueCount}</strong></span>}
           {creditPeriod == null && <span className="text-amber-600">Set credit period to see due dates &amp; overdue</span>}
         </div>
@@ -789,23 +829,23 @@ function DebtorInvoiceCycleCard({
                 <TableHead>Invoice Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Unpaid</TableHead>
                 <TableHead>Due Date</TableHead>
-                <TableHead>Paid On</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Overdue Days</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {matches.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No invoices for this debtor</TableCell></TableRow>
-              ) : matches.map((m, i) => (
+              {unpaidRows.length === 0 ? (
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No unpaid invoices</TableCell></TableRow>
+              ) : unpaidRows.map((m, i) => (
                 <TableRow key={i} className={m.status === 'overdue' ? 'bg-destructive/5' : ''}>
                   <TableCell className="font-medium">{m.voucher.voucher_number || '—'}</TableCell>
                   <TableCell>{m.voucher.voucher_date || '—'}</TableCell>
                   <TableCell className="text-right">{fmtINR(m.amount)}</TableCell>
                   <TableCell className="text-right">{fmtINR(m.paid)}</TableCell>
+                  <TableCell className="text-right font-medium">{fmtINR(m.unpaid)}</TableCell>
                   <TableCell>{m.dueDate || '—'}</TableCell>
-                  <TableCell>{m.paidOnDate || '—'}</TableCell>
                   <TableCell><StatusBadge status={m.status} /></TableCell>
                   <TableCell className={`text-right font-medium ${m.overdueDays && m.overdueDays > 0 ? 'text-destructive' : ''}`}>
                     {m.overdueDays == null ? '—' : m.overdueDays}
