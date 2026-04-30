@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -507,7 +507,7 @@ function DebtorPaymentSummaryTab({
 }) {
   const [search, setSearch] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const detailRef = useRef<HTMLDivElement | null>(null);
+  
 
   const overrideMap = useMemo(() => {
     const m = new Map<DebtorKey, DebtorOverride>();
@@ -595,12 +595,6 @@ function DebtorPaymentSummaryTab({
 
   const selectedRow = selectedKey ? rows.find(r => r.key === selectedKey) : null;
 
-  useEffect(() => {
-    if (selectedRow && detailRef.current) {
-      detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [selectedKey]);
-
   const missingCp = filtered.some(r => r.cp == null);
 
   // Build the list of rep tabs from dropdown options + any reps actually used
@@ -679,16 +673,21 @@ function DebtorPaymentSummaryTab({
         </CardContent>
       </Card>
 
-      {selectedRow && (
-        <div ref={detailRef}>
-          <DebtorInvoiceCycleCard
-            debtor={selectedRow.debtor}
-            sales={sales}
-            debtorCredits={debtorCredits}
-            creditPeriod={selectedRow.cp}
-          />
-        </div>
-      )}
+      <Dialog open={!!selectedRow} onOpenChange={(open) => { if (!open) setSelectedKey(null); }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedRow?.debtor.name || 'Debtor'}</DialogTitle>
+          </DialogHeader>
+          {selectedRow && (
+            <DebtorInvoiceCycleCard
+              debtor={selectedRow.debtor}
+              sales={sales}
+              debtorCredits={debtorCredits}
+              creditPeriod={selectedRow.cp}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
