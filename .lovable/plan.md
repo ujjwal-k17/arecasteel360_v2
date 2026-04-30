@@ -1,44 +1,42 @@
-## Goal
-Replace the single "Sync from Tally" button with separate sync buttons so users can sync just the lightweight ledgers data (Debtors & Creditors / Banks) without waiting on the slow voucher exports (Dispatches & Purchases). This avoids 90s+ timeouts when one dataset fails.
+## Why some debtors are missing
 
-## Current state
-- `tally-fetch` edge function already accepts `dataset: 'debtors' | 'banks' | 'dispatches' | 'purchases' | 'all'` and only runs the relevant Tally jobs.
-- `BusinessOverviewPage.tsx` always invokes it with `dataset: 'all'` via a single React Query keyed `['tally-fetch', fromDate, toDate]`, then derives debtors/banks/dispatches/purchases from one merged response.
+The Tally fetch returns **all ledgers**, but the edge function then keeps only those whose `PARENT` text literally contains `"sundry debtor"`. That filter is too narrow:
 
-## Changes — `src/pages/BusinessOverviewPage.tsx`
+- Many Tally setups put debtors under **sub-groups** like `Domestic Debtors`, `Export Debtors`, `Trade Receivables`, `Debtors - Delhi`. None of these contain the word "sundry", so every party under them is silently dropped.
+- The `<PARENT>` tag from Tally returns only the **immediate parent group**, not the full ancestor chain. A ledger under `Domestic Debtors` (which itself sits under `Sundry Debtors`) reports `PARENT = Domestic Debtors` and fails our keyword test.
+- Same problem affects bank accounts placed under sub-groups like `Bank OD A/c` or `Current Accounts`.
 
-1. **Drop the single `useQuery` "all" call.** Replace with manual fetch state per dataset group:
-   - `ledgersData` (debtors + banks) — synced together since both come from the same Tally ledger XML in one job.
-   - `vouchersData` (dispatches + purchases) — synced together since both are voucher exports.
-   - Each holds `{ debtors?, banks?, dispatches?, purchases?, errors, fetchedAt, companies }` plus `isFetching` flag.
+This is a parsing/filtering bug, not a Tally connectivity issue. Tally is sending the data; we're throwing it away.
 
-2. **Two sync handlers**:
-   - `handleSyncLedgers()` → `supabase.functions.invoke('tally-fetch', { body: { dataset: 'debtors', fromDate, toDate } })`. The backend's `'debtors'` branch already pulls the ledgers job which returns both debtors and banks, so one call covers Debtors & Creditors/Banks.
-   - `handleSyncVouchers()` → invokes with `dataset: 'all'` minus ledgers. Since the function doesn't have a "vouchers only" mode, add a new dataset value `'vouchers'` in the edge function (see below) OR call it twice in parallel with `'dispatches'` and `'purchases'`. Plan: **add `'vouchers'` as a dataset value** in `tally-fetch` for a single round-trip.
+## Fix — `supabase/functions/tally-fetch/index.ts`
 
-3. **Header buttons** — replace the one `Sync from Tally` button with two:
-   ```
-   [ Sync Debtors & Creditors ]   [ Sync Dispatches & Purchases ]
-   ```
-   Each shows its own spinner and last-synced timestamp underneath (e.g. "Ledgers: 10:42 AM · Vouchers: not yet").
+### 1. Ask Tally to walk the group hierarchy for us
+In `buildLedgerXml`, add `COMPUTE` fields that use Tally's built-in `$$IsLedOfGrp` formula. This returns Yes/No for whether a ledger belongs (directly or via any ancestor) to a primary group:
 
-4. **Companies dropdown** — populate from whichever response arrived most recently (merge `ledgersData.companies` ∪ `vouchersData.companies`).
+```xml
+<COMPUTE>IsDebtor : $$IsLedOfGrp:$Name:"Sundry Debtors"</COMPUTE>
+<COMPUTE>IsCreditor : $$IsLedOfGrp:$Name:"Sundry Creditors"</COMPUTE>
+<COMPUTE>IsBank : $$IsLedOfGrp:$Name:"Bank Accounts"</COMPUTE>
+<COMPUTE>IsBankOD : $$IsLedOfGrp:$Name:"Bank OD A/c"</COMPUTE>
+```
 
-5. **Errors / warnings panel** — combine `errors` arrays from both responses.
+(Drop the unused `BillAllocations` native method while we're here.)
 
-6. **Summary cards & tabs** — read debtors/banks from `ledgersData`, dispatches/purchases from `vouchersData`. Show a subtle "Not synced yet" placeholder when a group hasn't been fetched.
+### 2. Parse the new flags
+Extend `LedgerRow` with `isDebtor`, `isCreditor`, `isBank` booleans. Add a `parseYesNo` helper that reads `<ISDEBTOR>Yes</ISDEBTOR>` etc.
 
-## Changes — `supabase/functions/tally-fetch/index.ts`
+### 3. Use the flags + a broader keyword fallback
+In the ledger-job handler, classify a row as a debtor if **any** of these is true:
+- `l.isDebtor` (Tally's own group walk — primary signal)
+- parent text contains `"sundry debtor"`, `"debtor"`, or `"receivable"` (fallback for older Tally versions that may not honour COMPUTE in the export)
 
-- Extend the `dataset` union to include `'vouchers'`.
-- Add condition: when `dataset === 'vouchers'`, push both `sales` and `purchase` voucher jobs (skip ledgers).
-- Keep `'all'`, `'debtors'`, `'banks'`, `'dispatches'`, `'purchases'` working unchanged.
+Bank rows: `l.isBank` OR parent contains `"bank"`.
+
+This guarantees every party under any sub-group of `Sundry Debtors` is captured, while keeping the keyword path as a safety net.
 
 ## Out of scope
-- No persistence/caching across page reloads (still in-memory via component state).
-- No per-company sync — still all companies at once per dataset group.
-- No change to date-range controls.
+- Creditors aren't shown on the page yet — the Compute field is added so we can surface them next without another XML round-trip, but no UI change in this pass.
+- Overdue is still 0 (we don't fetch BillAllocations); that's a separate enhancement.
 
-## User-visible result
-- Clicking **Sync Debtors & Creditors** finishes in a few seconds even when Tally voucher exports are slow.
-- Clicking **Sync Dispatches & Purchases** is the heavy call; if it times out, the ledger numbers shown on the page are unaffected.
+## Expected outcome
+After deploy, click **Sync Debtors & Creditors** again and the Debtors tab should show every party that lives anywhere under the Sundry Debtors tree in Tally — not just those under a group literally named "Sundry Debtors".

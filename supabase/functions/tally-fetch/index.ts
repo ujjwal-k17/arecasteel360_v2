@@ -66,6 +66,10 @@ function parseQty(s: string | null): number {
 
 // ----------------- XML builders -----------------
 function buildLedgerXml(company: string): string {
+  // Use COMPUTE fields with $$IsLedOfGrp so Tally walks the full group
+  // hierarchy and tells us whether each ledger ultimately belongs to
+  // Sundry Debtors / Creditors / Bank — independent of sub-group naming
+  // (Domestic Debtors, Trade Receivables, Bank OD A/c, etc.).
   return `<ENVELOPE>
   <HEADER>
     <VERSION>1</VERSION>
@@ -86,7 +90,10 @@ function buildLedgerXml(company: string): string {
             <NATIVEMETHOD>Name</NATIVEMETHOD>
             <NATIVEMETHOD>Parent</NATIVEMETHOD>
             <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
-            <NATIVEMETHOD>BillAllocations</NATIVEMETHOD>
+            <COMPUTE>IsDebtor : $$IsLedOfGrp:$Name:"Sundry Debtors"</COMPUTE>
+            <COMPUTE>IsCreditor : $$IsLedOfGrp:$Name:"Sundry Creditors"</COMPUTE>
+            <COMPUTE>IsBank : $$IsLedOfGrp:$Name:"Bank Accounts"</COMPUTE>
+            <COMPUTE>IsBankOD : $$IsLedOfGrp:$Name:"Bank OD A/c"</COMPUTE>
           </COLLECTION>
         </TDLMESSAGE>
       </TDL>
@@ -129,7 +136,19 @@ function buildVoucherXml(company: string, fromDate: string, toDate: string, vouc
 }
 
 // ----------------- parsers -----------------
-type LedgerRow = { name: string; parent: string; closing: number; raw: string };
+type LedgerRow = {
+  name: string;
+  parent: string;
+  closing: number;
+  raw: string;
+  isDebtor: boolean;
+  isCreditor: boolean;
+  isBank: boolean;
+};
+
+function parseYesNo(s: string | null): boolean {
+  return !!s && /^\s*yes\s*$/i.test(s);
+}
 
 function parseLedgers(xml: string): LedgerRow[] {
   const out: LedgerRow[] = [];
@@ -142,8 +161,11 @@ function parseLedgers(xml: string): LedgerRow[] {
     const name = nameAttr ? decodeEntities(nameAttr[1]) : (tag(inner, 'NAME') || '');
     const parent = tag(inner, 'PARENT') || '';
     const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
+    const isDebtor = parseYesNo(tag(inner, 'ISDEBTOR'));
+    const isCreditor = parseYesNo(tag(inner, 'ISCREDITOR'));
+    const isBank = parseYesNo(tag(inner, 'ISBANK')) || parseYesNo(tag(inner, 'ISBANKOD'));
     if (!name) continue;
-    out.push({ name, parent, closing: parseAmount(closingRaw), raw: closingRaw });
+    out.push({ name, parent, closing: parseAmount(closingRaw), raw: closingRaw, isDebtor, isCreditor, isBank });
   }
   return out;
 }
