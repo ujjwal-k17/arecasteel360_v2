@@ -684,8 +684,7 @@ function DebtorPaymentSummaryTab({
           <DebtorInvoiceCycleCard
             debtor={selectedRow.debtor}
             sales={sales}
-            receipts={receipts}
-            billRefs={billRefs}
+            debtorCredits={debtorCredits}
             creditPeriod={selectedRow.cp}
           />
         </div>
