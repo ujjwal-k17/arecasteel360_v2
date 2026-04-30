@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const dataset = (body.dataset || 'all') as 'debtors' | 'banks' | 'dispatches' | 'purchases' | 'all';
+    const dataset = (body.dataset || 'all') as 'debtors' | 'banks' | 'ledgers' | 'dispatches' | 'purchases' | 'vouchers' | 'all';
     const fromDate = body.fromDate as string | undefined; // ISO
     const toDate = body.toDate as string | undefined; // ISO
 
@@ -275,13 +275,13 @@ Deno.serve(async (req) => {
 
     const jobs: Job[] = [];
     for (const company of COMPANIES) {
-      if (dataset === 'all' || dataset === 'debtors' || dataset === 'banks') {
+      if (dataset === 'all' || dataset === 'debtors' || dataset === 'banks' || dataset === 'ledgers') {
         jobs.push({ kind: 'ledgers', company });
       }
-      if (dataset === 'all' || dataset === 'dispatches') {
+      if (dataset === 'all' || dataset === 'vouchers' || dataset === 'dispatches') {
         jobs.push({ kind: 'sales', company });
       }
-      if (dataset === 'all' || dataset === 'purchases') {
+      if (dataset === 'all' || dataset === 'vouchers' || dataset === 'purchases') {
         jobs.push({ kind: 'purchase', company });
       }
     }

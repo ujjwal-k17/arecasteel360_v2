@@ -1,33 +1,44 @@
-# Diagnose why Tally is timing out
+## Goal
+Replace the single "Sync from Tally" button with separate sync buttons so users can sync just the lightweight ledgers data (Debtors & Creditors / Banks) without waiting on the slow voucher exports (Dispatches & Purchases). This avoids 90s+ timeouts when one dataset fails.
 
-The 20-second timeout is firing for every Tally call. Before doing anything bigger (queues, workers), we need to know whether the Tally server at `103.239.89.153:9000` is even reachable.
+## Current state
+- `tally-fetch` edge function already accepts `dataset: 'debtors' | 'banks' | 'dispatches' | 'purchases' | 'all'` and only runs the relevant Tally jobs.
+- `BusinessOverviewPage.tsx` always invokes it with `dataset: 'all'` via a single React Query keyed `['tally-fetch', fromDate, toDate]`, then derives debtors/banks/dispatches/purchases from one merged response.
 
-## Step 1 — New edge function: `tally-diagnose`
+## Changes — `src/pages/BusinessOverviewPage.tsx`
 
-A tiny function that runs two fast probes against Tally in parallel:
-- **Ping**: asks for `$$CurrentCompany` (10s timeout)
-- **List Companies**: asks Tally for the companies it has open (15s timeout)
+1. **Drop the single `useQuery` "all" call.** Replace with manual fetch state per dataset group:
+   - `ledgersData` (debtors + banks) — synced together since both come from the same Tally ledger XML in one job.
+   - `vouchersData` (dispatches + purchases) — synced together since both are voucher exports.
+   - Each holds `{ debtors?, banks?, dispatches?, purchases?, errors, fetchedAt, companies }` plus `isFetching` flag.
 
-Returns elapsed time, HTTP status, response length, and a 2 KB snippet of the raw response. No parsing, no business logic.
+2. **Two sync handlers**:
+   - `handleSyncLedgers()` → `supabase.functions.invoke('tally-fetch', { body: { dataset: 'debtors', fromDate, toDate } })`. The backend's `'debtors'` branch already pulls the ledgers job which returns both debtors and banks, so one call covers Debtors & Creditors/Banks.
+   - `handleSyncVouchers()` → invokes with `dataset: 'all'` minus ledgers. Since the function doesn't have a "vouchers only" mode, add a new dataset value `'vouchers'` in the edge function (see below) OR call it twice in parallel with `'dispatches'` and `'purchases'`. Plan: **add `'vouchers'` as a dataset value** in `tally-fetch` for a single round-trip.
 
-The result tells us the exact problem:
+3. **Header buttons** — replace the one `Sync from Tally` button with two:
+   ```
+   [ Sync Debtors & Creditors ]   [ Sync Dispatches & Purchases ]
+   ```
+   Each shows its own spinner and last-synced timestamp underneath (e.g. "Ledgers: 10:42 AM · Vouchers: not yet").
 
-| Result | Meaning | Fix |
-|---|---|---|
-| Both timeout | Tally not running OR port 9000 blocked | Open Tally, enable "Act as Server", check firewall |
-| HTTP error | Reverse proxy / wrong port | Adjust IP/port |
-| Returns fast, empty company list | Tally up but no companies loaded | Open the two Areca companies |
-| Returns fast with names | Names don't match our `COMPANIES` array | Update names in `tally-fetch` |
+4. **Companies dropdown** — populate from whichever response arrived most recently (merge `ledgersData.companies` ∪ `vouchersData.companies`).
 
-## Step 2 — "Test Connection" button on Business Overview
+5. **Errors / warnings panel** — combine `errors` arrays from both responses.
 
-A small button next to "Sync from Tally". Calls `tally-diagnose` and shows the JSON response in a dialog. Makes future Tally debugging a one-click operation.
+6. **Summary cards & tabs** — read debtors/banks from `ledgersData`, dispatches/purchases from `vouchersData`. Show a subtle "Not synced yet" placeholder when a group hasn't been fetched.
 
-## Files
+## Changes — `supabase/functions/tally-fetch/index.ts`
 
-- **New**: `supabase/functions/tally-diagnose/index.ts`
-- **Modified**: `src/pages/BusinessOverviewPage.tsx` — add Test Connection button + result dialog
+- Extend the `dataset` union to include `'vouchers'`.
+- Add condition: when `dataset === 'vouchers'`, push both `sales` and `purchase` voucher jobs (skip ledgers).
+- Keep `'all'`, `'debtors'`, `'banks'`, `'dispatches'`, `'purchases'` working unchanged.
 
-## What I'm NOT doing
+## Out of scope
+- No persistence/caching across page reloads (still in-memory via component state).
+- No per-company sync — still all companies at once per dataset group.
+- No change to date-range controls.
 
-Not building the queue/background-worker architecture yet. If the real issue is "Tally isn't running" or "companies aren't loaded", a queue won't fix it — it'll just hide the timeout behind a longer one. We'll revisit only if diagnostics show Tally is genuinely reachable but slow.
+## User-visible result
+- Clicking **Sync Debtors & Creditors** finishes in a few seconds even when Tally voucher exports are slow.
+- Clicking **Sync Dispatches & Purchases** is the heavy call; if it times out, the ledger numbers shown on the page are unaffected.
