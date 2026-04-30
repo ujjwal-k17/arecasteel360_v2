@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle, Stethoscope, Building2, CheckCircle2, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTallySnapshot, SnapshotVoucher } from '@/hooks/useTallySnapshot';
 
