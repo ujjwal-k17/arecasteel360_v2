@@ -407,8 +407,12 @@ Deno.serve(async (req) => {
           let dCount = 0, cCount = 0, bCount = 0;
           const sample: any[] = [];
 
+          // Diagnostics: track terminal groups (where the parent chain ends)
+          // so we can see what's missing from the Group collection.
+          const unmatchedTerminals = new Map<string, { count: number; examples: string[] }>();
+
           for (const l of ledgers) {
-            const root = rootGroupOf(l.parent, groupMap);
+            const { root, chain, terminatedInMap } = rootGroupOf(l.parent, groupMap);
 
             // Strict ancestor-chain classification: only ledgers whose
             // parent ultimately rolls up to the reserved primary group are
@@ -420,8 +424,19 @@ Deno.serve(async (req) => {
               root === 'bank od a/c' ||
               root === 'bank occ a/c';
 
+            // If chain didn't terminate in the group map (i.e. last group
+            // was missing from the Group collection) AND we didn't classify
+            // it, log the terminal so we can see where the chain broke.
+            if (debug && !terminatedInMap && !isDebtor && !isCreditor && !isBank && chain.length > 0) {
+              const terminal = chain[chain.length - 1];
+              const entry = unmatchedTerminals.get(terminal) || { count: 0, examples: [] };
+              entry.count++;
+              if (entry.examples.length < 3) entry.examples.push(l.name);
+              unmatchedTerminals.set(terminal, entry);
+            }
+
             if (debug && sample.length < 10) {
-              sample.push({ name: l.name, parent: l.parent, root, closing: l.closing });
+              sample.push({ name: l.name, parent: l.parent, chain, root, closing: l.closing });
             }
 
             if (isDebtor) {
@@ -437,6 +452,10 @@ Deno.serve(async (req) => {
           }
 
           if (dbg) {
+            const unmatched = [...unmatchedTerminals.entries()]
+              .map(([terminal, v]) => ({ terminal, count: v.count, examples: v.examples }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 25);
             Object.assign(dbg, {
               ledgerCount: ledgers.length,
               groupCount: groups.length,
@@ -445,6 +464,8 @@ Deno.serve(async (req) => {
               banks: bCount,
               sampleLedgers: sample,
               sampleGroups: groups.slice(0, 10),
+              unmatchedTerminalGroups: unmatched,
+              unmatchedTerminalNote: 'These are groups where the parent chain ended without reaching a reserved primary AND the group itself is missing from the Group collection. If you see "Sundry Debtors" or a sub-group of it here, that group is not being returned by Tally.',
             });
           }
         } else {
