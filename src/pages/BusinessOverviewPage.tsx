@@ -44,13 +44,52 @@ export default function BusinessOverviewPage() {
   const [toDate, setToDate] = useState<string>(todayIso());
 
   const [syncing, setSyncing] = useState(false);
+  const [syncAllOpen, setSyncAllOpen] = useState(false);
+  type ChunkProgress = {
+    label: string;
+    fromDate: string;
+    toDate: string;
+    status: 'pending' | 'running' | 'done' | 'error';
+    counts?: number;
+    error?: string;
+  };
+  const [chunkProgress, setChunkProgress] = useState<ChunkProgress[]>([]);
 
-  const handleSync = async () => {
+  // Build 90-day chunks from a start date up to today (oldest first).
+  const buildChunks = (startDate: string): { fromDate: string; toDate: string; label: string }[] => {
+    const out: { fromDate: string; toDate: string; label: string }[] = [];
+    const todayMs = new Date().getTime();
+    let cursor = new Date(startDate).getTime();
+    const day = 24 * 60 * 60 * 1000;
+    while (cursor <= todayMs) {
+      const from = new Date(cursor);
+      const toMs = Math.min(cursor + 90 * day - 1, todayMs);
+      const to = new Date(toMs);
+      const fromIso = from.toISOString().slice(0, 10);
+      const toIso = to.toISOString().slice(0, 10);
+      const label = `${from.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} → ${to.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`;
+      out.push({ fromDate: fromIso, toDate: toIso, label });
+      cursor = toMs + 1;
+    }
+    return out;
+  };
+
+  const sumCounts = (counts: Record<string, Record<string, number>> | undefined) =>
+    Object.values(counts || {}).reduce((s, c) => s + Object.values(c).reduce((a, b) => a + b, 0), 0);
+
+  // ---- Sync 30 Days: single call with a tight window.
+  const handleSync30Days = async () => {
     if (syncing) return;
     setSyncing(true);
-    const t = toast.loading('Syncing from Tally — this can take up to two minutes...');
+    const t = toast.loading('Syncing last 30 days from Tally...');
     try {
-      const { data: result, error } = await supabase.functions.invoke('tally-sync', { body: {} });
+      const today = new Date();
+      const from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const fromDate = from.toISOString().slice(0, 10);
+      const toDate = today.toISOString().slice(0, 10);
+      const { data: result, error } = await supabase.functions.invoke('tally-sync', {
+        body: { fromDate, toDate, includeLedgers: true, chunkLabel: 'Last 30 days' },
+      });
       if (error) {
         const msg = (error as any)?.message || String(error);
         if (/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(msg)) {
@@ -63,7 +102,7 @@ export default function BusinessOverviewPage() {
       const counts = (result as any)?.counts as Record<string, Record<string, number>>;
       const errCount = ((result as any)?.errors || []).length;
       const tot = (k: string) => Object.values(counts || {}).reduce((s, c) => s + (c[k] || 0), 0);
-      const summary = `${tot('ledgers')} ledgers, ${tot('sales')} sales, ${tot('receipts')} receipts, ${tot('payment') + tot('contra') + tot('journal')} bank/other`;
+      const summary = `${tot('ledgers')} ledgers, ${tot('sales')} sales, ${tot('receipt')} receipts, ${tot('payment') + tot('contra') + tot('journal')} bank/other`;
       if (status === 'success') toast.success(`Synced — ${summary}`, { id: t });
       else if (status === 'partial') toast.warning(`Partial sync — ${summary} · ${errCount} errors`, { id: t });
       else toast.error(`Sync failed — ${errCount} errors. Previous snapshot still active.`, { id: t });
@@ -76,6 +115,84 @@ export default function BusinessOverviewPage() {
       setSyncing(false);
     }
   };
+
+  // ---- Sync All: chunked 90-day windows from 2022-04-01 → today, client-orchestrated.
+  const handleSyncAll = async () => {
+    if (syncing) return;
+    setSyncAllOpen(false);
+    setSyncing(true);
+    const chunks = buildChunks('2022-04-01');
+    const initial: ChunkProgress[] = chunks.map(c => ({
+      label: c.label, fromDate: c.fromDate, toDate: c.toDate, status: 'pending' as const,
+    }));
+    setChunkProgress(initial);
+    const t = toast.loading(`Starting full sync — ${chunks.length} chunks queued...`);
+
+    let runId: string | undefined;
+    let priorCumulative = 0;
+    let chunkErrors = 0;
+
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const c = chunks[i];
+        const isFirst = i === 0;
+        const isLast = i === chunks.length - 1;
+        setChunkProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'running' } : p));
+        toast.loading(`Syncing ${c.label} (${i + 1}/${chunks.length})...`, { id: t });
+
+        try {
+          const { data: result, error } = await supabase.functions.invoke('tally-sync', {
+            body: {
+              runId,
+              fromDate: c.fromDate,
+              toDate: c.toDate,
+              includeLedgers: isFirst, // ledgers fetched once with the first chunk
+              finalize: isLast,
+              chunkLabel: c.label,
+            },
+          });
+          if (error) throw new Error((error as any)?.message || String(error));
+          if ((result as any)?.error) throw new Error((result as any).error);
+          if (!runId) runId = (result as any)?.runId as string;
+          const counts = (result as any)?.counts as Record<string, Record<string, number>> | undefined;
+          const cumulative = sumCounts(counts);
+          const thisChunkInserted = Math.max(0, cumulative - priorCumulative);
+          priorCumulative = cumulative;
+          setChunkProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'done', counts: thisChunkInserted } : p));
+        } catch (e: any) {
+          chunkErrors++;
+          const msg = e?.message || String(e);
+          setChunkProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'error', error: msg } : p));
+          // Continue with remaining chunks — partial data is better than none.
+        }
+      }
+
+      // Ensure the run is finalized even if the last chunk errored before finalize ran.
+      if (runId) {
+        await supabase.functions.invoke('tally-sync', {
+          body: {
+            runId,
+            fromDate: chunks[chunks.length - 1].fromDate,
+            toDate: chunks[chunks.length - 1].toDate,
+            includeLedgers: false,
+            finalize: true,
+            chunkLabel: 'finalize',
+          },
+        }).catch(() => { /* best effort */ });
+      }
+
+      if (chunkErrors === 0) toast.success(`Full sync complete — ${chunks.length} chunks synced`, { id: t });
+      else toast.warning(`Sync finished with ${chunkErrors} chunk error(s) of ${chunks.length}`, { id: t });
+      await qc.invalidateQueries({ queryKey: ['tally-snapshot'] });
+      await refetch();
+    } catch (e: any) {
+      toast.error(e?.message || 'Sync failed', { id: t });
+      await qc.invalidateQueries({ queryKey: ['tally-snapshot'] });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
 
   const [diagOpen, setDiagOpen] = useState(false);
   const [diagLoading, setDiagLoading] = useState(false);
@@ -151,9 +268,13 @@ export default function BusinessOverviewPage() {
             <Stethoscope className={`h-4 w-4 mr-2 ${diagLoading ? 'animate-pulse' : ''}`} />
             Test Connection
           </Button>
-          <Button onClick={handleSync} disabled={syncing}>
+          <Button variant="outline" onClick={handleSync30Days} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync from Tally'}
+            Sync 30 Days
+          </Button>
+          <Button onClick={() => setSyncAllOpen(true)} disabled={syncing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync All'}
           </Button>
         </div>
       </div>
@@ -175,6 +296,75 @@ export default function BusinessOverviewPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Sync All confirmation dialog */}
+      <Dialog open={syncAllOpen} onOpenChange={setSyncAllOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sync All History from Tally</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              <div className="font-medium flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5" />
+                This will take several minutes
+              </div>
+              <div className="text-muted-foreground mt-1">
+                Data is fetched in 90-day chunks starting from <span className="font-medium">1 Apr 2022</span> through today.
+                Keep this tab open while the sync runs. The previous data stays active until the full sync completes.
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {buildChunks('2022-04-01').length} chunks will be processed sequentially.
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setSyncAllOpen(false)}>Cancel</Button>
+              <Button onClick={handleSyncAll}>Start Full Sync</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chunked sync progress panel */}
+      {chunkProgress.length > 0 && (
+        <div className="rounded-md border bg-card px-3 py-2 text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div className="font-medium flex items-center gap-1.5">
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              Full sync progress — {chunkProgress.filter(p => p.status === 'done').length}/{chunkProgress.length} done
+              {chunkProgress.some(p => p.status === 'error') && (
+                <span className="text-destructive">· {chunkProgress.filter(p => p.status === 'error').length} error(s)</span>
+              )}
+            </div>
+            {!syncing && (
+              <button className="text-muted-foreground hover:text-foreground" onClick={() => setChunkProgress([])}>Dismiss</button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5">
+            {chunkProgress.map((p, idx) => {
+              const colorMap = {
+                pending: 'border-border text-muted-foreground',
+                running: 'border-primary text-primary bg-primary/5',
+                done: 'border-emerald-500/40 text-emerald-700 bg-emerald-500/5',
+                error: 'border-destructive/40 text-destructive bg-destructive/5',
+              };
+              return (
+                <div key={idx} className={`flex items-center justify-between gap-2 rounded border px-2 py-1 ${colorMap[p.status]}`} title={p.error || ''}>
+                  <div className="truncate"><span className="font-medium">{p.label}</span></div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {p.status === 'running' && <RefreshCw className="h-3 w-3 animate-spin" />}
+                    {p.status === 'done' && <CheckCircle2 className="h-3 w-3" />}
+                    {p.status === 'error' && <XCircle className="h-3 w-3" />}
+                    {p.status === 'done' && p.counts != null && (
+                      <span className="text-[10px]">{p.counts}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {lastRun && (lastRun.errors || []).length > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
