@@ -268,9 +268,13 @@ export default function BusinessOverviewPage() {
             <Stethoscope className={`h-4 w-4 mr-2 ${diagLoading ? 'animate-pulse' : ''}`} />
             Test Connection
           </Button>
-          <Button onClick={handleSync} disabled={syncing}>
+          <Button variant="outline" onClick={handleSync30Days} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync from Tally'}
+            Sync 30 Days
+          </Button>
+          <Button onClick={() => setSyncAllOpen(true)} disabled={syncing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync All'}
           </Button>
         </div>
       </div>
