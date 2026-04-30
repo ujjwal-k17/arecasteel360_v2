@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { useDropdownOptions } from '@/hooks/useDropdownOptions';
 import {
-  useTallySnapshot, SnapshotVoucher, SnapshotLedger, SnapshotBankTxn, SnapshotBillRef, DebtorOverride,
+  useTallySnapshot, SnapshotVoucher, SnapshotLedger, SnapshotBankTxn, SnapshotBillRef, SnapshotDebtorCredit, DebtorOverride,
 } from '@/hooks/useTallySnapshot';
 
 const ALL = '__all__';
@@ -107,6 +107,7 @@ export default function BusinessOverviewPage() {
   const receipts = filterCo(data?.receipts);
   const bankTxns = filterCo(data?.bankTxns);
   const billRefs = data?.billRefs || [];
+  const debtorCredits = (data?.debtorCredits || []).filter(c => companyFilter === ALL || c.company === companyFilter);
   const overrides = data?.overrides || [];
 
   const inRange = (d: string | null) => !!d && d >= fromDate && d <= toDate;
@@ -194,6 +195,7 @@ export default function BusinessOverviewPage() {
             sales={sales}
             receipts={receipts}
             billRefs={billRefs}
+            debtorCredits={debtorCredits}
             overrides={overrides}
             isLoading={isLoading}
             onChanged={() => qc.invalidateQueries({ queryKey: ['tally-snapshot'] })}
@@ -250,7 +252,7 @@ type InvoiceMatch = {
  */
 function fifoMatch(
   invoices: SnapshotVoucher[],
-  payments: SnapshotVoucher[],
+  payments: { voucher_date: string | null; amount: number }[],
   creditPeriodDays: number | null,
 ): InvoiceMatch[] {
   const sortedInv = [...invoices].sort((a, b) => (a.voucher_date || '').localeCompare(b.voucher_date || ''));
@@ -309,12 +311,13 @@ function fifoMatch(
 // ============================================================
 
 function DebtorSummaryModule({
-  debtors, sales, receipts, billRefs, overrides, isLoading, onChanged,
+  debtors, sales, receipts, billRefs, debtorCredits, overrides, isLoading, onChanged,
 }: {
   debtors: SnapshotLedger[];
   sales: SnapshotVoucher[];
   receipts: SnapshotVoucher[];
   billRefs: SnapshotBillRef[];
+  debtorCredits: SnapshotDebtorCredit[];
   overrides: DebtorOverride[];
   isLoading: boolean;
   onChanged: () => void;
@@ -339,6 +342,7 @@ function DebtorSummaryModule({
           sales={sales}
           receipts={receipts}
           billRefs={billRefs}
+          debtorCredits={debtorCredits}
           overrides={overrides}
           isLoading={isLoading}
         />
@@ -491,12 +495,13 @@ function SalesRepSelect({
 }
 
 function DebtorPaymentSummaryTab({
-  debtors, sales, receipts, billRefs, overrides, isLoading,
+  debtors, sales, receipts, billRefs, debtorCredits, overrides, isLoading,
 }: {
   debtors: SnapshotLedger[];
   sales: SnapshotVoucher[];
   receipts: SnapshotVoucher[];
   billRefs: SnapshotBillRef[];
+  debtorCredits: SnapshotDebtorCredit[];
   overrides: DebtorOverride[];
   isLoading: boolean;
 }) {
@@ -510,6 +515,20 @@ function DebtorPaymentSummaryTab({
     return m;
   }, [overrides]);
 
+  // Index debtor credits by (company, ledger_name lowercase) for fast FIFO lookup.
+  // These represent every banking / journal / contra entry that credits the debtor's
+  // ledger across all voucher kinds — i.e. all payment inflows or adjustments
+  // reducing the receivable.
+  const creditIndex = useMemo(() => {
+    const m = new Map<string, SnapshotDebtorCredit[]>();
+    for (const c of debtorCredits) {
+      const key = `${c.company}__${c.ledger_name.toLowerCase()}`;
+      const arr = m.get(key);
+      if (arr) arr.push(c); else m.set(key, [c]);
+    }
+    return m;
+  }, [debtorCredits]);
+
   // Compute per-debtor overdue from FIFO matches; outstanding = Tally ledger closing balance
   const rows = useMemo(() => {
     const today = todayIso();
@@ -520,18 +539,15 @@ function DebtorPaymentSummaryTab({
       const salesRep = ov?.sales_rep ?? null;
       const ledgerLow = d.name.toLowerCase();
       const dInvoices = sales.filter(v => v.company === d.company && (v.party_name || '').toLowerCase() === ledgerLow);
-      const dReceipts = receipts.filter(v => {
-        if (v.company !== d.company) return false;
-        if ((v.party_name || '').toLowerCase() === ledgerLow) return true;
-        return billRefs.some(b => b.voucher_id === v.id && b.ledger_name.toLowerCase() === ledgerLow);
-      });
-      const matches = fifoMatch(dInvoices, dReceipts, cp);
+      const dPayments = creditIndex.get(`${d.company}__${ledgerLow}`) || [];
+      const matches = fifoMatch(dInvoices, dPayments, cp);
       let overdue = 0;
       let overdueCount = 0;
       for (const m of matches) {
         const open = m.amount - m.paid;
+        // Overdue amount = unpaid balance on invoices past their due date (FIFO basis)
         if (open > 0.0001 && m.dueDate && m.dueDate < today) {
-          overdue += m.amount; // total amount of the invoice that is unpaid beyond due date
+          overdue += open;
           overdueCount += 1;
         }
       }
@@ -544,7 +560,7 @@ function DebtorPaymentSummaryTab({
       r.salesRep !== 'IntraCompany' &&            // exclude intra-company debtors
       Math.abs(r.outstanding) > 0.5               // active = has a non-zero ledger balance
     );
-  }, [debtors, sales, receipts, billRefs, overrideMap]);
+  }, [debtors, sales, creditIndex, overrideMap]);
 
   // Sales-rep sub-tab
   const [repTab, setRepTab] = useState<string>('__all__');
@@ -668,8 +684,7 @@ function DebtorPaymentSummaryTab({
           <DebtorInvoiceCycleCard
             debtor={selectedRow.debtor}
             sales={sales}
-            receipts={receipts}
-            billRefs={billRefs}
+            debtorCredits={debtorCredits}
             creditPeriod={selectedRow.cp}
           />
         </div>
@@ -728,30 +743,25 @@ function CreditPeriodInput({
 }
 
 function DebtorInvoiceCycleCard({
-  debtor, sales, receipts, billRefs, creditPeriod,
+  debtor, sales, debtorCredits, creditPeriod,
 }: {
   debtor: SnapshotLedger;
   sales: SnapshotVoucher[];
-  receipts: SnapshotVoucher[];
-  billRefs: SnapshotBillRef[];
+  debtorCredits: SnapshotDebtorCredit[];
   creditPeriod: number | null;
 }) {
+  const ledgerLow = debtor.name.toLowerCase();
   const dInvoices = sales.filter(v =>
     v.company === debtor.company &&
-    (v.party_name || '').toLowerCase() === debtor.name.toLowerCase()
+    (v.party_name || '').toLowerCase() === ledgerLow
   );
-  const ledgerLow = debtor.name.toLowerCase();
-  const dReceipts = receipts.filter(v => {
-    if (v.company !== debtor.company) return false;
-    if ((v.party_name || '').toLowerCase() === ledgerLow) return true;
-    // If party_name is missing, fall back to bill refs that touch this ledger
-    const refsHit = billRefs.some(b => b.voucher_id === v.id && b.ledger_name.toLowerCase() === ledgerLow);
-    return refsHit;
-  });
+  const dPayments = debtorCredits.filter(c =>
+    c.company === debtor.company && c.ledger_name.toLowerCase() === ledgerLow
+  );
 
   const matches = useMemo(
-    () => fifoMatch(dInvoices, dReceipts, creditPeriod),
-    [dInvoices, dReceipts, creditPeriod]
+    () => fifoMatch(dInvoices, dPayments, creditPeriod),
+    [dInvoices, dPayments, creditPeriod]
   );
 
   const totalInv = matches.reduce((s, m) => s + m.amount, 0);
