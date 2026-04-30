@@ -837,10 +837,15 @@ function TallySyncSection() {
       const { data, error } = await supabase.functions.invoke('tally-sync', { body: {} });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      const result = data as { items: TallyStockItem[]; fetchedAt: string };
+      const result = data as { items: TallyStockItem[]; fetchedAt: string; count?: number };
       setItems(result.items || []);
       setFetchedAt(result.fetchedAt);
-      toast.success(`Synced ${result.items?.length || 0} items from Tally`);
+      const itemCount = result.count ?? result.items?.length ?? 0;
+      if (itemCount === 0) {
+        toast.warning('Tally responded, but no stock items were found');
+      } else {
+        toast.success(`Synced ${itemCount} items from Tally`);
+      }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to sync from Tally');
     } finally {
