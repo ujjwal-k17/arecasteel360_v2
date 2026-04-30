@@ -98,6 +98,7 @@ export type TallySnapshot = {
   receipts: SnapshotVoucher[];
   bankTxns: SnapshotBankTxn[];
   billRefs: SnapshotBillRef[];
+  debtorCredits: SnapshotDebtorCredit[];
   overrides: DebtorOverride[];
   lastRun: SyncRunSummary | null;
   companies: string[];
