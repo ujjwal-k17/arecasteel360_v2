@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
             sync_run_id: runId, company,
             name: l.name, parent_group: l.parent, root_group: root,
             parent_chain: chain, closing_balance: l.closing,
-            classification: classify(root),
+            classification: classify(root, chain, l.parent),
           };
         });
         for (let i = 0; i < ledgerRows.length; i += 1000) {
