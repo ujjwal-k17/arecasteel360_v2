@@ -673,16 +673,21 @@ function DebtorPaymentSummaryTab({
         </CardContent>
       </Card>
 
-      {selectedRow && (
-        <div ref={detailRef}>
-          <DebtorInvoiceCycleCard
-            debtor={selectedRow.debtor}
-            sales={sales}
-            debtorCredits={debtorCredits}
-            creditPeriod={selectedRow.cp}
-          />
-        </div>
-      )}
+      <Dialog open={!!selectedRow} onOpenChange={(open) => { if (!open) setSelectedKey(null); }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedRow?.debtor.name || 'Debtor'}</DialogTitle>
+          </DialogHeader>
+          {selectedRow && (
+            <DebtorInvoiceCycleCard
+              debtor={selectedRow.debtor}
+              sales={sales}
+              debtorCredits={debtorCredits}
+              creditPeriod={selectedRow.cp}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
