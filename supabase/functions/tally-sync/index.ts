@@ -19,12 +19,32 @@ const COMPANIES = [
 // ============================================================
 function decodeEntities(s: string): string {
   return s
+    // Numeric entities (decimal & hex) — handles &#4; &#13; &#10; etc.
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
+      const code = parseInt(h, 16);
+      // Strip Tally's control chars (e.g. 0x04 SOT, 0x00-0x1F except tab/newline)
+      if (code < 32 && code !== 9 && code !== 10 && code !== 13) return '';
+      return String.fromCharCode(code);
+    })
+    .replace(/&#(\d+);/g, (_, d) => {
+      const code = parseInt(d, 10);
+      if (code < 32 && code !== 9 && code !== 10 && code !== 13) return '';
+      return String.fromCharCode(code);
+    })
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#4;/g, '');
+    .replace(/&apos;/g, "'");
+}
+
+function cleanAddressPart(s: string): string {
+  // Collapse whitespace, strip stray control chars, trim trailing punctuation
+  return s
+    .replace(/[\u0000-\u001F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,\s\-]+|[,\s\-]+$/g, '')
+    .trim();
 }
 
 function escapeXml(s: string): string {
@@ -125,7 +145,7 @@ function parseLedgers(xml: string): LedgerRow[] {
     const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
     if (!name) continue;
     // Address can be a list of <ADDRESS> entries inside <LEDGERMAILINGDETAILS.LIST> or top-level
-    const addrParts = tagAll(inner, 'ADDRESS').filter(Boolean);
+    const addrParts = tagAll(inner, 'ADDRESS').map(cleanAddressPart).filter(Boolean);
     out.push({
       name, parent, closing: parseAmount(closingRaw),
       mailingName: tag(inner, 'MAILINGNAME') || tag(inner, 'LEDGERMAILINGNAME') || '',

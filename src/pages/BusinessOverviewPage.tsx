@@ -318,6 +318,138 @@ function DebtorSummaryModule({
   isLoading: boolean;
   onChanged: () => void;
 }) {
+  return (
+    <Tabs defaultValue="master">
+      <TabsList>
+        <TabsTrigger value="master">Master Data</TabsTrigger>
+        <TabsTrigger value="payments">Payment Summary</TabsTrigger>
+      </TabsList>
+      <TabsContent value="master">
+        <DebtorMasterDataTab
+          debtors={debtors}
+          overrides={overrides}
+          isLoading={isLoading}
+          onChanged={onChanged}
+        />
+      </TabsContent>
+      <TabsContent value="payments">
+        <DebtorPaymentSummaryTab
+          debtors={debtors}
+          sales={sales}
+          receipts={receipts}
+          billRefs={billRefs}
+          overrides={overrides}
+          isLoading={isLoading}
+        />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function AddressCell({ address }: { address: string | null }) {
+  if (!address) return <span className="text-muted-foreground">—</span>;
+  // Render multi-line addresses cleanly
+  const lines = address.split(/\s*,\s*|\n+/).map(s => s.trim()).filter(Boolean);
+  return (
+    <div className="text-xs leading-snug max-w-[280px] whitespace-normal" title={lines.join(', ')}>
+      {lines.join(', ')}
+    </div>
+  );
+}
+
+function DebtorMasterDataTab({
+  debtors, overrides, isLoading, onChanged,
+}: {
+  debtors: SnapshotLedger[];
+  overrides: DebtorOverride[];
+  isLoading: boolean;
+  onChanged: () => void;
+}) {
+  const [search, setSearch] = useState('');
+
+  const overrideMap = useMemo(() => {
+    const m = new Map<DebtorKey, DebtorOverride>();
+    for (const o of overrides) m.set(dkey(o.company, o.ledger_name), o);
+    return m;
+  }, [overrides]);
+
+  // Deduplicate by ledger name (across companies, in case a debtor exists in multiple companies
+  // we still show one row per (company, ledger) but the "Company" column is dropped per request).
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const base = q
+      ? debtors.filter(r =>
+          r.name.toLowerCase().includes(q) ||
+          (r.gstin || '').toLowerCase().includes(q))
+      : debtors;
+    return [...base].sort((a, b) => Math.abs(b.closing_balance) - Math.abs(a.closing_balance));
+  }, [debtors, search]);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
+        <div>
+          <CardTitle className="text-lg">Debtor Master Data</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            New debtors are added on each sync; existing entries (and their credit period) are preserved.
+          </p>
+        </div>
+        <Input placeholder="Search name / GSTIN..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ledger</TableHead>
+                <TableHead>GSTIN</TableHead>
+                <TableHead>Address</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead className="w-[140px]">Credit Period (days)</TableHead>
+                <TableHead className="text-right">Outstanding</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{isLoading ? 'Loading...' : 'No debtors'}</TableCell></TableRow>
+              ) : filtered.map((d) => {
+                const k = dkey(d.company, d.name);
+                const ov = overrideMap.get(k);
+                return (
+                  <TableRow key={k}>
+                    <TableCell className="font-medium">{d.name}</TableCell>
+                    <TableCell className="text-xs">{d.gstin || '—'}</TableCell>
+                    <TableCell><AddressCell address={d.address} /></TableCell>
+                    <TableCell className="text-xs">
+                      <div>{d.contact_person || '—'}</div>
+                      <div className="text-muted-foreground">{d.phone || ''}</div>
+                      {d.email && <div className="text-muted-foreground">{d.email}</div>}
+                    </TableCell>
+                    <TableCell>
+                      <CreditPeriodInput debtor={d} current={ov?.credit_period_days ?? null} onSaved={onChanged} />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">{fmtINR(d.closing_balance)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DebtorPaymentSummaryTab({
+  debtors, sales, receipts, billRefs, overrides, isLoading,
+}: {
+  debtors: SnapshotLedger[];
+  sales: SnapshotVoucher[];
+  receipts: SnapshotVoucher[];
+  billRefs: SnapshotBillRef[];
+  overrides: DebtorOverride[];
+  isLoading: boolean;
+}) {
   const [search, setSearch] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const detailRef = useRef<HTMLDivElement | null>(null);
@@ -328,91 +460,122 @@ function DebtorSummaryModule({
     return m;
   }, [overrides]);
 
+  // Compute per-debtor outstanding & overdue from FIFO matches
+  const rows = useMemo(() => {
+    const today = todayIso();
+    return debtors.map(d => {
+      const k = dkey(d.company, d.name);
+      const cp = overrideMap.get(k)?.credit_period_days ?? null;
+      const ledgerLow = d.name.toLowerCase();
+      const dInvoices = sales.filter(v => v.company === d.company && (v.party_name || '').toLowerCase() === ledgerLow);
+      const dReceipts = receipts.filter(v => {
+        if (v.company !== d.company) return false;
+        if ((v.party_name || '').toLowerCase() === ledgerLow) return true;
+        return billRefs.some(b => b.voucher_id === v.id && b.ledger_name.toLowerCase() === ledgerLow);
+      });
+      const matches = fifoMatch(dInvoices, dReceipts, cp);
+      let outstanding = 0;
+      let overdue = 0;
+      let overdueCount = 0;
+      for (const m of matches) {
+        const open = m.amount - m.paid;
+        if (open > 0.0001) {
+          outstanding += open;
+          if (m.dueDate && m.dueDate < today) {
+            overdue += open;
+            overdueCount += 1;
+          }
+        }
+      }
+      return { debtor: d, key: k, cp, outstanding, overdue, overdueCount, invoiceCount: matches.length };
+    }).filter(r => r.outstanding > 0.5); // active = has pending receivable
+  }, [debtors, sales, receipts, billRefs, overrideMap]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = q
-      ? debtors.filter(r =>
-          r.name.toLowerCase().includes(q) ||
-          (r.gstin || '').toLowerCase().includes(q) ||
-          r.company.toLowerCase().includes(q))
-      : debtors;
-    return [...base].sort((a, b) => Math.abs(b.closing_balance) - Math.abs(a.closing_balance));
-  }, [debtors, search]);
+    const base = q ? rows.filter(r => r.debtor.name.toLowerCase().includes(q) || (r.debtor.gstin || '').toLowerCase().includes(q)) : rows;
+    return [...base].sort((a, b) => b.outstanding - a.outstanding);
+  }, [rows, search]);
 
-  const selectedDebtor = selectedKey
-    ? debtors.find(d => dkey(d.company, d.name) === selectedKey)
-    : null;
+  const totals = useMemo(() => {
+    return filtered.reduce((acc, r) => {
+      acc.outstanding += r.outstanding;
+      acc.overdue += r.overdue;
+      return acc;
+    }, { outstanding: 0, overdue: 0 });
+  }, [filtered]);
+
+  const selectedRow = selectedKey ? rows.find(r => r.key === selectedKey) : null;
 
   useEffect(() => {
-    if (selectedDebtor && detailRef.current) {
+    if (selectedRow && detailRef.current) {
       detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [selectedKey]);
 
+  const missingCp = filtered.some(r => r.cp == null);
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 pb-3">
           <div>
-            <CardTitle className="text-lg">Debtors</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Click a row to view invoice-wise payment cycle (FIFO matched against receipts).
-            </p>
+            <CardTitle className="text-lg">Payment Summary</CardTitle>
+            <div className="text-xs text-muted-foreground flex flex-wrap gap-3 mt-1">
+              <span>Active debtors: <strong className="text-foreground">{filtered.length}</strong></span>
+              <span>Total outstanding: <strong className="text-foreground">{fmtINR(totals.outstanding)}</strong></span>
+              <span className={totals.overdue > 0 ? 'text-destructive' : ''}>
+                Total overdue: <strong>{fmtINR(totals.overdue)}</strong>
+              </span>
+              {missingCp && <span className="text-amber-600">Some debtors have no credit period — overdue may be understated.</span>}
+            </div>
           </div>
-          <Input placeholder="Search name / GSTIN / company..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
+          <Input placeholder="Search name / GSTIN..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
         </CardHeader>
         <CardContent>
           <div className="overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Company</TableHead>
                   <TableHead>Ledger</TableHead>
-                  <TableHead>GSTIN</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead className="w-[140px]">Credit Period (days)</TableHead>
+                  <TableHead className="text-right">Open Invoices</TableHead>
                   <TableHead className="text-right">Outstanding</TableHead>
+                  <TableHead className="text-right">Overdue</TableHead>
+                  <TableHead className="text-right">Overdue Invoices</TableHead>
+                  <TableHead className="w-[120px]">Credit Period</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">{isLoading ? 'Loading...' : 'No debtors'}</TableCell></TableRow>
-                ) : filtered.map((d) => {
-                  const k = dkey(d.company, d.name);
-                  const ov = overrideMap.get(k);
-                  return (
-                    <TableRow key={k} className={`cursor-pointer hover:bg-muted/30 ${selectedKey === k ? 'bg-muted/40' : ''}`} onClick={() => setSelectedKey(k)}>
-                      <TableCell><Badge variant="outline">{d.company}</Badge></TableCell>
-                      <TableCell className="font-medium">{d.name}</TableCell>
-                      <TableCell className="text-xs">{d.gstin || '—'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[260px] truncate" title={d.address || ''}>{d.address || '—'}</TableCell>
-                      <TableCell className="text-xs">
-                        <div>{d.contact_person || '—'}</div>
-                        <div className="text-muted-foreground">{d.phone || ''}</div>
-                        {d.email && <div className="text-muted-foreground">{d.email}</div>}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <CreditPeriodInput debtor={d} current={ov?.credit_period_days ?? null} onSaved={onChanged} />
-                      </TableCell>
-                      <TableCell className="text-right font-medium">{fmtINR(d.closing_balance)}</TableCell>
-                    </TableRow>
-                  );
-                })}
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{isLoading ? 'Loading...' : 'No active debtors with pending invoices'}</TableCell></TableRow>
+                ) : filtered.map(r => (
+                  <TableRow
+                    key={r.key}
+                    className={`cursor-pointer hover:bg-muted/30 ${selectedKey === r.key ? 'bg-muted/40' : ''}`}
+                    onClick={() => setSelectedKey(r.key)}
+                  >
+                    <TableCell className="font-medium">{r.debtor.name}</TableCell>
+                    <TableCell className="text-right">{r.invoiceCount}</TableCell>
+                    <TableCell className="text-right font-medium">{fmtINR(r.outstanding)}</TableCell>
+                    <TableCell className={`text-right font-medium ${r.overdue > 0 ? 'text-destructive' : ''}`}>{fmtINR(r.overdue)}</TableCell>
+                    <TableCell className="text-right">{r.overdueCount}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.cp == null ? '—' : `${r.cp} days`}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
 
-      {selectedDebtor && (
+      {selectedRow && (
         <div ref={detailRef}>
           <DebtorInvoiceCycleCard
-            debtor={selectedDebtor}
+            debtor={selectedRow.debtor}
             sales={sales}
             receipts={receipts}
             billRefs={billRefs}
-            creditPeriod={overrideMap.get(dkey(selectedDebtor.company, selectedDebtor.name))?.credit_period_days ?? null}
+            creditPeriod={selectedRow.cp}
           />
         </div>
       )}
