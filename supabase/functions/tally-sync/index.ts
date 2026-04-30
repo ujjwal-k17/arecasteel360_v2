@@ -359,7 +359,10 @@ Deno.serve(async (req) => {
   );
 
   const today = new Date();
-  const fromTally = '19000101';
+  // Pull as far back as Tally has data. Use 1 Apr 2000 as a safe lower bound
+  // (Tally rejects very early dates and we want overdue calculations to consider
+  // every historical invoice/receipt available). Upper bound: today.
+  const fromTally = '20000401';
   const toTally = today.toISOString().slice(0, 10).replace(/-/g, '');
 
   const { data: runRow, error: runErr } = await admin.from('tally_sync_runs').insert({

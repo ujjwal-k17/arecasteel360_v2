@@ -116,10 +116,12 @@ async function fetchSnapshot(): Promise<TallySnapshot> {
     supabase.from('v_tally_debtors').select(ledgerCols).order('closing_balance', { ascending: false }),
     supabase.from('v_tally_creditors').select(ledgerCols).order('closing_balance', { ascending: false }),
     supabase.from('v_tally_banks').select(ledgerCols).order('closing_balance', { ascending: false }),
-    supabase.from('v_tally_sales').select(voucherCols).order('voucher_date', { ascending: false }).limit(5000),
-    supabase.from('v_tally_purchases').select(voucherCols).order('voucher_date', { ascending: false }).limit(5000),
-    supabase.from('v_tally_receipts').select(voucherCols).order('voucher_date', { ascending: true }).limit(5000),
-    supabase.from('v_tally_bank_txns').select('id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount,bank_ledger,bank_amount,bank_is_debit').order('voucher_date', { ascending: false }).limit(5000),
+    // For overdue calc we need ALL historical invoices/receipts — order ascending
+    // and use a high cap so the oldest data is never silently truncated.
+    supabase.from('v_tally_sales').select(voucherCols).order('voucher_date', { ascending: true }).limit(50000),
+    supabase.from('v_tally_purchases').select(voucherCols).order('voucher_date', { ascending: true }).limit(50000),
+    supabase.from('v_tally_receipts').select(voucherCols).order('voucher_date', { ascending: true }).limit(50000),
+    supabase.from('v_tally_bank_txns').select('id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount,bank_ledger,bank_amount,bank_is_debit').order('voucher_date', { ascending: false }).limit(50000),
     supabase.from('tally_sync_runs').select('id,started_at,finished_at,status,triggered_by_email,counts,errors').order('started_at', { ascending: false }).limit(1),
     supabase.from('tally_debtor_overrides').select('id,company,ledger_name,credit_period_days,sales_rep,notes'),
   ]);
