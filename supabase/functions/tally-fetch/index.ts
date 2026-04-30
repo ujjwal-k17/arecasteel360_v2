@@ -454,7 +454,8 @@ Deno.serve(async (req) => {
           const r = await callTally(buildVoucherXml(job.company, fromTally, toTally, filter));
           const dsName = filter === 'sales' ? 'dispatches' : 'purchases';
           if (!r.ok) {
-            result.errors.push({ company: job.company, dataset: dsName, error: `HTTP ${r.status}` });
+            const errMsg = r.error || `HTTP ${r.status}`;
+            result.errors.push({ company: job.company, dataset: dsName, error: errMsg });
             return;
           }
           const vs = parseVouchers(r.text);
