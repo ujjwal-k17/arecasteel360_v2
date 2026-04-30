@@ -297,6 +297,75 @@ export default function BusinessOverviewPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Sync All confirmation dialog */}
+      <Dialog open={syncAllOpen} onOpenChange={setSyncAllOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sync All History from Tally</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              <div className="font-medium flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5" />
+                This will take several minutes
+              </div>
+              <div className="text-muted-foreground mt-1">
+                Data is fetched in 90-day chunks starting from <span className="font-medium">1 Apr 2022</span> through today.
+                Keep this tab open while the sync runs. The previous data stays active until the full sync completes.
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {buildChunks('2022-04-01').length} chunks will be processed sequentially.
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setSyncAllOpen(false)}>Cancel</Button>
+              <Button onClick={handleSyncAll}>Start Full Sync</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chunked sync progress panel */}
+      {chunkProgress.length > 0 && (
+        <div className="rounded-md border bg-card px-3 py-2 text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div className="font-medium flex items-center gap-1.5">
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              Full sync progress — {chunkProgress.filter(p => p.status === 'done').length}/{chunkProgress.length} done
+              {chunkProgress.some(p => p.status === 'error') && (
+                <span className="text-destructive">· {chunkProgress.filter(p => p.status === 'error').length} error(s)</span>
+              )}
+            </div>
+            {!syncing && (
+              <button className="text-muted-foreground hover:text-foreground" onClick={() => setChunkProgress([])}>Dismiss</button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5">
+            {chunkProgress.map((p, idx) => {
+              const colorMap = {
+                pending: 'border-border text-muted-foreground',
+                running: 'border-primary text-primary bg-primary/5',
+                done: 'border-emerald-500/40 text-emerald-700 bg-emerald-500/5',
+                error: 'border-destructive/40 text-destructive bg-destructive/5',
+              };
+              return (
+                <div key={idx} className={`flex items-center justify-between gap-2 rounded border px-2 py-1 ${colorMap[p.status]}`} title={p.error || ''}>
+                  <div className="truncate"><span className="font-medium">{p.label}</span></div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {p.status === 'running' && <RefreshCw className="h-3 w-3 animate-spin" />}
+                    {p.status === 'done' && <CheckCircle2 className="h-3 w-3" />}
+                    {p.status === 'error' && <XCircle className="h-3 w-3" />}
+                    {p.status === 'done' && p.counts != null && (
+                      <span className="text-[10px]">{p.counts}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {lastRun && (lastRun.errors || []).length > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
           <div className="font-medium mb-1 flex items-center gap-2">
