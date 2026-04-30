@@ -56,6 +56,20 @@ export type SnapshotBillRef = {
   amount: number;
 };
 
+/**
+ * A credit-side ledger entry against a debtor (any voucher kind: receipt, journal, contra, payment).
+ * Represents money / adjustment that reduces the receivable, used for FIFO payment matching.
+ */
+export type SnapshotDebtorCredit = {
+  voucher_id: string;
+  company: string;
+  kind: string;
+  voucher_date: string | null;
+  voucher_number: string | null;
+  ledger_name: string;       // the debtor ledger that was credited
+  amount: number;            // positive = credit reducing receivable
+};
+
 export type DebtorOverride = {
   id?: string;
   company: string;
