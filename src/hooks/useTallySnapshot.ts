@@ -61,6 +61,7 @@ export type DebtorOverride = {
   company: string;
   ledger_name: string;
   credit_period_days: number | null;
+  sales_rep: string | null;
   notes: string | null;
 };
 
@@ -105,7 +106,7 @@ async function fetchSnapshot(): Promise<TallySnapshot> {
     supabase.from('v_tally_receipts').select(voucherCols).order('voucher_date', { ascending: true }).limit(5000),
     supabase.from('v_tally_bank_txns').select('id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount,bank_ledger,bank_amount,bank_is_debit').order('voucher_date', { ascending: false }).limit(5000),
     supabase.from('tally_sync_runs').select('id,started_at,finished_at,status,triggered_by_email,counts,errors').order('started_at', { ascending: false }).limit(1),
-    supabase.from('tally_debtor_overrides').select('id,company,ledger_name,credit_period_days,notes'),
+    supabase.from('tally_debtor_overrides').select('id,company,ledger_name,credit_period_days,sales_rep,notes'),
   ]);
 
   const errs = [debtorsRes, creditorsRes, banksRes, salesRes, purchasesRes, receiptsRes, bankTxnsRes, lastRunRes, overridesRes].find(r => r.error);

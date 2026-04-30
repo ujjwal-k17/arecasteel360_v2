@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, AlertCircle, Stethoscope, CheckCircle2, XCircle, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useDropdownOptions } from '@/hooks/useDropdownOptions';
 import {
   useTallySnapshot, SnapshotVoucher, SnapshotLedger, SnapshotBankTxn, SnapshotBillRef, DebtorOverride,
 } from '@/hooks/useTallySnapshot';
@@ -391,7 +392,7 @@ function DebtorMasterDataTab({
         <div>
           <CardTitle className="text-lg">Debtor Master Data</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            New debtors are added on each sync; existing entries (and their credit period) are preserved.
+            New debtors are added on each sync; existing entries (and their credit period / sales rep) are preserved.
           </p>
         </div>
         <Input placeholder="Search name / GSTIN..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
@@ -405,8 +406,8 @@ function DebtorMasterDataTab({
                 <TableHead>GSTIN</TableHead>
                 <TableHead>Address</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableHead className="w-[160px]">Sales Rep</TableHead>
                 <TableHead className="w-[140px]">Credit Period (days)</TableHead>
-                <TableHead className="text-right">Outstanding</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -426,9 +427,11 @@ function DebtorMasterDataTab({
                       {d.email && <div className="text-muted-foreground">{d.email}</div>}
                     </TableCell>
                     <TableCell>
+                      <SalesRepSelect debtor={d} current={ov?.sales_rep ?? null} onSaved={onChanged} />
+                    </TableCell>
+                    <TableCell>
                       <CreditPeriodInput debtor={d} current={ov?.credit_period_days ?? null} onSaved={onChanged} />
                     </TableCell>
-                    <TableCell className="text-right font-medium">{fmtINR(d.closing_balance)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -437,6 +440,53 @@ function DebtorMasterDataTab({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function SalesRepSelect({
+  debtor, current, onSaved,
+}: { debtor: SnapshotLedger; current: string | null; onSaved: () => void }) {
+  const { data: options } = useDropdownOptions();
+  const reps = useMemo(
+    () => (options || []).filter(o => o.category === 'sales_rep').map(o => o.value),
+    [options]
+  );
+  const [saving, setSaving] = useState(false);
+
+  const save = async (val: string | null) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('tally_debtor_overrides')
+        .upsert(
+          { company: debtor.company, ledger_name: debtor.name, sales_rep: val },
+          { onConflict: 'company,ledger_name' }
+        );
+      if (error) throw error;
+      toast.success('Saved');
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Select
+      value={current ?? '__none__'}
+      onValueChange={(v) => save(v === '__none__' ? null : v)}
+      disabled={saving}
+    >
+      <SelectTrigger className="h-8 w-[150px]">
+        <SelectValue placeholder="—" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">—</SelectItem>
+        {reps.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+      </SelectContent>
+    </Select>
   );
 }
 
