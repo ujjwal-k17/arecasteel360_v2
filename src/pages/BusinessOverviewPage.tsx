@@ -107,6 +107,7 @@ export default function BusinessOverviewPage() {
   const receipts = filterCo(data?.receipts);
   const bankTxns = filterCo(data?.bankTxns);
   const billRefs = data?.billRefs || [];
+  const debtorCredits = (data?.debtorCredits || []).filter(c => companyFilter === ALL || c.company === companyFilter);
   const overrides = data?.overrides || [];
 
   const inRange = (d: string | null) => !!d && d >= fromDate && d <= toDate;
