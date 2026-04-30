@@ -406,13 +406,15 @@ function DebtorSummaryModule({
       </Card>
 
       {selectedDebtor && (
-        <DebtorInvoiceCycleCard
-          debtor={selectedDebtor}
-          sales={sales}
-          receipts={receipts}
-          billRefs={billRefs}
-          creditPeriod={overrideMap.get(dkey(selectedDebtor.company, selectedDebtor.name))?.credit_period_days ?? null}
-        />
+        <div ref={detailRef}>
+          <DebtorInvoiceCycleCard
+            debtor={selectedDebtor}
+            sales={sales}
+            receipts={receipts}
+            billRefs={billRefs}
+            creditPeriod={overrideMap.get(dkey(selectedDebtor.company, selectedDebtor.name))?.credit_period_days ?? null}
+          />
+        </div>
       )}
     </div>
   );
