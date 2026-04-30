@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { useDropdownOptions } from '@/hooks/useDropdownOptions';
 import {
-  useTallySnapshot, SnapshotVoucher, SnapshotLedger, SnapshotBankTxn, SnapshotBillRef, DebtorOverride,
+  useTallySnapshot, SnapshotVoucher, SnapshotLedger, SnapshotBankTxn, SnapshotBillRef, SnapshotDebtorCredit, DebtorOverride,
 } from '@/hooks/useTallySnapshot';
 
 const ALL = '__all__';
