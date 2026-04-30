@@ -388,7 +388,9 @@ Deno.serve(async (req) => {
           }
 
           if (!lResp.ok) {
-            result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${lResp.status}` });
+            const errMsg = lResp.error || `HTTP ${lResp.status}`;
+            result.errors.push({ company: job.company, dataset: 'ledgers', error: errMsg });
+            if (dbg) dbg.ledgerError = errMsg;
             return;
           }
           const groups = gResp.ok ? parseGroups(gResp.text) : [];
