@@ -405,3 +405,55 @@ function VoucherTable({ rows, partyLabel }: { rows: Voucher[]; partyLabel: strin
     </div>
   );
 }
+
+function DiagSummary({ result }: { result: any }) {
+  if (result?.error) {
+    return (
+      <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+        <div className="font-medium">Diagnostic call failed</div>
+        <div className="text-muted-foreground text-xs">{result.error}</div>
+      </div>
+    );
+  }
+  const { ping, list, tallyUrl } = result || {};
+  const bothFailed = !ping?.ok && !list?.ok;
+  const reachable = ping?.ok || list?.ok;
+  return (
+    <div className="space-y-2 text-sm">
+      <div className="text-xs text-muted-foreground">Tally URL: <span className="font-mono">{tallyUrl}</span></div>
+      <ProbeRow probe={ping} />
+      <ProbeRow probe={list} />
+      {bothFailed && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+          <div className="font-medium">Tally is not reachable</div>
+          <div className="text-muted-foreground mt-1">
+            The server at this IP/port did not respond. Check that Tally is running with "Act as Server" enabled on port 9000, the right companies are loaded, and port 9000 is open in the firewall.
+          </div>
+        </div>
+      )}
+      {reachable && (
+        <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs">
+          <div className="font-medium">Tally is reachable</div>
+          <div className="text-muted-foreground mt-1">
+            Check the response snippet below to confirm the company names match what we're requesting.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProbeRow({ probe }: { probe: any }) {
+  if (!probe) return null;
+  return (
+    <div className="flex items-center justify-between rounded-md border px-3 py-2 text-xs">
+      <div>
+        <div className="font-medium">{probe.label}</div>
+        <div className="text-muted-foreground">
+          {probe.ok ? `HTTP ${probe.status} · ${probe.bodyLength} bytes` : (probe.error || `HTTP ${probe.status}`)}
+        </div>
+      </div>
+      <Badge variant={probe.ok ? 'default' : 'destructive'}>{probe.elapsedMs}ms</Badge>
+    </div>
+  );
+}
