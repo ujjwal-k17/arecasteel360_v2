@@ -5,6 +5,8 @@ export type SnapshotDebtor = {
   company: string;
   name: string;
   parent_group: string | null;
+  parent_chain?: string[] | null;
+  root_group?: string | null;
   closing_balance: number;
 };
 
@@ -48,8 +50,8 @@ export type TallySnapshot = {
 
 async function fetchSnapshot(): Promise<TallySnapshot> {
   const [debtorsRes, creditorsRes, banksRes, salesRes, purchasesRes, lastRunRes] = await Promise.all([
-    supabase.from('v_tally_debtors').select('company,name,parent_group,closing_balance').order('closing_balance', { ascending: false }),
-    supabase.from('v_tally_creditors').select('company,name,parent_group,closing_balance').order('closing_balance', { ascending: false }),
+    supabase.from('v_tally_debtors').select('company,name,parent_group,parent_chain,root_group,closing_balance').order('closing_balance', { ascending: false }),
+    supabase.from('v_tally_creditors').select('company,name,parent_group,parent_chain,root_group,closing_balance').order('closing_balance', { ascending: false }),
     supabase.from('v_tally_banks').select('company,name,closing_balance').order('closing_balance', { ascending: false }),
     supabase.from('v_tally_sales').select('id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount').order('voucher_date', { ascending: false }).limit(2000),
     supabase.from('v_tally_purchases').select('id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount').order('voucher_date', { ascending: false }).limit(2000),
