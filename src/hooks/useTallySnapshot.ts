@@ -61,6 +61,7 @@ export type DebtorOverride = {
   company: string;
   ledger_name: string;
   credit_period_days: number | null;
+  sales_rep: string | null;
   notes: string | null;
 };
 
