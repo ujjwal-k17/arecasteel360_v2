@@ -354,13 +354,26 @@ Deno.serve(async (req) => {
     }
 
     await Promise.all(jobs.map(async (job) => {
+      const ensureDbg = () => {
+        if (!debug) return null;
+        debugInfo.companies[job.company] = debugInfo.companies[job.company] || {};
+        return debugInfo.companies[job.company];
+      };
       try {
         if (job.kind === 'ledgers') {
-          // Fetch groups + ledgers in parallel for this company
           const [gResp, lResp] = await Promise.all([
             callTally(buildGroupXml(job.company)),
             callTally(buildLedgerXml(job.company)),
           ]);
+
+          const dbg = ensureDbg();
+          if (dbg) {
+            dbg.ledgerHttp = `${lResp.status} (${lResp.text.length} bytes)`;
+            dbg.groupHttp = `${gResp.status} (${gResp.text.length} bytes)`;
+            dbg.ledgerSample = lResp.text.slice(0, 600);
+            dbg.groupSample = gResp.text.slice(0, 600);
+          }
+
           if (!lResp.ok) {
             result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${lResp.status}` });
             return;
@@ -394,7 +407,7 @@ Deno.serve(async (req) => {
               root === 'bank occ a/c' ||
               parent.includes('bank');
 
-            if (debug && sample.length < 8) {
+            if (debug && sample.length < 10) {
               sample.push({ name: l.name, parent: l.parent, root, closing: l.closing });
             }
 
@@ -410,16 +423,16 @@ Deno.serve(async (req) => {
             }
           }
 
-          if (debug) {
-            debugInfo.companies[job.company] = {
+          if (dbg) {
+            Object.assign(dbg, {
               ledgerCount: ledgers.length,
               groupCount: groups.length,
               debtors: dCount,
               creditors: cCount,
               banks: bCount,
               sampleLedgers: sample,
-              sampleGroups: groups.slice(0, 8),
-            };
+              sampleGroups: groups.slice(0, 10),
+            });
           }
         } else {
           const filter = job.kind === 'sales' ? 'sales' : 'purchase';
@@ -452,12 +465,17 @@ Deno.serve(async (req) => {
         }
       } catch (e: any) {
         const dsName = job.kind === 'ledgers' ? 'ledgers' : (job.kind === 'sales' ? 'dispatches' : 'purchases');
-        const msg = e?.name === 'AbortError' ? 'Tally timed out (20s)' : (e?.message || String(e));
+        const msg = e?.name === 'AbortError' ? 'Tally timed out' : (e?.message || String(e));
         result.errors.push({ company: job.company, dataset: dsName, error: msg });
+        const dbg = ensureDbg();
+        if (dbg) dbg.exception = msg;
       }
     }));
 
-    if (debug) result._debug = debugInfo;
+    if (debug) {
+      debugInfo.errors = result.errors;
+      result._debug = debugInfo;
+    }
 
     return new Response(JSON.stringify(result), {
       status: 200,
