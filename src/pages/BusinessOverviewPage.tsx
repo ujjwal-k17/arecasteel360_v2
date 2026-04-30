@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle } from 'lucide-react';
+import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle, Stethoscope } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -80,6 +81,25 @@ export default function BusinessOverviewPage() {
     }
   };
 
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagResult, setDiagResult] = useState<any>(null);
+
+  const handleTestConnection = async () => {
+    setDiagOpen(true);
+    setDiagLoading(true);
+    setDiagResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('tally-diagnose', { body: {} });
+      if (error) throw error;
+      setDiagResult(data);
+    } catch (e: any) {
+      setDiagResult({ error: e?.message || String(e) });
+    } finally {
+      setDiagLoading(false);
+    }
+  };
+
   const companies = data?.companies || [];
 
   const filterByCompany = <T extends { company: string }>(arr: T[] | undefined): T[] =>
@@ -122,12 +142,34 @@ export default function BusinessOverviewPage() {
               </SelectContent>
             </Select>
           </div>
+          <Button variant="outline" onClick={handleTestConnection} disabled={diagLoading}>
+            <Stethoscope className={`h-4 w-4 mr-2 ${diagLoading ? 'animate-pulse' : ''}`} />
+            Test Connection
+          </Button>
           <Button onClick={handleSync} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
             Sync from Tally
           </Button>
         </div>
       </div>
+
+      <Dialog open={diagOpen} onOpenChange={setDiagOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Tally Connection Diagnostic</DialogTitle>
+          </DialogHeader>
+          {diagLoading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">Probing Tally server...</div>
+          ) : diagResult ? (
+            <div className="space-y-3">
+              <DiagSummary result={diagResult} />
+              <pre className="text-xs bg-muted rounded-md p-3 overflow-auto max-h-[400px] whitespace-pre-wrap break-all">
+                {JSON.stringify(diagResult, null, 2)}
+              </pre>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm flex items-start gap-2">
@@ -360,6 +402,58 @@ function VoucherTable({ rows, partyLabel }: { rows: Voucher[]; partyLabel: strin
           )}
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+function DiagSummary({ result }: { result: any }) {
+  if (result?.error) {
+    return (
+      <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+        <div className="font-medium">Diagnostic call failed</div>
+        <div className="text-muted-foreground text-xs">{result.error}</div>
+      </div>
+    );
+  }
+  const { ping, list, tallyUrl } = result || {};
+  const bothFailed = !ping?.ok && !list?.ok;
+  const reachable = ping?.ok || list?.ok;
+  return (
+    <div className="space-y-2 text-sm">
+      <div className="text-xs text-muted-foreground">Tally URL: <span className="font-mono">{tallyUrl}</span></div>
+      <ProbeRow probe={ping} />
+      <ProbeRow probe={list} />
+      {bothFailed && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+          <div className="font-medium">Tally is not reachable</div>
+          <div className="text-muted-foreground mt-1">
+            The server at this IP/port did not respond. Check that Tally is running with "Act as Server" enabled on port 9000, the right companies are loaded, and port 9000 is open in the firewall.
+          </div>
+        </div>
+      )}
+      {reachable && (
+        <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs">
+          <div className="font-medium">Tally is reachable</div>
+          <div className="text-muted-foreground mt-1">
+            Check the response snippet below to confirm the company names match what we're requesting.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProbeRow({ probe }: { probe: any }) {
+  if (!probe) return null;
+  return (
+    <div className="flex items-center justify-between rounded-md border px-3 py-2 text-xs">
+      <div>
+        <div className="font-medium">{probe.label}</div>
+        <div className="text-muted-foreground">
+          {probe.ok ? `HTTP ${probe.status} · ${probe.bodyLength} bytes` : (probe.error || `HTTP ${probe.status}`)}
+        </div>
+      </div>
+      <Badge variant={probe.ok ? 'default' : 'destructive'}>{probe.elapsedMs}ms</Badge>
     </div>
   );
 }

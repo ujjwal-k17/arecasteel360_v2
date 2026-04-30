@@ -1,24 +1,33 @@
-## Diagnose "Synced 0 items from Tally"
+# Diagnose why Tally is timing out
 
-The edge function reached Tally and got HTTP 200, but the parser found zero `<STOCKITEM>` blocks. We need to see the raw XML Tally is actually returning to fix the parser correctly.
+The 20-second timeout is firing for every Tally call. Before doing anything bigger (queues, workers), we need to know whether the Tally server at `103.239.89.153:9000` is even reachable.
 
-### Step 1 — Add debug payload to `tally-sync`
-In `supabase/functions/tally-sync/index.ts`, when `items.length === 0`, include a `debug` object in the JSON response containing:
-- `rawLength` — total length of Tally's response
-- `rawSnippet` — first 3000 chars of the raw XML
-- `stockItemTagCount` — count of `<STOCKITEM` occurrences
-- `tallyMessageTagCount` — count of `<TALLYMESSAGE` occurrences
-- `contentType` — the Content-Type header Tally sent
+## Step 1 — New edge function: `tally-diagnose`
 
-No UI changes. The user clicks **Sync from Tally** once; I read the network response.
+A tiny function that runs two fast probes against Tally in parallel:
+- **Ping**: asks for `$$CurrentCompany` (10s timeout)
+- **List Companies**: asks Tally for the companies it has open (15s timeout)
 
-### Step 2 — Fix the parser based on what we see
-After seeing the actual response shape:
-- **If error envelope** (e.g. "Could not Set Object", "No Company Loaded") → surface the message in the toast.
-- **If different tag structure** (items inside `<COLLECTION>`, `<TALLYMESSAGE>` only, etc.) → update the regex / switch to a real XML parser.
-- **If genuinely empty** → show "No items in Tally" empty state.
-- **If a specific company is needed** → add `<SVCURRENTCOMPANY>` to the request envelope.
+Returns elapsed time, HTTP status, response length, and a 2 KB snippet of the raw response. No parsing, no business logic.
 
-### Files
-- edit `supabase/functions/tally-sync/index.ts` (debug payload only — Step 1)
-- Step 2 edits depend on what we observe.
+The result tells us the exact problem:
+
+| Result | Meaning | Fix |
+|---|---|---|
+| Both timeout | Tally not running OR port 9000 blocked | Open Tally, enable "Act as Server", check firewall |
+| HTTP error | Reverse proxy / wrong port | Adjust IP/port |
+| Returns fast, empty company list | Tally up but no companies loaded | Open the two Areca companies |
+| Returns fast with names | Names don't match our `COMPANIES` array | Update names in `tally-fetch` |
+
+## Step 2 — "Test Connection" button on Business Overview
+
+A small button next to "Sync from Tally". Calls `tally-diagnose` and shows the JSON response in a dialog. Makes future Tally debugging a one-click operation.
+
+## Files
+
+- **New**: `supabase/functions/tally-diagnose/index.ts`
+- **Modified**: `src/pages/BusinessOverviewPage.tsx` — add Test Connection button + result dialog
+
+## What I'm NOT doing
+
+Not building the queue/background-worker architecture yet. If the real issue is "Tally isn't running" or "companies aren't loaded", a queue won't fix it — it'll just hide the timeout behind a longer one. We'll revisit only if diagnostics show Tally is genuinely reachable but slow.
