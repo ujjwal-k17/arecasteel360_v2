@@ -145,7 +145,7 @@ function parseLedgers(xml: string): LedgerRow[] {
     const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
     if (!name) continue;
     // Address can be a list of <ADDRESS> entries inside <LEDGERMAILINGDETAILS.LIST> or top-level
-    const addrParts = tagAll(inner, 'ADDRESS').filter(Boolean);
+    const addrParts = tagAll(inner, 'ADDRESS').map(cleanAddressPart).filter(Boolean);
     out.push({
       name, parent, closing: parseAmount(closingRaw),
       mailingName: tag(inner, 'MAILINGNAME') || tag(inner, 'LEDGERMAILINGNAME') || '',
