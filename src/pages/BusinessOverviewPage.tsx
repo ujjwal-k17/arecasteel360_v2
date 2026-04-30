@@ -540,28 +540,48 @@ function DebtorPaymentSummaryTab({
     return m;
   }, [debtorCredits]);
 
-  // Compute per-debtor overdue from FIFO matches; outstanding = Tally ledger closing balance
+  // Pre-index sales by (company, ledger lowercase), pre-sorted descending by date.
+  // This collapses what was an O(debtors × sales) `sales.filter(...)` + per-row
+  // `sort()` into a single O(sales) build + O(1) lookup per debtor.
+  const salesByDebtor = useMemo(() => {
+    const m = new Map<string, SnapshotVoucher[]>();
+    for (const v of sales) {
+      const party = (v.party_name || '').toLowerCase();
+      if (!party) continue;
+      const key = `${v.company}__${party}`;
+      const arr = m.get(key);
+      if (arr) arr.push(v); else m.set(key, [v]);
+    }
+    // ISO date strings sort lexicographically — descending = b vs a.
+    for (const arr of m.values()) {
+      arr.sort((a, b) => (b.voucher_date || '').localeCompare(a.voucher_date || ''));
+    }
+    return m;
+  }, [sales]);
+
+  // Compute per-debtor overdue using outstanding walk-back; outstanding = Tally closing balance
   const rows = useMemo(() => {
     const today = todayIso();
+    // Add `days` to an ISO date string (yyyy-mm-dd) without allocating two Date
+    // objects per invoice.
+    const addDaysIso = (iso: string, days: number): string => {
+      const d = new Date(iso + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
     return debtors.map(d => {
       const k = dkey(d.company, d.name);
       const ov = overrideMap.get(k);
       const cp = ov?.credit_period_days ?? null;
       const salesRep = ov?.sales_rep ?? null;
-      const ledgerLow = d.name.toLowerCase();
-      const dInvoices = sales.filter(v => v.company === d.company && (v.party_name || '').toLowerCase() === ledgerLow);
-      // Outstanding from Tally ledger (Cr-side, stored negative). Walk invoices
-      // newest -> oldest, accumulating amounts until they cover outstanding.
-      // The oldest invoice in that set may be partially paid.
+      const dInvoices = salesByDebtor.get(`${d.company}__${d.name.toLowerCase()}`) || [];
       const outstandingAbs = Math.abs(Number(d.closing_balance) || 0);
-      const sortedDesc = [...dInvoices].sort((a, b) =>
-        (b.voucher_date || '').localeCompare(a.voucher_date || '')
-      );
       let remaining = outstandingAbs;
       let overdue = 0;
       let overdueCount = 0;
       let unpaidInvoiceCount = 0;
-      for (const v of sortedDesc) {
+      // dInvoices is already sorted descending by date.
+      for (const v of dInvoices) {
         if (remaining <= 0.0001) break;
         const amt = Number(v.amount) || 0;
         if (amt <= 0) continue;
@@ -569,9 +589,7 @@ function DebtorPaymentSummaryTab({
         remaining -= unpaidPortion;
         unpaidInvoiceCount += 1;
         if (v.voucher_date && cp != null) {
-          const due = new Date(v.voucher_date);
-          due.setDate(due.getDate() + cp);
-          const dueIso = due.toISOString().slice(0, 10);
+          const dueIso = addDaysIso(v.voucher_date, cp);
           if (dueIso < today) {
             overdue += unpaidPortion;
             overdueCount += 1;
@@ -580,14 +598,14 @@ function DebtorPaymentSummaryTab({
       }
       return {
         debtor: d, key: k, cp, salesRep,
-        outstanding: d.closing_balance, // direct from Tally ledger balance
+        outstanding: d.closing_balance,
         overdue, overdueCount, invoiceCount: unpaidInvoiceCount,
       };
     }).filter(r =>
-      r.salesRep !== 'IntraCompany' &&            // exclude intra-company debtors
-      Math.abs(r.outstanding) > 0.5               // active = has a non-zero ledger balance
+      r.salesRep !== 'IntraCompany' &&
+      Math.abs(r.outstanding) > 0.5
     );
-  }, [debtors, sales, creditIndex, overrideMap]);
+  }, [debtors, salesByDebtor, overrideMap]);
 
   // Sales-rep sub-tab
   const [repTab, setRepTab] = useState<string>('__all__');
