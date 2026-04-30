@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle } from 'lucide-react';
+import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle, Stethoscope } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -80,6 +81,25 @@ export default function BusinessOverviewPage() {
     }
   };
 
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagResult, setDiagResult] = useState<any>(null);
+
+  const handleTestConnection = async () => {
+    setDiagOpen(true);
+    setDiagLoading(true);
+    setDiagResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('tally-diagnose', { body: {} });
+      if (error) throw error;
+      setDiagResult(data);
+    } catch (e: any) {
+      setDiagResult({ error: e?.message || String(e) });
+    } finally {
+      setDiagLoading(false);
+    }
+  };
+
   const companies = data?.companies || [];
 
   const filterByCompany = <T extends { company: string }>(arr: T[] | undefined): T[] =>
@@ -122,10 +142,34 @@ export default function BusinessOverviewPage() {
               </SelectContent>
             </Select>
           </div>
+          <Button variant="outline" onClick={handleTestConnection} disabled={diagLoading}>
+            <Stethoscope className={`h-4 w-4 mr-2 ${diagLoading ? 'animate-pulse' : ''}`} />
+            Test Connection
+          </Button>
           <Button onClick={handleSync} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
             Sync from Tally
           </Button>
+        </div>
+      </div>
+
+      <Dialog open={diagOpen} onOpenChange={setDiagOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Tally Connection Diagnostic</DialogTitle>
+          </DialogHeader>
+          {diagLoading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">Probing Tally server...</div>
+          ) : diagResult ? (
+            <div className="space-y-3">
+              <DiagSummary result={diagResult} />
+              <pre className="text-xs bg-muted rounded-md p-3 overflow-auto max-h-[400px] whitespace-pre-wrap break-all">
+                {JSON.stringify(diagResult, null, 2)}
+              </pre>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
         </div>
       </div>
 
