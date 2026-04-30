@@ -1,0 +1,367 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+const TALLY_URL = 'http://103.239.89.153:9000';
+
+const COMPANIES = [
+  'Areca Indocorp LLP (Delhi) - FY-2022-23',
+  'Areca Indocorp LLP (Gzb.) FY-2022-23',
+];
+
+// ----------------- helpers -----------------
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#4;/g, '');
+}
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function tag(inner: string, name: string): string | null {
+  const re = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, 'i');
+  const m = inner.match(re);
+  return m ? decodeEntities(m[1].trim()) : null;
+}
+
+function tagAll(inner: string, name: string): string[] {
+  const re = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, 'gi');
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(inner)) !== null) out.push(decodeEntities(m[1].trim()));
+  return out;
+}
+
+function parseAmount(s: string | null): number {
+  if (!s) return 0;
+  // Tally returns amounts like " 1234.56 Dr" or " -1234.56" - extract sign and number
+  const cleaned = s.replace(/[^\d.\-]/g, '');
+  const n = parseFloat(cleaned);
+  if (isNaN(n)) return 0;
+  // Treat trailing "Cr" as negative for outstanding (debtor Cr = advance/credit)
+  const isCr = /Cr/i.test(s);
+  return isCr ? -Math.abs(n) : Math.abs(n) * (n < 0 ? 1 : 1) * (s.trim().startsWith('-') ? -1 : 1);
+}
+
+function parseQty(s: string | null): number {
+  if (!s) return 0;
+  const m = s.match(/-?[\d.]+/);
+  return m ? parseFloat(m[0]) : 0;
+}
+
+// ----------------- XML builders -----------------
+function buildLedgerXml(company: string): string {
+  return `<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>ArecaLedgerSync</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="ArecaLedgerSync" ISMODIFY="No">
+            <TYPE>Ledger</TYPE>
+            <NATIVEMETHOD>Name</NATIVEMETHOD>
+            <NATIVEMETHOD>Parent</NATIVEMETHOD>
+            <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
+            <NATIVEMETHOD>BillAllocations</NATIVEMETHOD>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
+function buildVoucherXml(company: string, fromDate: string, toDate: string, voucherTypeFilter: 'sales' | 'purchase'): string {
+  // Date format YYYYMMDD
+  return `<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>ArecaVoucherSync</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+        <SVFROMDATE>${fromDate}</SVFROMDATE>
+        <SVTODATE>${toDate}</SVTODATE>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="ArecaVoucherSync" ISMODIFY="No">
+            <TYPE>Voucher</TYPE>
+            <FETCH>Date,VoucherTypeName,VoucherNumber,PartyLedgerName,Amount,InventoryEntries.List,IsInvoice,IsCancelled,IsOptional</FETCH>
+            <FILTER>${voucherTypeFilter === 'sales' ? 'IsSalesVch' : 'IsPurchVch'}</FILTER>
+          </COLLECTION>
+          <SYSTEM TYPE="Formulae" NAME="IsSalesVch">$$IsSales:$VoucherTypeName</SYSTEM>
+          <SYSTEM TYPE="Formulae" NAME="IsPurchVch">$$IsPurchase:$VoucherTypeName</SYSTEM>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
+// ----------------- parsers -----------------
+type LedgerRow = { name: string; parent: string; closing: number; raw: string };
+
+function parseLedgers(xml: string): LedgerRow[] {
+  const out: LedgerRow[] = [];
+  const blockRe = /<LEDGER\b([^>]*)>([\s\S]*?)<\/LEDGER>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = blockRe.exec(xml)) !== null) {
+    const attrs = m[1] || '';
+    const inner = m[2] || '';
+    const nameAttr = attrs.match(/NAME\s*=\s*"([^"]*)"/i);
+    const name = nameAttr ? decodeEntities(nameAttr[1]) : (tag(inner, 'NAME') || '');
+    const parent = tag(inner, 'PARENT') || '';
+    const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
+    if (!name) continue;
+    out.push({ name, parent, closing: parseAmount(closingRaw), raw: closingRaw });
+  }
+  return out;
+}
+
+type VoucherRow = {
+  date: string;
+  voucherNumber: string;
+  voucherType: string;
+  party: string;
+  amount: number;
+  items: { name: string; qty: number; rate: number; amount: number }[];
+};
+
+function parseVouchers(xml: string): VoucherRow[] {
+  const out: VoucherRow[] = [];
+  const blockRe = /<VOUCHER\b([^>]*)>([\s\S]*?)<\/VOUCHER>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = blockRe.exec(xml)) !== null) {
+    const inner = m[2] || '';
+    if (/<ISCANCELLED[^>]*>\s*Yes/i.test(inner)) continue;
+    if (/<ISOPTIONAL[^>]*>\s*Yes/i.test(inner)) continue;
+    const dateRaw = tag(inner, 'DATE') || '';
+    // Tally date YYYYMMDD -> ISO
+    const date = dateRaw.length === 8
+      ? `${dateRaw.slice(0, 4)}-${dateRaw.slice(4, 6)}-${dateRaw.slice(6, 8)}`
+      : dateRaw;
+    const voucherNumber = tag(inner, 'VOUCHERNUMBER') || '';
+    const voucherType = tag(inner, 'VOUCHERTYPENAME') || '';
+    const party = tag(inner, 'PARTYLEDGERNAME') || tag(inner, 'PARTYNAME') || '';
+    const amountRaw = tag(inner, 'AMOUNT') || '';
+    const amount = Math.abs(parseAmount(amountRaw));
+
+    const items: VoucherRow['items'] = [];
+    const invRe = /<ALLINVENTORYENTRIES\.LIST>([\s\S]*?)<\/ALLINVENTORYENTRIES\.LIST>/gi;
+    let im: RegExpExecArray | null;
+    while ((im = invRe.exec(inner)) !== null) {
+      const ie = im[1];
+      const stockName = tag(ie, 'STOCKITEMNAME') || '';
+      const qty = parseQty(tag(ie, 'ACTUALQTY') || tag(ie, 'BILLEDQTY') || '');
+      const rate = parseQty(tag(ie, 'RATE') || '');
+      const amt = Math.abs(parseAmount(tag(ie, 'AMOUNT') || ''));
+      if (stockName) items.push({ name: stockName, qty, rate, amount: amt });
+    }
+    out.push({ date, voucherNumber, voucherType, party, amount, items });
+  }
+  return out;
+}
+
+// ----------------- Tally call -----------------
+async function callTally(xml: string): Promise<{ ok: boolean; text: string; status: number }> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 45000);
+  try {
+    const resp = await fetch(TALLY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+      body: xml,
+      signal: controller.signal,
+    });
+    const text = await resp.text();
+    return { ok: resp.ok, text, status: resp.status };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function toTallyDate(iso: string): string {
+  // ISO YYYY-MM-DD -> YYYYMMDD
+  return iso.replace(/-/g, '').slice(0, 8);
+}
+
+// ----------------- handler -----------------
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const dataset = (body.dataset || 'all') as 'debtors' | 'banks' | 'dispatches' | 'purchases' | 'all';
+    const fromDate = body.fromDate as string | undefined; // ISO
+    const toDate = body.toDate as string | undefined; // ISO
+
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const fromIso = fromDate || monthStart.toISOString().slice(0, 10);
+    const toIso = toDate || today.toISOString().slice(0, 10);
+    const fromTally = toTallyDate(fromIso);
+    const toTally = toTallyDate(toIso);
+
+    const result: any = {
+      debtors: [],
+      banks: [],
+      dispatches: [],
+      purchases: [],
+      errors: [] as { company: string; dataset: string; error: string }[],
+      fetchedAt: new Date().toISOString(),
+      fromDate: fromIso,
+      toDate: toIso,
+      companies: COMPANIES,
+    };
+
+    for (const company of COMPANIES) {
+      // Ledgers (debtors + banks)
+      if (dataset === 'all' || dataset === 'debtors' || dataset === 'banks') {
+        try {
+          const r = await callTally(buildLedgerXml(company));
+          if (!r.ok) {
+            result.errors.push({ company, dataset: 'ledgers', error: `HTTP ${r.status}` });
+          } else {
+            const ledgers = parseLedgers(r.text);
+            for (const l of ledgers) {
+              const parent = (l.parent || '').toLowerCase();
+              if (parent.includes('sundry debtor')) {
+                result.debtors.push({
+                  company,
+                  partyName: l.name,
+                  outstanding: l.closing,
+                  overdue: 0, // overdue requires bill-wise breakdown; populated below if available
+                });
+              } else if (parent.includes('bank')) {
+                result.banks.push({
+                  company,
+                  accountName: l.name,
+                  balance: l.closing,
+                });
+              }
+            }
+          }
+        } catch (e: any) {
+          result.errors.push({ company, dataset: 'ledgers', error: e?.message || String(e) });
+        }
+      }
+
+      // Sales vouchers (dispatches)
+      if (dataset === 'all' || dataset === 'dispatches') {
+        try {
+          const r = await callTally(buildVoucherXml(company, fromTally, toTally, 'sales'));
+          if (!r.ok) {
+            result.errors.push({ company, dataset: 'dispatches', error: `HTTP ${r.status}` });
+          } else {
+            const vs = parseVouchers(r.text);
+            for (const v of vs) {
+              result.dispatches.push({
+                company,
+                date: v.date,
+                voucherNumber: v.voucherNumber,
+                voucherType: v.voucherType,
+                party: v.party,
+                amount: v.amount,
+                items: v.items,
+                totalQty: v.items.reduce((s, i) => s + (i.qty || 0), 0),
+                itemsSummary: v.items.map(i => i.name).filter(Boolean).join(', '),
+              });
+            }
+          }
+        } catch (e: any) {
+          result.errors.push({ company, dataset: 'dispatches', error: e?.message || String(e) });
+        }
+      }
+
+      // Purchase vouchers
+      if (dataset === 'all' || dataset === 'purchases') {
+        try {
+          const r = await callTally(buildVoucherXml(company, fromTally, toTally, 'purchase'));
+          if (!r.ok) {
+            result.errors.push({ company, dataset: 'purchases', error: `HTTP ${r.status}` });
+          } else {
+            const vs = parseVouchers(r.text);
+            for (const v of vs) {
+              result.purchases.push({
+                company,
+                date: v.date,
+                voucherNumber: v.voucherNumber,
+                voucherType: v.voucherType,
+                supplier: v.party,
+                amount: v.amount,
+                items: v.items,
+                totalQty: v.items.reduce((s, i) => s + (i.qty || 0), 0),
+                itemsSummary: v.items.map(i => i.name).filter(Boolean).join(', '),
+              });
+            }
+          }
+        } catch (e: any) {
+          result.errors.push({ company, dataset: 'purchases', error: e?.message || String(e) });
+        }
+      }
+    }
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message || 'Unknown error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
