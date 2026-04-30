@@ -755,8 +755,9 @@ function DebtorInvoiceCycleCard({
     (v.party_name || '').toLowerCase() === ledgerLow
   );
 
-  // Outstanding from Tally closing balance (positive = receivable).
-  const outstanding = Math.max(0, Number(debtor.closing_balance) || 0);
+  // Outstanding from Tally closing balance. Tally stores debtor balances on the
+  // Cr side (negative in <AMOUNT>), so we take the absolute value as the receivable.
+  const outstanding = Math.abs(Number(debtor.closing_balance) || 0);
 
   // Identify unpaid invoices: walk from most recent backward, summing invoice amounts
   // until they cover the outstanding. The oldest invoice in this set may be partially paid.
