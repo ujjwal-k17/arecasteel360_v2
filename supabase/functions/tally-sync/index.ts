@@ -363,30 +363,68 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
+  // ----------------------------------------------------------------
+  // Parse body for chunked-sync orchestration.
+  //   { runId?, fromDate?: 'YYYY-MM-DD', toDate?: 'YYYY-MM-DD',
+  //     includeLedgers?: boolean, finalize?: boolean,
+  //     chunkLabel?: string }
+  // - If `runId` is omitted -> creates a new sync_run and (by default) finalizes it.
+  // - If `runId` is provided -> appends rows to that run; only finalizes when
+  //   `finalize === true`. Until finalized, the run stays `running` and the
+  //   existing successful run remains active in the views (no flicker).
+  // ----------------------------------------------------------------
+  let body: any = {};
+  try {
+    if (req.headers.get('content-length') !== '0') body = await req.json();
+  } catch { body = {}; }
+
   const today = new Date();
-  // Pull as far back as Tally has data. Use 1 Apr 2000 as a safe lower bound
-  // (Tally rejects very early dates and we want overdue calculations to consider
-  // every historical invoice/receipt available). Upper bound: today.
-  const fromTally = '20000401';
-  const toTally = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const todayIso = today.toISOString().slice(0, 10);
+  const reqFrom: string = (body.fromDate && /^\d{4}-\d{2}-\d{2}$/.test(body.fromDate)) ? body.fromDate : '2000-04-01';
+  const reqTo: string = (body.toDate && /^\d{4}-\d{2}-\d{2}$/.test(body.toDate)) ? body.toDate : todayIso;
+  const fromTally = reqFrom.replace(/-/g, '');
+  const toTally = reqTo.replace(/-/g, '');
+  const includeLedgers: boolean = body.includeLedgers !== false; // default true
+  const chunkLabel: string = body.chunkLabel || `${reqFrom} → ${reqTo}`;
+  const externalRunId: string | undefined = body.runId;
+  const finalize: boolean = !externalRunId || body.finalize === true;
 
-  const { data: runRow, error: runErr } = await admin.from('tally_sync_runs').insert({
-    status: 'running',
-    triggered_by: userId,
-    triggered_by_email: userEmail,
-    datasets: ['ledgers', 'sales', 'purchases', 'receipts', 'payments', 'contra', 'journal'],
-    companies: COMPANIES,
-  }).select('id').single();
-
-  if (runErr || !runRow) {
-    return new Response(JSON.stringify({ error: 'Failed to create sync run', detail: runErr?.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  let runId: string;
+  if (externalRunId) {
+    runId = externalRunId;
+  } else {
+    const { data: runRow, error: runErr } = await admin.from('tally_sync_runs').insert({
+      status: 'running',
+      triggered_by: userId,
+      triggered_by_email: userEmail,
+      datasets: includeLedgers
+        ? ['ledgers', 'sales', 'purchases', 'receipts', 'payments', 'contra', 'journal']
+        : ['sales', 'purchases', 'receipts', 'payments', 'contra', 'journal'],
+      companies: COMPANIES,
+    }).select('id').single();
+    if (runErr || !runRow) {
+      return new Response(JSON.stringify({ error: 'Failed to create sync run', detail: runErr?.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    runId = runRow.id as string;
   }
-  const runId = runRow.id as string;
 
-  const errors: { company: string; dataset: string; error: string }[] = [];
-  const counts: Record<string, Record<string, number>> = {};
+  // For chunk appends, load existing counts/errors so we can merge.
+  let errors: { company: string; dataset: string; error: string }[] = [];
+  let counts: Record<string, Record<string, number>> = {};
+  if (externalRunId) {
+    const { data: existing } = await admin
+      .from('tally_sync_runs')
+      .select('counts,errors')
+      .eq('id', runId)
+      .single();
+    if (existing) {
+      counts = (existing.counts as any) || {};
+      errors = (existing.errors as any) || [];
+    }
+  }
+
   const recordCount = (company: string, dataset: string, n: number) => {
     counts[company] = counts[company] || {};
     counts[company][dataset] = (counts[company][dataset] || 0) + n;
@@ -411,26 +449,17 @@ Deno.serve(async (req) => {
     (inserted || []).forEach((row, idx) => {
       const v = slice[idx];
       for (const it of v.items) {
-        itemRows.push({
-          voucher_id: row.id, stock_item: it.name,
-          qty: it.qty, rate: it.rate, amount: it.amount,
-        });
+        itemRows.push({ voucher_id: row.id, stock_item: it.name, qty: it.qty, rate: it.rate, amount: it.amount });
       }
       for (const e of v.ledgerEntries) {
         entryRows.push({
-          voucher_id: row.id,
-          ledger_name: e.ledgerName,
-          amount: e.amount,
-          is_debit: e.isDebit,
-          is_party_ledger: e.isPartyLedger,
+          voucher_id: row.id, ledger_name: e.ledgerName,
+          amount: e.amount, is_debit: e.isDebit, is_party_ledger: e.isPartyLedger,
         });
         for (const br of e.billRefs) {
           billRows.push({
-            voucher_id: row.id,
-            ledger_name: e.ledgerName,
-            bill_name: br.name,
-            bill_type: br.type,
-            amount: br.amount,
+            voucher_id: row.id, ledger_name: e.ledgerName,
+            bill_name: br.name, bill_type: br.type, amount: br.amount,
           });
         }
       }
@@ -450,64 +479,67 @@ Deno.serve(async (req) => {
   }
 
   const work = COMPANIES.map(async (company) => {
-    // 1) Groups + Ledgers
-    try {
-      const [gResp, lResp] = await Promise.all([
-        callTally(buildGroupXml(company)),
-        callTally(buildLedgerXml(company)),
-      ]);
-      if (!lResp.ok) {
-        errors.push({ company, dataset: 'ledgers', error: lResp.error || `HTTP ${lResp.status}` });
-      } else {
-        const groups = gResp.ok ? parseGroups(gResp.text) : [];
-        const groupMap = new Map<string, string>();
-        for (const g of groups) groupMap.set(g.name.toLowerCase(), g.parent);
+    // 1) Groups + Ledgers (only when requested — typically only the first chunk
+    //    in a multi-chunk Sync All, or every Sync 30 Days call).
+    if (includeLedgers) {
+      try {
+        const [gResp, lResp] = await Promise.all([
+          callTally(buildGroupXml(company)),
+          callTally(buildLedgerXml(company)),
+        ]);
+        if (!lResp.ok) {
+          errors.push({ company, dataset: 'ledgers', error: lResp.error || `HTTP ${lResp.status}` });
+        } else {
+          const groups = gResp.ok ? parseGroups(gResp.text) : [];
+          const groupMap = new Map<string, string>();
+          for (const g of groups) groupMap.set(g.name.toLowerCase(), g.parent);
 
-        if (groups.length) {
-          const groupRows = groups.map(g => ({
-            sync_run_id: runId, company,
-            name: g.name, parent: g.parent, is_reserved: g.isReserved,
-          }));
-          for (let i = 0; i < groupRows.length; i += 1000) {
-            const { error } = await admin.from('tally_groups').insert(groupRows.slice(i, i + 1000));
-            if (error) throw new Error(`groups insert: ${error.message}`);
+          if (groups.length) {
+            const groupRows = groups.map(g => ({
+              sync_run_id: runId, company,
+              name: g.name, parent: g.parent, is_reserved: g.isReserved,
+            }));
+            for (let i = 0; i < groupRows.length; i += 1000) {
+              const { error } = await admin.from('tally_groups').insert(groupRows.slice(i, i + 1000));
+              if (error) throw new Error(`groups insert: ${error.message}`);
+            }
+            recordCount(company, 'groups', groups.length);
           }
-          recordCount(company, 'groups', groups.length);
-        }
 
-        const ledgers = parseLedgers(lResp.text);
-        const ledgerRows = ledgers.map(l => {
-          const { root, chain } = rootGroupOf(l.parent, groupMap);
-          return {
-            sync_run_id: runId, company,
-            name: l.name, parent_group: l.parent, root_group: root,
-            parent_chain: chain, closing_balance: l.closing,
-            classification: classify(root, chain, l.parent),
-            mailing_name: l.mailingName || null,
-            address: l.address || null,
-            gstin: l.gstin || null,
-            contact_person: l.contact || null,
-            phone: l.phone || null,
-            email: l.email || null,
-          };
-        });
-        for (let i = 0; i < ledgerRows.length; i += 1000) {
-          const { error } = await admin.from('tally_ledgers').insert(ledgerRows.slice(i, i + 1000));
-          if (error) throw new Error(`ledgers insert: ${error.message}`);
+          const ledgers = parseLedgers(lResp.text);
+          const ledgerRows = ledgers.map(l => {
+            const { root, chain } = rootGroupOf(l.parent, groupMap);
+            return {
+              sync_run_id: runId, company,
+              name: l.name, parent_group: l.parent, root_group: root,
+              parent_chain: chain, closing_balance: l.closing,
+              classification: classify(root, chain, l.parent),
+              mailing_name: l.mailingName || null,
+              address: l.address || null,
+              gstin: l.gstin || null,
+              contact_person: l.contact || null,
+              phone: l.phone || null,
+              email: l.email || null,
+            };
+          });
+          for (let i = 0; i < ledgerRows.length; i += 1000) {
+            const { error } = await admin.from('tally_ledgers').insert(ledgerRows.slice(i, i + 1000));
+            if (error) throw new Error(`ledgers insert: ${error.message}`);
+          }
+          recordCount(company, 'ledgers', ledgerRows.length);
         }
-        recordCount(company, 'ledgers', ledgerRows.length);
+      } catch (e: any) {
+        errors.push({ company, dataset: 'ledgers', error: e?.message || String(e) });
       }
-    } catch (e: any) {
-      errors.push({ company, dataset: 'ledgers', error: e?.message || String(e) });
     }
 
-    // 2) Vouchers per kind (sales, purchase, receipt, payment, contra, journal)
+    // 2) Vouchers per kind for [fromTally, toTally]
     const kinds: VoucherKind[] = ['sales', 'purchase', 'receipt', 'payment', 'contra', 'journal'];
     for (const kind of kinds) {
       try {
         const r = await callTally(buildVoucherXml(company, fromTally, toTally, kind));
         if (!r.ok) {
-          errors.push({ company, dataset: kind, error: r.error || `HTTP ${r.status}` });
+          errors.push({ company, dataset: kind, error: `[${chunkLabel}] ${r.error || `HTTP ${r.status}`}` });
           continue;
         }
         const vs = parseVouchers(r.text);
@@ -516,37 +548,44 @@ Deno.serve(async (req) => {
         }
         recordCount(company, kind, vs.length);
       } catch (e: any) {
-        errors.push({ company, dataset: kind, error: e?.message || String(e) });
+        errors.push({ company, dataset: kind, error: `[${chunkLabel}] ${e?.message || String(e)}` });
       }
     }
   });
 
-  // 140s wall-clock guard (extended for additional voucher kinds and historical fetches).
+  // Wall-clock guard. With smaller date ranges per call, 140s is plenty.
   let timedOut = false;
   await Promise.race([
     Promise.all(work),
     new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 140000)),
   ]);
   if (timedOut) {
-    errors.push({ company: '*', dataset: 'all', error: 'Backend wall-clock timeout (140s). Some datasets may be incomplete.' });
+    errors.push({ company: '*', dataset: 'all', error: `[${chunkLabel}] Backend wall-clock timeout (140s).` });
   }
 
   const totalInserted = Object.values(counts).reduce(
     (sum, byDs) => sum + Object.values(byDs).reduce((a, b) => a + b, 0), 0
   );
-  let finalStatus: 'success' | 'partial' | 'failed';
-  if (errors.length === 0 && totalInserted > 0) finalStatus = 'success';
-  else if (totalInserted > 0) finalStatus = 'partial';
-  else finalStatus = 'failed';
 
-  await admin.from('tally_sync_runs').update({
-    status: finalStatus,
-    finished_at: new Date().toISOString(),
-    counts,
-    errors,
-  }).eq('id', runId);
+  let finalStatus: 'success' | 'partial' | 'failed' | 'running';
+  if (finalize) {
+    if (errors.length === 0 && totalInserted > 0) finalStatus = 'success';
+    else if (totalInserted > 0) finalStatus = 'partial';
+    else finalStatus = 'failed';
+    await admin.from('tally_sync_runs').update({
+      status: finalStatus,
+      finished_at: new Date().toISOString(),
+      counts, errors,
+    }).eq('id', runId);
+  } else {
+    finalStatus = 'running';
+    await admin.from('tally_sync_runs').update({ counts, errors }).eq('id', runId);
+  }
 
-  return new Response(JSON.stringify({ runId, status: finalStatus, counts, errors }), {
+  return new Response(JSON.stringify({
+    runId, status: finalStatus, counts, errors,
+    chunkLabel, finalized: finalize, timedOut,
+  }), {
     status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
