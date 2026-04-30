@@ -66,10 +66,6 @@ function parseQty(s: string | null): number {
 
 // ----------------- XML builders -----------------
 function buildLedgerXml(company: string): string {
-  // Use COMPUTE fields with $$IsLedOfGrp so Tally walks the full group
-  // hierarchy and tells us whether each ledger ultimately belongs to
-  // Sundry Debtors / Creditors / Bank — independent of sub-group naming
-  // (Domestic Debtors, Trade Receivables, Bank OD A/c, etc.).
   return `<ENVELOPE>
   <HEADER>
     <VERSION>1</VERSION>
@@ -90,10 +86,35 @@ function buildLedgerXml(company: string): string {
             <NATIVEMETHOD>Name</NATIVEMETHOD>
             <NATIVEMETHOD>Parent</NATIVEMETHOD>
             <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
-            <COMPUTE>IsDebtor : $$IsLedOfGrp:$Name:"Sundry Debtors"</COMPUTE>
-            <COMPUTE>IsCreditor : $$IsLedOfGrp:$Name:"Sundry Creditors"</COMPUTE>
-            <COMPUTE>IsBank : $$IsLedOfGrp:$Name:"Bank Accounts"</COMPUTE>
-            <COMPUTE>IsBankOD : $$IsLedOfGrp:$Name:"Bank OD A/c"</COMPUTE>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
+function buildGroupXml(company: string): string {
+  return `<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>ArecaGroupSync</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="ArecaGroupSync" ISMODIFY="No">
+            <TYPE>Group</TYPE>
+            <NATIVEMETHOD>Name</NATIVEMETHOD>
+            <NATIVEMETHOD>Parent</NATIVEMETHOD>
+            <NATIVEMETHOD>IsReserved</NATIVEMETHOD>
           </COLLECTION>
         </TDLMESSAGE>
       </TDL>
@@ -141,14 +162,7 @@ type LedgerRow = {
   parent: string;
   closing: number;
   raw: string;
-  isDebtor: boolean;
-  isCreditor: boolean;
-  isBank: boolean;
 };
-
-function parseYesNo(s: string | null): boolean {
-  return !!s && /^\s*yes\s*$/i.test(s);
-}
 
 function parseLedgers(xml: string): LedgerRow[] {
   const out: LedgerRow[] = [];
@@ -161,13 +175,42 @@ function parseLedgers(xml: string): LedgerRow[] {
     const name = nameAttr ? decodeEntities(nameAttr[1]) : (tag(inner, 'NAME') || '');
     const parent = tag(inner, 'PARENT') || '';
     const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
-    const isDebtor = parseYesNo(tag(inner, 'ISDEBTOR'));
-    const isCreditor = parseYesNo(tag(inner, 'ISCREDITOR'));
-    const isBank = parseYesNo(tag(inner, 'ISBANK')) || parseYesNo(tag(inner, 'ISBANKOD'));
     if (!name) continue;
-    out.push({ name, parent, closing: parseAmount(closingRaw), raw: closingRaw, isDebtor, isCreditor, isBank });
+    out.push({ name, parent, closing: parseAmount(closingRaw), raw: closingRaw });
   }
   return out;
+}
+
+type GroupRow = { name: string; parent: string };
+
+function parseGroups(xml: string): GroupRow[] {
+  const out: GroupRow[] = [];
+  const blockRe = /<GROUP\b([^>]*)>([\s\S]*?)<\/GROUP>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = blockRe.exec(xml)) !== null) {
+    const attrs = m[1] || '';
+    const inner = m[2] || '';
+    const nameAttr = attrs.match(/NAME\s*=\s*"([^"]*)"/i);
+    const name = nameAttr ? decodeEntities(nameAttr[1]) : (tag(inner, 'NAME') || '');
+    const parent = tag(inner, 'PARENT') || '';
+    if (!name) continue;
+    out.push({ name, parent });
+  }
+  return out;
+}
+
+// Walk parent chain in groupMap until we hit a reserved primary group
+// or run out of parents. Returns the final ancestor name (lowercased).
+function rootGroupOf(parent: string, groupMap: Map<string, string>): string {
+  const seen = new Set<string>();
+  let cur = (parent || '').trim();
+  while (cur && !seen.has(cur.toLowerCase())) {
+    seen.add(cur.toLowerCase());
+    const next = groupMap.get(cur.toLowerCase());
+    if (!next) break;
+    cur = next.trim();
+  }
+  return (cur || '').toLowerCase();
 }
 
 type VoucherRow = {
@@ -267,6 +310,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const dataset = (body.dataset || 'all') as 'debtors' | 'banks' | 'ledgers' | 'dispatches' | 'purchases' | 'vouchers' | 'all';
+    const debug = body.debug === true;
     const fromDate = body.fromDate as string | undefined; // ISO
     const toDate = body.toDate as string | undefined; // ISO
 
@@ -279,6 +323,7 @@ Deno.serve(async (req) => {
 
     const result: any = {
       debtors: [],
+      creditors: [],
       banks: [],
       dispatches: [],
       purchases: [],
@@ -288,8 +333,8 @@ Deno.serve(async (req) => {
       toDate: toIso,
       companies: COMPANIES,
     };
+    const debugInfo: any = debug ? { companies: {} } : null;
 
-    // Build all jobs and run in parallel — keeps total wall time ~ longest single call
     type Job =
       | { kind: 'ledgers'; company: string }
       | { kind: 'sales'; company: string }
@@ -311,39 +356,70 @@ Deno.serve(async (req) => {
     await Promise.all(jobs.map(async (job) => {
       try {
         if (job.kind === 'ledgers') {
-          const r = await callTally(buildLedgerXml(job.company));
-          if (!r.ok) {
-            result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${r.status}` });
+          // Fetch groups + ledgers in parallel for this company
+          const [gResp, lResp] = await Promise.all([
+            callTally(buildGroupXml(job.company)),
+            callTally(buildLedgerXml(job.company)),
+          ]);
+          if (!lResp.ok) {
+            result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${lResp.status}` });
             return;
           }
-          const ledgers = parseLedgers(r.text);
+          const groups = gResp.ok ? parseGroups(gResp.text) : [];
+          const groupMap = new Map<string, string>();
+          for (const g of groups) groupMap.set(g.name.toLowerCase(), g.parent);
+
+          const ledgers = parseLedgers(lResp.text);
+
+          let dCount = 0, cCount = 0, bCount = 0;
+          const sample: any[] = [];
+
           for (const l of ledgers) {
+            const root = rootGroupOf(l.parent, groupMap);
             const parent = (l.parent || '').toLowerCase();
-            // Primary signal: Tally walks the group hierarchy via $$IsLedOfGrp.
-            // Fallback: keyword match on parent name (covers older Tally
-            // versions that may not honour COMPUTE in collection exports).
-            const looksLikeDebtor =
-              l.isDebtor ||
+
+            const isDebtor =
+              root === 'sundry debtors' ||
               parent.includes('sundry debtor') ||
               parent.includes('debtor') ||
               parent.includes('receivable');
-            const looksLikeBank =
-              l.isBank ||
+            const isCreditor =
+              root === 'sundry creditors' ||
+              parent.includes('sundry creditor') ||
+              parent.includes('creditor') ||
+              parent.includes('payable');
+            const isBank =
+              root === 'bank accounts' ||
+              root === 'bank od a/c' ||
+              root === 'bank occ a/c' ||
               parent.includes('bank');
-            if (looksLikeDebtor) {
-              result.debtors.push({
-                company: job.company,
-                partyName: l.name,
-                outstanding: l.closing,
-                overdue: 0,
-              });
-            } else if (looksLikeBank) {
-              result.banks.push({
-                company: job.company,
-                accountName: l.name,
-                balance: l.closing,
-              });
+
+            if (debug && sample.length < 8) {
+              sample.push({ name: l.name, parent: l.parent, root, closing: l.closing });
             }
+
+            if (isDebtor) {
+              dCount++;
+              result.debtors.push({ company: job.company, partyName: l.name, outstanding: l.closing, overdue: 0 });
+            } else if (isCreditor) {
+              cCount++;
+              result.creditors.push({ company: job.company, partyName: l.name, outstanding: l.closing });
+            } else if (isBank) {
+              bCount++;
+              result.banks.push({ company: job.company, accountName: l.name, balance: l.closing });
+            }
+          }
+
+          if (debug) {
+            debugInfo.companies[job.company] = {
+              ledgerCount: ledgers.length,
+              groupCount: groups.length,
+              debtors: dCount,
+              creditors: cCount,
+              banks: bCount,
+              sampleLedgers: sample,
+              sampleGroups: groups.slice(0, 8),
+            };
           }
         } else {
           const filter = job.kind === 'sales' ? 'sales' : 'purchase';
@@ -380,6 +456,8 @@ Deno.serve(async (req) => {
         result.errors.push({ company: job.company, dataset: dsName, error: msg });
       }
     }));
+
+    if (debug) result._debug = debugInfo;
 
     return new Response(JSON.stringify(result), {
       status: 200,
