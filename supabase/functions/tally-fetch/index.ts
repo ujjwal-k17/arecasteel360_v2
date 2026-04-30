@@ -200,17 +200,22 @@ function parseGroups(xml: string): GroupRow[] {
 }
 
 // Walk parent chain in groupMap until we hit a reserved primary group
-// or run out of parents. Returns the final ancestor name (lowercased).
-function rootGroupOf(parent: string, groupMap: Map<string, string>): string {
+// or run out of parents. Returns the final ancestor name (lowercased)
+// and the full chain walked (original casing) for diagnostics.
+function rootGroupOf(parent: string, groupMap: Map<string, string>): { root: string; chain: string[]; terminatedInMap: boolean } {
   const seen = new Set<string>();
+  const chain: string[] = [];
   let cur = (parent || '').trim();
+  let terminatedInMap = false;
   while (cur && !seen.has(cur.toLowerCase())) {
     seen.add(cur.toLowerCase());
+    chain.push(cur);
     const next = groupMap.get(cur.toLowerCase());
-    if (!next) break;
+    if (next === undefined) break; // current group not in map -> chain breaks here
+    if (!next || !next.trim()) { terminatedInMap = true; break; } // reached a primary (no parent)
     cur = next.trim();
   }
-  return (cur || '').toLowerCase();
+  return { root: (cur || '').toLowerCase(), chain, terminatedInMap };
 }
 
 type VoucherRow = {
