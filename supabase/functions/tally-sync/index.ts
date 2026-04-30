@@ -288,7 +288,7 @@ function parseVouchers(xml: string): VoucherRow[] {
 // ============================================================
 type TallyResult = { ok: boolean; text: string; status: number; error?: string };
 
-async function callTally(xml: string, timeoutMs = 25000): Promise<TallyResult> {
+async function callTally(xml: string, timeoutMs = 90000): Promise<TallyResult> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -516,14 +516,14 @@ Deno.serve(async (req) => {
     }
   });
 
-  // 120s wall-clock guard (extended for additional voucher kinds).
+  // 140s wall-clock guard (extended for additional voucher kinds and historical fetches).
   let timedOut = false;
   await Promise.race([
     Promise.all(work),
-    new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 120000)),
+    new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 140000)),
   ]);
   if (timedOut) {
-    errors.push({ company: '*', dataset: 'all', error: 'Backend wall-clock timeout (120s). Some datasets may be incomplete.' });
+    errors.push({ company: '*', dataset: 'all', error: 'Backend wall-clock timeout (140s). Some datasets may be incomplete.' });
   }
 
   const totalInserted = Object.values(counts).reduce(
