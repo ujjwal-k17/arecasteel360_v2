@@ -510,12 +510,14 @@ function DebtorPaymentSummaryTab({
     return m;
   }, [overrides]);
 
-  // Compute per-debtor outstanding & overdue from FIFO matches
+  // Compute per-debtor overdue from FIFO matches; outstanding = Tally ledger closing balance
   const rows = useMemo(() => {
     const today = todayIso();
     return debtors.map(d => {
       const k = dkey(d.company, d.name);
-      const cp = overrideMap.get(k)?.credit_period_days ?? null;
+      const ov = overrideMap.get(k);
+      const cp = ov?.credit_period_days ?? null;
+      const salesRep = ov?.sales_rep ?? null;
       const ledgerLow = d.name.toLowerCase();
       const dInvoices = sales.filter(v => v.company === d.company && (v.party_name || '').toLowerCase() === ledgerLow);
       const dReceipts = receipts.filter(v => {
@@ -524,28 +526,48 @@ function DebtorPaymentSummaryTab({
         return billRefs.some(b => b.voucher_id === v.id && b.ledger_name.toLowerCase() === ledgerLow);
       });
       const matches = fifoMatch(dInvoices, dReceipts, cp);
-      let outstanding = 0;
       let overdue = 0;
       let overdueCount = 0;
       for (const m of matches) {
         const open = m.amount - m.paid;
-        if (open > 0.0001) {
-          outstanding += open;
-          if (m.dueDate && m.dueDate < today) {
-            overdue += open;
-            overdueCount += 1;
-          }
+        if (open > 0.0001 && m.dueDate && m.dueDate < today) {
+          overdue += m.amount; // total amount of the invoice that is unpaid beyond due date
+          overdueCount += 1;
         }
       }
-      return { debtor: d, key: k, cp, outstanding, overdue, overdueCount, invoiceCount: matches.length };
-    }).filter(r => r.outstanding > 0.5); // active = has pending receivable
+      return {
+        debtor: d, key: k, cp, salesRep,
+        outstanding: d.closing_balance, // direct from Tally ledger balance
+        overdue, overdueCount, invoiceCount: matches.length,
+      };
+    }).filter(r =>
+      r.salesRep !== 'IntraCompany' &&            // exclude intra-company debtors
+      Math.abs(r.outstanding) > 0.5               // active = has a non-zero ledger balance
+    );
   }, [debtors, sales, receipts, billRefs, overrideMap]);
+
+  // Sales-rep sub-tab
+  const [repTab, setRepTab] = useState<string>('__all__');
+  const repCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const key = r.salesRep || '__unassigned__';
+      m.set(key, (m.get(key) || 0) + 1);
+    }
+    return m;
+  }, [rows]);
+
+  const repFilteredRows = useMemo(() => {
+    if (repTab === '__all__') return rows;
+    if (repTab === '__unassigned__') return rows.filter(r => !r.salesRep);
+    return rows.filter(r => r.salesRep === repTab);
+  }, [rows, repTab]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = q ? rows.filter(r => r.debtor.name.toLowerCase().includes(q) || (r.debtor.gstin || '').toLowerCase().includes(q)) : rows;
-    return [...base].sort((a, b) => b.outstanding - a.outstanding);
-  }, [rows, search]);
+    const base = q ? repFilteredRows.filter(r => r.debtor.name.toLowerCase().includes(q) || (r.debtor.gstin || '').toLowerCase().includes(q)) : repFilteredRows;
+    return [...base].sort((a, b) => Math.abs(b.outstanding) - Math.abs(a.outstanding));
+  }, [repFilteredRows, search]);
 
   const totals = useMemo(() => {
     return filtered.reduce((acc, r) => {
@@ -564,6 +586,17 @@ function DebtorPaymentSummaryTab({
   }, [selectedKey]);
 
   const missingCp = filtered.some(r => r.cp == null);
+
+  // Build the list of rep tabs from dropdown options + any reps actually used
+  const repTabValues = useMemo(() => {
+    const used = new Set<string>();
+    for (const r of rows) if (r.salesRep) used.add(r.salesRep);
+    // Predictable order: registered options first, then any extras, then unassigned
+    const list: string[] = [];
+    for (const v of Array.from(used).sort()) list.push(v);
+    if (rows.some(r => !r.salesRep)) list.push('__unassigned__');
+    return list;
+  }, [rows]);
 
   return (
     <div className="space-y-4">
