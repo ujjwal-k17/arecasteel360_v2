@@ -743,30 +743,25 @@ function CreditPeriodInput({
 }
 
 function DebtorInvoiceCycleCard({
-  debtor, sales, receipts, billRefs, creditPeriod,
+  debtor, sales, debtorCredits, creditPeriod,
 }: {
   debtor: SnapshotLedger;
   sales: SnapshotVoucher[];
-  receipts: SnapshotVoucher[];
-  billRefs: SnapshotBillRef[];
+  debtorCredits: SnapshotDebtorCredit[];
   creditPeriod: number | null;
 }) {
+  const ledgerLow = debtor.name.toLowerCase();
   const dInvoices = sales.filter(v =>
     v.company === debtor.company &&
-    (v.party_name || '').toLowerCase() === debtor.name.toLowerCase()
+    (v.party_name || '').toLowerCase() === ledgerLow
   );
-  const ledgerLow = debtor.name.toLowerCase();
-  const dReceipts = receipts.filter(v => {
-    if (v.company !== debtor.company) return false;
-    if ((v.party_name || '').toLowerCase() === ledgerLow) return true;
-    // If party_name is missing, fall back to bill refs that touch this ledger
-    const refsHit = billRefs.some(b => b.voucher_id === v.id && b.ledger_name.toLowerCase() === ledgerLow);
-    return refsHit;
-  });
+  const dPayments = debtorCredits.filter(c =>
+    c.company === debtor.company && c.ledger_name.toLowerCase() === ledgerLow
+  );
 
   const matches = useMemo(
-    () => fifoMatch(dInvoices, dReceipts, creditPeriod),
-    [dInvoices, dReceipts, creditPeriod]
+    () => fifoMatch(dInvoices, dPayments, creditPeriod),
+    [dInvoices, dPayments, creditPeriod]
   );
 
   const totalInv = matches.reduce((s, m) => s + m.amount, 0);
