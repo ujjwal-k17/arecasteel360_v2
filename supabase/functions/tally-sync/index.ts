@@ -56,11 +56,11 @@ function parseStockItems(xml: string): Array<{ name: string; quantity: string; v
     const nameAttrMatch = attrs.match(/NAME\s*=\s*"([^"]*)"/i);
     let name = nameAttrMatch ? decodeEntities(nameAttrMatch[1]) : '';
     if (!name) {
-      const nameTag = inner.match(/<NAME>([\s\S]*?)<\/NAME>/i);
+      const nameTag = inner.match(/<NAME\b[^>]*>([\s\S]*?)<\/NAME>/i);
       name = nameTag ? decodeEntities(nameTag[1].trim()) : '';
     }
-    const balMatch = inner.match(/<CLOSINGBALANCE>([\s\S]*?)<\/CLOSINGBALANCE>/i);
-    const valMatch = inner.match(/<CLOSINGVALUE>([\s\S]*?)<\/CLOSINGVALUE>/i);
+    const balMatch = inner.match(/<CLOSINGBALANCE\b[^>]*>([\s\S]*?)<\/CLOSINGBALANCE>/i);
+    const valMatch = inner.match(/<CLOSINGVALUE\b[^>]*>([\s\S]*?)<\/CLOSINGVALUE>/i);
     const quantity = balMatch ? decodeEntities(balMatch[1].trim()) : '';
     const value = valMatch ? decodeEntities(valMatch[1].trim()) : '';
     if (!name) continue;
