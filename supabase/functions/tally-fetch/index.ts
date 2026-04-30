@@ -319,14 +319,25 @@ Deno.serve(async (req) => {
           const ledgers = parseLedgers(r.text);
           for (const l of ledgers) {
             const parent = (l.parent || '').toLowerCase();
-            if (parent.includes('sundry debtor')) {
+            // Primary signal: Tally walks the group hierarchy via $$IsLedOfGrp.
+            // Fallback: keyword match on parent name (covers older Tally
+            // versions that may not honour COMPUTE in collection exports).
+            const looksLikeDebtor =
+              l.isDebtor ||
+              parent.includes('sundry debtor') ||
+              parent.includes('debtor') ||
+              parent.includes('receivable');
+            const looksLikeBank =
+              l.isBank ||
+              parent.includes('bank');
+            if (looksLikeDebtor) {
               result.debtors.push({
                 company: job.company,
                 partyName: l.name,
                 outstanding: l.closing,
                 overdue: 0,
               });
-            } else if (parent.includes('bank')) {
+            } else if (looksLikeBank) {
               result.banks.push({
                 company: job.company,
                 accountName: l.name,
