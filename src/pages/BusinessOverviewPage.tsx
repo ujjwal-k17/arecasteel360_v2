@@ -382,7 +382,7 @@ function DebtorSummaryModule({
                   const k = dkey(d.company, d.name);
                   const ov = overrideMap.get(k);
                   return (
-                    <TableRow key={k} className={selectedKey === k ? 'bg-muted/40' : 'cursor-pointer hover:bg-muted/30'} onClick={() => setSelectedKey(k)}>
+                    <TableRow key={k} className={`cursor-pointer hover:bg-muted/30 ${selectedKey === k ? 'bg-muted/40' : ''}`} onClick={() => setSelectedKey(k)}>
                       <TableCell><Badge variant="outline">{d.company}</Badge></TableCell>
                       <TableCell className="font-medium">{d.name}</TableCell>
                       <TableCell className="text-xs">{d.gstin || '—'}</TableCell>
