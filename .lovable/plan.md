@@ -1,36 +1,24 @@
+## Tally Sync Integration
 
+### 1. New edge function `supabase/functions/tally-sync/index.ts`
+- CORS headers + OPTIONS handler.
+- Validate caller's JWT via `supabase.auth.getClaims()` (authenticated users only).
+- POST the provided XML envelope to `http://103.239.89.153:9000` with `Content-Type: text/xml; charset=utf-8`, 30s `AbortController` timeout.
+- Parse Tally's XML response: iterate `<STOCKITEM>` elements, extract `NAME` attribute, `<CLOSINGBALANCE>`, `<CLOSINGVALUE>`. Filter out group rows with empty balance.
+- Return `{ items: [{ name, quantity, value }], fetchedAt }` as JSON.
+- On network/timeout/parse failure return 502 with `{ error }` and include raw text snippet for debugging.
+- Default `verify_jwt = false` is fine (in-code check); no `supabase/config.toml` edit needed.
 
-User wants to read emails from a specific sender (`amns.customercare@amns.in`) in the connected Outlook inbox (`info@arecacorp.com`). This is a quick read/inspection task — no auto-import, no parsing into tables yet. Just fetch and display.
+### 2. Dashboard UI `src/components/DashboardTab.tsx`
+- Add a "Tally Sync" card at the top with a **Sync from Tally** button.
+- Use `useMutation` calling `supabase.functions.invoke('tally-sync')`. Disable button while pending (per project convention).
+- On success: show "Last synced at ..." and render a table with columns **Item Name | Quantity | Value**. Empty state when no items.
+- On error: toast with friendly message ("Could not reach Tally — make sure Tally Server is running and reachable at 103.239.89.153:9000").
 
-Best to build a small admin-only viewer in the existing Connections tab so they can:
-- Filter by sender (default: `amns.customercare@amns.in`, but editable)
-- See last N messages with subject, date, snippet, attachment indicator
-- Click a row to expand body + list attachments
-
-## Plan: Outlook sender inbox viewer
-
-### Backend
-- New edge function `outlook-list-messages` (admin-only, JWT-validated)
-  - Input: `{ sender?: string, top?: number (default 25) }`
-  - Calls Microsoft Graph via gateway: `GET /me/messages?$top=N&$filter=from/emailAddress/address eq '{sender}'&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,bodyPreview,hasAttachments,isRead`
-  - Returns array of messages
-- New edge function `outlook-get-message` (admin-only)
-  - Input: `{ messageId: string }`
-  - Returns full body (HTML) + attachments list (id, name, size, contentType) via `/me/messages/{id}` and `/me/messages/{id}/attachments`
-
-### Frontend
-- Extend `src/components/admin/ConnectionsTab.tsx` with a new section **"Browse Outlook Inbox"**:
-  - Sender input (prefilled `amns.customercare@amns.in`) + "Fetch" button
-  - Results table: Date | Subject | Snippet | Attachments | Read
-  - Click row → dialog showing full HTML body (sandboxed iframe) + attachment list with sizes
-
-### Out of scope (next steps)
-- Downloading/parsing attachment contents into batches/orders
-- Polling / auto-import
-- Marking as read / replying
+### Caveats to flag to user after build
+- Tally must be reachable from the public internet at that IP/port (not behind NAT/firewall). If it isn't, the function will time out — that's a network/infrastructure issue, not a code bug.
+- Data is ephemeral (not stored). Tell me if you want a history table.
 
 ### Files
-- `supabase/functions/outlook-list-messages/index.ts` (new)
-- `supabase/functions/outlook-get-message/index.ts` (new)
-- `src/components/admin/ConnectionsTab.tsx` (extend)
-
+- create `supabase/functions/tally-sync/index.ts`
+- edit `src/components/DashboardTab.tsx`
