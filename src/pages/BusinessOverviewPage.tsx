@@ -526,19 +526,7 @@ function DebtorPaymentSummaryTab({
     return m;
   }, [overrides]);
 
-  // Index debtor credits by (company, ledger_name lowercase) for fast FIFO lookup.
-  // These represent every banking / journal / contra entry that credits the debtor's
-  // ledger across all voucher kinds — i.e. all payment inflows or adjustments
-  // reducing the receivable.
-  const creditIndex = useMemo(() => {
-    const m = new Map<string, SnapshotDebtorCredit[]>();
-    for (const c of debtorCredits) {
-      const key = `${c.company}__${c.ledger_name.toLowerCase()}`;
-      const arr = m.get(key);
-      if (arr) arr.push(c); else m.set(key, [c]);
-    }
-    return m;
-  }, [debtorCredits]);
+
 
   // Pre-index sales by (company, ledger lowercase), pre-sorted descending by date.
   // This collapses what was an O(debtors × sales) `sales.filter(...)` + per-row
