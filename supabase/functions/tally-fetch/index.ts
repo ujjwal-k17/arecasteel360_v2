@@ -366,7 +366,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await Promise.all(jobs.map(async (job) => {
+    const allJobs = Promise.all(jobs.map(async (job) => {
       const ensureDbg = () => {
         if (!debug) return null;
         debugInfo.companies[job.company] = debugInfo.companies[job.company] || {};
