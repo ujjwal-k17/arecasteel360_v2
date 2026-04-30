@@ -1,42 +1,53 @@
-## Problem
+## Goal
 
-The browser shows "Failed to send a request to the Edge Function" when syncing Debtors & Creditors. Edge function logs show clean boot/shutdown cycles with no exception trace, and shutdowns occur ~75–80 seconds after boot. This indicates the edge worker is being killed by the platform's wall-clock limit because the 4 parallel Tally calls (2 companies × groups + ledgers, each with a 90s timeout) all hang when Tally is unreachable. When the worker dies mid-request, the client receives a transport-level invoke failure instead of a JSON response.
+Make Debtors & Creditors classification rely strictly on the **ancestor chain** rolling up to the reserved primary groups **"Sundry Debtors"** or **"Sundry Creditors"**. This correctly captures any custom sub-group (e.g. "Delhi Debtors", "Local Parties", "Overdue > 90 days") that the user has created under those primaries, and excludes ledgers that just happen to have the words "debtor"/"creditor"/"payable"/"receivable" in their immediate parent name.
 
-This is independent of (and additional to) the underlying network issue that Tally on the cloud RDP isn't reachable on port 9000.
+## Current behaviour (problem)
 
-## Fix
+In `supabase/functions/tally-fetch/index.ts`, the classifier checks:
 
-Make `supabase/functions/tally-fetch/index.ts` resilient so it always returns a JSON response within the platform's time budget, even when Tally is unreachable.
+```
+isDebtor   = root === 'sundry debtors'   OR parent contains 'debtor'/'receivable'
+isCreditor = root === 'sundry creditors' OR parent contains 'creditor'/'payable'
+```
 
-### 1. Reduce per-request timeout
+The substring fallbacks on the immediate parent are noisy:
+- They miss ledgers whose immediate parent doesn't contain the word but which roll up correctly (e.g. parent = "Delhi Parties" → "Sundry Debtors").
+- They wrongly include ledgers under unrelated parents that happen to share a substring.
 
-Change `callTally` default `timeoutMs` from `90000` → `25000`. Twenty-five seconds is more than enough for a healthy Tally response and leaves headroom for the function to assemble and return the response within the platform limit.
+## Change
 
-### 2. Classify network errors clearly
+In `supabase/functions/tally-fetch/index.ts`, replace the classification block inside the ledgers job with a strict root-group check:
 
-In `callTally`, wrap the `fetch` in a try/catch. Distinguish:
-- `AbortError` → "Tally timed out (25s)"
-- `TypeError` / connection errors → "Cannot reach Tally at 103.239.89.153:9000 (connection refused or unreachable)"
-- Other → original message
+```ts
+const root = rootGroupOf(l.parent, groupMap); // already lowercase
 
-Return these as structured `{ ok: false, text: '', status: 0, error: <msg> }` instead of throwing, so the job loop records a per-company error and continues.
+const isDebtor   = root === 'sundry debtors';
+const isCreditor = root === 'sundry creditors';
+const isBank     = root === 'bank accounts'
+                || root === 'bank od a/c'
+                || root === 'bank occ a/c';
+```
 
-### 3. Hard wall-clock guard
+`rootGroupOf` already walks the full parent chain via the Group collection until it hits a top-level (reserved) primary, so any ledger whose chain terminates at "Sundry Debtors" / "Sundry Creditors" will be picked up regardless of how many intermediate user-defined sub-groups exist.
 
-Add an outer `Promise.race` around the `Promise.all(jobs.map(...))` with a 60-second cap. If hit, mark any unresolved jobs as "Tally unreachable (timeout)" and return whatever partial data we have plus errors. Guarantees the function always responds within budget.
+### Edge cases handled by the existing walker
 
-### 4. Better client-side error message
+- The function detects cycles via a `seen` set.
+- It returns the immediate parent if no further parent is found in `groupMap` — so for the walk to terminate at "Sundry Debtors", that primary must appear in the Group collection. The current `buildGroupXml` fetches **all** groups (including reserved ones via `NATIVEMETHOD IsReserved`), so the chain resolves correctly. No XML change needed.
 
-In `BusinessOverviewPage.tsx`, in `handleSyncLedgers` (and `handleSyncVouchers`), when `supabase.functions.invoke` returns a transport `error` (FunctionsFetchError), surface a friendlier message: "Backend timed out reaching Tally. Check that Tally on the cloud RDP is running and port 9000 is open." instead of the raw "Failed to send a request to the Edge Function".
+### Defensive note
+
+If the Group collection comes back empty (e.g. partial Tally response), the walker returns the immediate parent name. In that degenerate case we'd classify nothing as debtor/creditor rather than misclassify — acceptable, and the diagnostics panel already surfaces `groupCount: 0` when this happens.
 
 ## Files
 
-- `supabase/functions/tally-fetch/index.ts` — timeout reduction, error classification, wall-clock guard
-- `src/pages/BusinessOverviewPage.tsx` — friendlier error toast for invoke failures
+- `supabase/functions/tally-fetch/index.ts` — tighten `isDebtor` / `isCreditor` / `isBank` to root-only checks (remove substring fallbacks on `parent`).
 
-## What this does and doesn't fix
+No frontend, schema, or RLS changes. No new dependencies.
 
-- **Fixes**: The unhelpful "Failed to send a request" error. After this change, when Tally is unreachable, the UI will clearly say so per company, and the diagnostics panel will show specific reasons (timeout vs. connection refused vs. DNS).
-- **Does NOT fix**: Tally itself being unreachable. That still requires opening inbound TCP 9000 on the cloud RDP's firewall/security group as discussed earlier. Once that's done, the existing sync logic will work — this change just makes the failure mode informative until then.
+## Verification after deploy
 
-No database changes. No new dependencies.
+1. Sync Debtors & Creditors.
+2. Open the diagnostics panel — `sampleLedgers` shows `{ name, parent, root, closing }`. Confirm every row in `result.debtors` has `root === "sundry debtors"` and every row in `result.creditors` has `root === "sundry creditors"`.
+3. Spot-check a known ledger nested 2+ levels deep under a custom sub-group of Sundry Debtors — it should now appear.

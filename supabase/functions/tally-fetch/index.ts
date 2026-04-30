@@ -404,23 +404,16 @@ Deno.serve(async (req) => {
 
           for (const l of ledgers) {
             const root = rootGroupOf(l.parent, groupMap);
-            const parent = (l.parent || '').toLowerCase();
 
-            const isDebtor =
-              root === 'sundry debtors' ||
-              parent.includes('sundry debtor') ||
-              parent.includes('debtor') ||
-              parent.includes('receivable');
-            const isCreditor =
-              root === 'sundry creditors' ||
-              parent.includes('sundry creditor') ||
-              parent.includes('creditor') ||
-              parent.includes('payable');
+            // Strict ancestor-chain classification: only ledgers whose
+            // parent ultimately rolls up to the reserved primary group are
+            // counted. No substring fallbacks on the immediate parent.
+            const isDebtor   = root === 'sundry debtors';
+            const isCreditor = root === 'sundry creditors';
             const isBank =
               root === 'bank accounts' ||
               root === 'bank od a/c' ||
-              root === 'bank occ a/c' ||
-              parent.includes('bank');
+              root === 'bank occ a/c';
 
             if (debug && sample.length < 10) {
               sample.push({ name: l.name, parent: l.parent, root, closing: l.closing });
