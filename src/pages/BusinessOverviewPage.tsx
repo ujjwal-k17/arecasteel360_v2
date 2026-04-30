@@ -204,9 +204,17 @@ export default function BusinessOverviewPage() {
 
         <TabsContent value="debtors">
           <Card>
-            <CardHeader><CardTitle className="text-lg">Debtor Balances</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-lg">Debtors — All ledgers under Sundry Debtors</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Includes every ledger whose parent chain ultimately rolls up to "Sundry Debtors", regardless of intermediate group names.
+              </p>
+            </CardHeader>
             <CardContent>
-              <PartyTable rows={debtors} valueLabel="Outstanding" empty={isLoading ? 'Loading...' : 'No data — click Sync from Tally'} />
+              <DebtorsTable
+                rows={debtors}
+                empty={isLoading ? 'Loading...' : 'No data — click Sync from Tally'}
+              />
             </CardContent>
           </Card>
         </TabsContent>
