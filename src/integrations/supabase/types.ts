@@ -1141,6 +1141,7 @@ export type Database = {
           id: string
           ledger_name: string
           notes: string | null
+          sales_rep: string | null
           updated_at: string
           updated_by: string | null
           updated_by_email: string | null
@@ -1152,6 +1153,7 @@ export type Database = {
           id?: string
           ledger_name: string
           notes?: string | null
+          sales_rep?: string | null
           updated_at?: string
           updated_by?: string | null
           updated_by_email?: string | null
@@ -1163,6 +1165,7 @@ export type Database = {
           id?: string
           ledger_name?: string
           notes?: string | null
+          sales_rep?: string | null
           updated_at?: string
           updated_by?: string | null
           updated_by_email?: string | null
