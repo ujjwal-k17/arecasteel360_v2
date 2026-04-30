@@ -1,24 +1,24 @@
-## Tally Sync Integration
+## Diagnose "Synced 0 items from Tally"
 
-### 1. New edge function `supabase/functions/tally-sync/index.ts`
-- CORS headers + OPTIONS handler.
-- Validate caller's JWT via `supabase.auth.getClaims()` (authenticated users only).
-- POST the provided XML envelope to `http://103.239.89.153:9000` with `Content-Type: text/xml; charset=utf-8`, 30s `AbortController` timeout.
-- Parse Tally's XML response: iterate `<STOCKITEM>` elements, extract `NAME` attribute, `<CLOSINGBALANCE>`, `<CLOSINGVALUE>`. Filter out group rows with empty balance.
-- Return `{ items: [{ name, quantity, value }], fetchedAt }` as JSON.
-- On network/timeout/parse failure return 502 with `{ error }` and include raw text snippet for debugging.
-- Default `verify_jwt = false` is fine (in-code check); no `supabase/config.toml` edit needed.
+The edge function reached Tally and got HTTP 200, but the parser found zero `<STOCKITEM>` blocks. We need to see the raw XML Tally is actually returning to fix the parser correctly.
 
-### 2. Dashboard UI `src/components/DashboardTab.tsx`
-- Add a "Tally Sync" card at the top with a **Sync from Tally** button.
-- Use `useMutation` calling `supabase.functions.invoke('tally-sync')`. Disable button while pending (per project convention).
-- On success: show "Last synced at ..." and render a table with columns **Item Name | Quantity | Value**. Empty state when no items.
-- On error: toast with friendly message ("Could not reach Tally — make sure Tally Server is running and reachable at 103.239.89.153:9000").
+### Step 1 — Add debug payload to `tally-sync`
+In `supabase/functions/tally-sync/index.ts`, when `items.length === 0`, include a `debug` object in the JSON response containing:
+- `rawLength` — total length of Tally's response
+- `rawSnippet` — first 3000 chars of the raw XML
+- `stockItemTagCount` — count of `<STOCKITEM` occurrences
+- `tallyMessageTagCount` — count of `<TALLYMESSAGE` occurrences
+- `contentType` — the Content-Type header Tally sent
 
-### Caveats to flag to user after build
-- Tally must be reachable from the public internet at that IP/port (not behind NAT/firewall). If it isn't, the function will time out — that's a network/infrastructure issue, not a code bug.
-- Data is ephemeral (not stored). Tell me if you want a history table.
+No UI changes. The user clicks **Sync from Tally** once; I read the network response.
+
+### Step 2 — Fix the parser based on what we see
+After seeing the actual response shape:
+- **If error envelope** (e.g. "Could not Set Object", "No Company Loaded") → surface the message in the toast.
+- **If different tag structure** (items inside `<COLLECTION>`, `<TALLYMESSAGE>` only, etc.) → update the regex / switch to a real XML parser.
+- **If genuinely empty** → show "No items in Tally" empty state.
+- **If a specific company is needed** → add `<SVCURRENTCOMPANY>` to the request envelope.
 
 ### Files
-- create `supabase/functions/tally-sync/index.ts`
-- edit `src/components/DashboardTab.tsx`
+- edit `supabase/functions/tally-sync/index.ts` (debug payload only — Step 1)
+- Step 2 edits depend on what we observe.
