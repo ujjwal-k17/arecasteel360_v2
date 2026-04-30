@@ -250,7 +250,7 @@ type InvoiceMatch = {
  */
 function fifoMatch(
   invoices: SnapshotVoucher[],
-  payments: SnapshotVoucher[],
+  payments: { voucher_date: string | null; amount: number }[],
   creditPeriodDays: number | null,
 ): InvoiceMatch[] {
   const sortedInv = [...invoices].sort((a, b) => (a.voucher_date || '').localeCompare(b.voucher_date || ''));
