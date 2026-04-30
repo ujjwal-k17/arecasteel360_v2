@@ -195,6 +195,7 @@ export default function BusinessOverviewPage() {
             sales={sales}
             receipts={receipts}
             billRefs={billRefs}
+            debtorCredits={debtorCredits}
             overrides={overrides}
             isLoading={isLoading}
             onChanged={() => qc.invalidateQueries({ queryKey: ['tally-snapshot'] })}
