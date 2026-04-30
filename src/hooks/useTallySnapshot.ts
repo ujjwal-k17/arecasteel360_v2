@@ -108,6 +108,10 @@ async function fetchSnapshot(): Promise<TallySnapshot> {
   const ledgerCols = 'company,name,parent_group,parent_chain,root_group,closing_balance,mailing_name,address,gstin,contact_person,phone,email';
   const voucherCols = 'id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount';
 
+  // Slim payload: the Payment Summary table and debtor dialog now derive everything
+  // from `closing_balance` + `sales` (outstanding walk-back logic). We no longer
+  // fetch debtor credits or bill refs here — those were O(25k) rows + a chunked
+  // second-stage query for data nothing currently reads.
   const [
     debtorsRes, creditorsRes, banksRes,
     salesRes, purchasesRes, receiptsRes,
@@ -116,12 +120,10 @@ async function fetchSnapshot(): Promise<TallySnapshot> {
     supabase.from('v_tally_debtors').select(ledgerCols).order('closing_balance', { ascending: false }),
     supabase.from('v_tally_creditors').select(ledgerCols).order('closing_balance', { ascending: false }),
     supabase.from('v_tally_banks').select(ledgerCols).order('closing_balance', { ascending: false }),
-    // For overdue calc we need ALL historical invoices/receipts — order ascending
-    // and use a high cap so the oldest data is never silently truncated.
     supabase.from('v_tally_sales').select(voucherCols).order('voucher_date', { ascending: true }).limit(50000),
     supabase.from('v_tally_purchases').select(voucherCols).order('voucher_date', { ascending: true }).limit(50000),
-    supabase.from('v_tally_receipts').select(voucherCols).order('voucher_date', { ascending: true }).limit(50000),
-    supabase.from('v_tally_bank_txns').select('id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount,bank_ledger,bank_amount,bank_is_debit').order('voucher_date', { ascending: false }).limit(50000),
+    supabase.from('v_tally_receipts').select(voucherCols).order('voucher_date', { ascending: true }).limit(20000),
+    supabase.from('v_tally_bank_txns').select('id,company,kind,voucher_type,voucher_number,voucher_date,party_name,amount,bank_ledger,bank_amount,bank_is_debit').order('voucher_date', { ascending: false }).limit(20000),
     supabase.from('tally_sync_runs').select('id,started_at,finished_at,status,triggered_by_email,counts,errors').order('started_at', { ascending: false }).limit(1),
     supabase.from('tally_debtor_overrides').select('id,company,ledger_name,credit_period_days,sales_rep,notes'),
   ]);
@@ -139,66 +141,8 @@ async function fetchSnapshot(): Promise<TallySnapshot> {
   const overrides = (overridesRes.data || []) as DebtorOverride[];
   const lastRun = (lastRunRes.data?.[0] as SyncRunSummary) || null;
 
-  // Pull bill refs for receipts in a second query (only those receipt voucher ids)
-  const receiptIds = receipts.map(r => r.id);
-  let billRefs: SnapshotBillRef[] = [];
-  if (receiptIds.length) {
-    // Chunk to avoid URL-too-long
-    const chunks: string[][] = [];
-    for (let i = 0; i < receiptIds.length; i += 500) chunks.push(receiptIds.slice(i, i + 500));
-    const results = await Promise.all(chunks.map(c =>
-      supabase.from('tally_voucher_bill_refs').select('voucher_id,ledger_name,bill_name,bill_type,amount').in('voucher_id', c)
-    ));
-    billRefs = results.flatMap(r => (r.data || []) as SnapshotBillRef[]);
-  }
-
-  // Pull all CREDIT-side ledger entries against any debtor ledger across ALL voucher kinds
-  // (receipt / journal / contra / payment / etc.). These represent money or adjustments
-  // that reduce the receivable and feed the FIFO payment matcher.
-  let debtorCredits: SnapshotDebtorCredit[] = [];
-  if (debtors.length) {
-    const debtorKeySet = new Set(debtors.map(d => `${d.company}__${d.name.toLowerCase()}`));
-    const debtorNames = Array.from(new Set(debtors.map(d => d.name)));
-    // Chunk by ledger_name (some lists may be large)
-    const nameChunks: string[][] = [];
-    for (let i = 0; i < debtorNames.length; i += 200) nameChunks.push(debtorNames.slice(i, i + 200));
-    const entryResults = await Promise.all(nameChunks.map(c =>
-      supabase.from('tally_voucher_ledger_entries')
-        .select('voucher_id,ledger_name,amount,is_debit')
-        .in('ledger_name', c)
-        .eq('is_debit', false)
-        .limit(20000)
-    ));
-    const rawEntries = entryResults.flatMap(r => (r.data || []) as { voucher_id: string; ledger_name: string; amount: number; is_debit: boolean }[]);
-    const voucherIds = Array.from(new Set(rawEntries.map(e => e.voucher_id)));
-    // Fetch voucher metadata for these entries
-    const vChunks: string[][] = [];
-    for (let i = 0; i < voucherIds.length; i += 500) vChunks.push(voucherIds.slice(i, i + 500));
-    const vRes = await Promise.all(vChunks.map(c =>
-      supabase.from('tally_vouchers')
-        .select('id,company,kind,voucher_date,voucher_number,is_cancelled')
-        .in('id', c)
-    ));
-    const vMap = new Map<string, { company: string; kind: string; voucher_date: string | null; voucher_number: string | null; is_cancelled: boolean | null }>();
-    vRes.flatMap(r => (r.data || [])).forEach((v: any) => vMap.set(v.id, v));
-    debtorCredits = rawEntries
-      .map(e => {
-        const v = vMap.get(e.voucher_id);
-        if (!v || v.is_cancelled) return null;
-        // Ensure (company, ledger_name) is actually a debtor pair (avoid same-named ledgers in other companies)
-        if (!debtorKeySet.has(`${v.company}__${e.ledger_name.toLowerCase()}`)) return null;
-        return {
-          voucher_id: e.voucher_id,
-          company: v.company,
-          kind: v.kind,
-          voucher_date: v.voucher_date,
-          voucher_number: v.voucher_number,
-          ledger_name: e.ledger_name,
-          amount: Math.abs(e.amount),
-        } as SnapshotDebtorCredit;
-      })
-      .filter((x): x is SnapshotDebtorCredit => !!x);
-  }
+  const billRefs: SnapshotBillRef[] = [];
+  const debtorCredits: SnapshotDebtorCredit[] = [];
 
   const companies = Array.from(new Set([
     ...debtors.map(d => d.company),
