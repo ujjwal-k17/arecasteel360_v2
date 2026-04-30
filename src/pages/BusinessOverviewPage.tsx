@@ -97,18 +97,29 @@ export default function BusinessOverviewPage() {
   };
 
   const companies = data?.companies || [];
-  const filterCo = <T extends { company: string }>(arr: T[] | undefined): T[] =>
-    (arr || []).filter(r => companyFilter === ALL || r.company === companyFilter);
 
-  const debtors = filterCo(data?.debtors);
-  const banks = filterCo(data?.banks);
-  const sales = filterCo(data?.sales);
-  const purchases = filterCo(data?.purchases);
-  const receipts = filterCo(data?.receipts);
-  const bankTxns = filterCo(data?.bankTxns);
-  const billRefs = data?.billRefs || [];
-  const debtorCredits = (data?.debtorCredits || []).filter(c => companyFilter === ALL || c.company === companyFilter);
-  const overrides = data?.overrides || [];
+  // Memoize the company-filtered slices so they don't rebuild on every render
+  // (e.g. on every search keystroke or dialog open). Filtering large arrays
+  // unconditionally was a meaningful render-time cost.
+  const {
+    debtors, banks, sales, purchases, receipts, bankTxns, billRefs, debtorCredits, overrides,
+  } = useMemo(() => {
+    const match = <T extends { company: string }>(arr: T[] | undefined): T[] =>
+      companyFilter === ALL ? (arr || []) : (arr || []).filter(r => r.company === companyFilter);
+    return {
+      debtors: match(data?.debtors),
+      banks: match(data?.banks),
+      sales: match(data?.sales),
+      purchases: match(data?.purchases),
+      receipts: match(data?.receipts),
+      bankTxns: match(data?.bankTxns),
+      billRefs: data?.billRefs || [],
+      debtorCredits: companyFilter === ALL
+        ? (data?.debtorCredits || [])
+        : (data?.debtorCredits || []).filter(c => c.company === companyFilter),
+      overrides: data?.overrides || [],
+    };
+  }, [data, companyFilter]);
 
   const inRange = (d: string | null) => !!d && d >= fromDate && d <= toDate;
 
