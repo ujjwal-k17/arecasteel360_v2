@@ -203,10 +203,19 @@ async function callTally(xml: string, timeoutMs = 25000): Promise<TallyResult> {
   }
 }
 
-function classify(root: string): 'debtor' | 'creditor' | 'bank' | 'other' {
-  if (root === 'sundry debtors') return 'debtor';
-  if (root === 'sundry creditors') return 'creditor';
-  if (root === 'bank accounts' || root === 'bank od a/c' || root === 'bank occ a/c') return 'bank';
+function classify(root: string, chain: string[], parent: string): 'debtor' | 'creditor' | 'bank' | 'other' {
+  // Build full ancestor set (lowercased): immediate parent + every step in the resolved chain + final root.
+  // This catches ledgers grouped under user-defined sub-groups of "Sundry Debtors" / "Sundry Creditors",
+  // even when intermediate groups are missing from Tally's response and the walk dead-ends at
+  // "Current Assets" or similar.
+  const ancestors = new Set<string>();
+  if (parent) ancestors.add(parent.trim().toLowerCase());
+  for (const c of chain) ancestors.add((c || '').trim().toLowerCase());
+  if (root) ancestors.add(root);
+
+  if (ancestors.has('sundry debtors')) return 'debtor';
+  if (ancestors.has('sundry creditors')) return 'creditor';
+  if (ancestors.has('bank accounts') || ancestors.has('bank od a/c') || ancestors.has('bank occ a/c')) return 'bank';
   return 'other';
 }
 
