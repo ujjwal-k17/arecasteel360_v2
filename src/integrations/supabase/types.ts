@@ -1133,6 +1133,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tally_debtor_overrides: {
+        Row: {
+          company: string
+          created_at: string
+          credit_period_days: number | null
+          id: string
+          ledger_name: string
+          notes: string | null
+          updated_at: string
+          updated_by: string | null
+          updated_by_email: string | null
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          credit_period_days?: number | null
+          id?: string
+          ledger_name: string
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_email?: string | null
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          credit_period_days?: number | null
+          id?: string
+          ledger_name?: string
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_email?: string | null
+        }
+        Relationships: []
+      }
       tally_groups: {
         Row: {
           company: string
@@ -1173,38 +1209,56 @@ export type Database = {
       }
       tally_ledgers: {
         Row: {
+          address: string | null
           classification: string
           closing_balance: number
           company: string
+          contact_person: string | null
           created_at: string
+          email: string | null
+          gstin: string | null
           id: string
+          mailing_name: string | null
           name: string
           parent_chain: string[]
           parent_group: string | null
+          phone: string | null
           root_group: string | null
           sync_run_id: string
         }
         Insert: {
+          address?: string | null
           classification?: string
           closing_balance?: number
           company: string
+          contact_person?: string | null
           created_at?: string
+          email?: string | null
+          gstin?: string | null
           id?: string
+          mailing_name?: string | null
           name: string
           parent_chain?: string[]
           parent_group?: string | null
+          phone?: string | null
           root_group?: string | null
           sync_run_id: string
         }
         Update: {
+          address?: string | null
           classification?: string
           closing_balance?: number
           company?: string
+          contact_person?: string | null
           created_at?: string
+          email?: string | null
+          gstin?: string | null
           id?: string
+          mailing_name?: string | null
           name?: string
           parent_chain?: string[]
           parent_group?: string | null
+          phone?: string | null
           root_group?: string | null
           sync_run_id?: string
         }
@@ -1260,6 +1314,72 @@ export type Database = {
         }
         Relationships: []
       }
+      tally_voucher_bill_refs: {
+        Row: {
+          amount: number
+          bill_name: string | null
+          bill_type: string | null
+          created_at: string
+          id: string
+          ledger_name: string
+          voucher_id: string
+        }
+        Insert: {
+          amount?: number
+          bill_name?: string | null
+          bill_type?: string | null
+          created_at?: string
+          id?: string
+          ledger_name: string
+          voucher_id: string
+        }
+        Update: {
+          amount?: number
+          bill_name?: string | null
+          bill_type?: string | null
+          created_at?: string
+          id?: string
+          ledger_name?: string
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_voucher_bill_refs_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "tally_vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_bill_refs_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_bank_txns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_bill_refs_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_bill_refs_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_bill_refs_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tally_voucher_items: {
         Row: {
           amount: number | null
@@ -1300,11 +1420,91 @@ export type Database = {
             foreignKeyName: "tally_voucher_items_voucher_id_fkey"
             columns: ["voucher_id"]
             isOneToOne: false
+            referencedRelation: "v_tally_bank_txns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_items_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
             referencedRelation: "v_tally_purchases"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tally_voucher_items_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_items_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tally_voucher_ledger_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          is_debit: boolean
+          is_party_ledger: boolean | null
+          ledger_name: string
+          voucher_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          is_debit?: boolean
+          is_party_ledger?: boolean | null
+          ledger_name: string
+          voucher_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          is_debit?: boolean
+          is_party_ledger?: boolean | null
+          ledger_name?: string
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_voucher_ledger_entries_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "tally_vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_ledger_entries_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_bank_txns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_ledger_entries_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_ledger_entries_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_ledger_entries_voucher_id_fkey"
             columns: ["voucher_id"]
             isOneToOne: false
             referencedRelation: "v_tally_sales"
@@ -1798,16 +1998,40 @@ export type Database = {
         }
         Relationships: []
       }
+      v_tally_bank_txns: {
+        Row: {
+          amount: number | null
+          bank_amount: number | null
+          bank_is_debit: boolean | null
+          bank_ledger: string | null
+          company: string | null
+          id: string | null
+          is_cancelled: boolean | null
+          is_optional: boolean | null
+          kind: string | null
+          party_name: string | null
+          voucher_date: string | null
+          voucher_number: string | null
+          voucher_type: string | null
+        }
+        Relationships: []
+      }
       v_tally_banks: {
         Row: {
+          address: string | null
           classification: string | null
           closing_balance: number | null
           company: string | null
+          contact_person: string | null
           created_at: string | null
+          email: string | null
+          gstin: string | null
           id: string | null
+          mailing_name: string | null
           name: string | null
           parent_chain: string[] | null
           parent_group: string | null
+          phone: string | null
           root_group: string | null
           sync_run_id: string | null
         }
@@ -1823,14 +2047,20 @@ export type Database = {
       }
       v_tally_creditors: {
         Row: {
+          address: string | null
           classification: string | null
           closing_balance: number | null
           company: string | null
+          contact_person: string | null
           created_at: string | null
+          email: string | null
+          gstin: string | null
           id: string | null
+          mailing_name: string | null
           name: string | null
           parent_chain: string[] | null
           parent_group: string | null
+          phone: string | null
           root_group: string | null
           sync_run_id: string | null
         }
@@ -1846,14 +2076,20 @@ export type Database = {
       }
       v_tally_debtors: {
         Row: {
+          address: string | null
           classification: string | null
           closing_balance: number | null
           company: string | null
+          contact_person: string | null
           created_at: string | null
+          email: string | null
+          gstin: string | null
           id: string | null
+          mailing_name: string | null
           name: string | null
           parent_chain: string[] | null
           parent_group: string | null
+          phone: string | null
           root_group: string | null
           sync_run_id: string | null
         }
@@ -1868,6 +2104,31 @@ export type Database = {
         ]
       }
       v_tally_purchases: {
+        Row: {
+          amount: number | null
+          company: string | null
+          created_at: string | null
+          id: string | null
+          is_cancelled: boolean | null
+          is_optional: boolean | null
+          kind: string | null
+          party_name: string | null
+          sync_run_id: string | null
+          voucher_date: string | null
+          voucher_number: string | null
+          voucher_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_vouchers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_tally_receipts: {
         Row: {
           amount: number | null
           company: string | null
