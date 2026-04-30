@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -320,6 +320,7 @@ function DebtorSummaryModule({
 }) {
   const [search, setSearch] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement | null>(null);
 
   const overrideMap = useMemo(() => {
     const m = new Map<DebtorKey, DebtorOverride>();
@@ -341,6 +342,12 @@ function DebtorSummaryModule({
   const selectedDebtor = selectedKey
     ? debtors.find(d => dkey(d.company, d.name) === selectedKey)
     : null;
+
+  useEffect(() => {
+    if (selectedDebtor && detailRef.current) {
+      detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedKey]);
 
   return (
     <div className="space-y-4">
@@ -375,7 +382,7 @@ function DebtorSummaryModule({
                   const k = dkey(d.company, d.name);
                   const ov = overrideMap.get(k);
                   return (
-                    <TableRow key={k} className={selectedKey === k ? 'bg-muted/40' : 'cursor-pointer hover:bg-muted/30'} onClick={() => setSelectedKey(k)}>
+                    <TableRow key={k} className={`cursor-pointer hover:bg-muted/30 ${selectedKey === k ? 'bg-muted/40' : ''}`} onClick={() => setSelectedKey(k)}>
                       <TableCell><Badge variant="outline">{d.company}</Badge></TableCell>
                       <TableCell className="font-medium">{d.name}</TableCell>
                       <TableCell className="text-xs">{d.gstin || '—'}</TableCell>
@@ -399,13 +406,15 @@ function DebtorSummaryModule({
       </Card>
 
       {selectedDebtor && (
-        <DebtorInvoiceCycleCard
-          debtor={selectedDebtor}
-          sales={sales}
-          receipts={receipts}
-          billRefs={billRefs}
-          creditPeriod={overrideMap.get(dkey(selectedDebtor.company, selectedDebtor.name))?.credit_period_days ?? null}
-        />
+        <div ref={detailRef}>
+          <DebtorInvoiceCycleCard
+            debtor={selectedDebtor}
+            sales={sales}
+            receipts={receipts}
+            billRefs={billRefs}
+            creditPeriod={overrideMap.get(dkey(selectedDebtor.company, selectedDebtor.name))?.credit_period_days ?? null}
+          />
+        </div>
       )}
     </div>
   );
