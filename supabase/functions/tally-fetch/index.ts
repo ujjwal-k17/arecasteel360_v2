@@ -488,6 +488,21 @@ Deno.serve(async (req) => {
       }
     }));
 
+    // Hard wall-clock guard: never let the worker get killed by the platform.
+    // If jobs don't all finish within 60s, return whatever we have so far.
+    let timedOut = false;
+    await Promise.race([
+      allJobs,
+      new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 60000)),
+    ]);
+    if (timedOut) {
+      result.errors.push({
+        company: '*',
+        dataset: 'all',
+        error: 'Backend wall-clock timeout (60s). Tally is likely unreachable; returning partial results.',
+      });
+    }
+
     if (debug) {
       debugInfo.errors = result.errors;
       result._debug = debugInfo;
