@@ -42,6 +42,16 @@ function tag(inner: string, name: string): string | null {
   return m ? decodeEntities(m[1].trim()) : null;
 }
 
+function tagAll(inner: string, name: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, 'gi');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(inner)) !== null) {
+    out.push(decodeEntities(m[1].trim()));
+  }
+  return out;
+}
+
 function parseAmount(s: string | null): number {
   if (!s) return 0;
   const cleaned = s.replace(/[^\d.\-]/g, '');
@@ -61,21 +71,46 @@ function parseQty(s: string | null): number {
 // XML builders
 // ============================================================
 function buildLedgerXml(company: string): string {
-  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>ArecaLedgerSync</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="ArecaLedgerSync" ISMODIFY="No"><TYPE>Ledger</TYPE><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD><NATIVEMETHOD>ClosingBalance</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
+  // Pull contact / GST fields in addition to balance
+  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>ArecaLedgerSync</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="ArecaLedgerSync" ISMODIFY="No"><TYPE>Ledger</TYPE><FETCH>Name,Parent,ClosingBalance,MailingName,LedgerMailingName,Address,LedgerContact,LedgerPhone,LedgerMobile,Email,IncomeTaxNumber,PartyGSTIN</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
 }
 
 function buildGroupXml(company: string): string {
   return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>ArecaGroupSync</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="ArecaGroupSync" ISMODIFY="No"><TYPE>Group</TYPE><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD><NATIVEMETHOD>IsReserved</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
 }
 
-function buildVoucherXml(company: string, fromDate: string, toDate: string, kind: 'sales' | 'purchase'): string {
-  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>ArecaVoucherSync</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY><SVFROMDATE>${fromDate}</SVFROMDATE><SVTODATE>${toDate}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="ArecaVoucherSync" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>Date,VoucherTypeName,VoucherNumber,PartyLedgerName,Amount,InventoryEntries.List,IsInvoice,IsCancelled,IsOptional</FETCH><FILTER>${kind === 'sales' ? 'IsSalesVch' : 'IsPurchVch'}</FILTER></COLLECTION><SYSTEM TYPE="Formulae" NAME="IsSalesVch">$$IsSales:$VoucherTypeName</SYSTEM><SYSTEM TYPE="Formulae" NAME="IsPurchVch">$$IsPurchase:$VoucherTypeName</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
+type VoucherKind = 'sales' | 'purchase' | 'receipt' | 'payment' | 'contra' | 'journal';
+
+function buildVoucherXml(company: string, fromDate: string, toDate: string, kind: VoucherKind): string {
+  const filterMap: Record<VoucherKind, string> = {
+    sales: 'IsSalesVch',
+    purchase: 'IsPurchVch',
+    receipt: 'IsReceiptVch',
+    payment: 'IsPaymentVch',
+    contra: 'IsContraVch',
+    journal: 'IsJournalVch',
+  };
+  const formulaMap: Record<VoucherKind, string> = {
+    sales: '$$IsSales:$VoucherTypeName',
+    purchase: '$$IsPurchase:$VoucherTypeName',
+    receipt: '$$IsReceipt:$VoucherTypeName',
+    payment: '$$IsPayment:$VoucherTypeName',
+    contra: '$$IsContra:$VoucherTypeName',
+    journal: '$$IsJournal:$VoucherTypeName',
+  };
+  const filterName = filterMap[kind];
+  const formula = formulaMap[kind];
+  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>ArecaVoucherSync</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY><SVFROMDATE>${fromDate}</SVFROMDATE><SVTODATE>${toDate}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="ArecaVoucherSync" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>Date,VoucherTypeName,VoucherNumber,PartyLedgerName,Amount,AllInventoryEntries.List,AllLedgerEntries.List,IsInvoice,IsCancelled,IsOptional</FETCH><FILTER>${filterName}</FILTER></COLLECTION><SYSTEM TYPE="Formulae" NAME="${filterName}">${formula}</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
 }
 
 // ============================================================
 // Parsers
 // ============================================================
-type LedgerRow = { name: string; parent: string; closing: number };
+type LedgerRow = {
+  name: string; parent: string; closing: number;
+  mailingName: string; address: string; gstin: string;
+  contact: string; phone: string; email: string;
+};
 
 function parseLedgers(xml: string): LedgerRow[] {
   const out: LedgerRow[] = [];
@@ -89,7 +124,17 @@ function parseLedgers(xml: string): LedgerRow[] {
     const parent = tag(inner, 'PARENT') || '';
     const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
     if (!name) continue;
-    out.push({ name, parent, closing: parseAmount(closingRaw) });
+    // Address can be a list of <ADDRESS> entries inside <LEDGERMAILINGDETAILS.LIST> or top-level
+    const addrParts = tagAll(inner, 'ADDRESS').filter(Boolean);
+    out.push({
+      name, parent, closing: parseAmount(closingRaw),
+      mailingName: tag(inner, 'MAILINGNAME') || tag(inner, 'LEDGERMAILINGNAME') || '',
+      address: addrParts.join(', '),
+      gstin: tag(inner, 'PARTYGSTIN') || tag(inner, 'GSTIN') || '',
+      contact: tag(inner, 'LEDGERCONTACT') || '',
+      phone: tag(inner, 'LEDGERPHONE') || tag(inner, 'LEDGERMOBILE') || '',
+      email: tag(inner, 'EMAIL') || '',
+    });
   }
   return out;
 }
@@ -128,6 +173,14 @@ function rootGroupOf(parent: string, groupMap: Map<string, string>): { root: str
   return { root: (cur || '').toLowerCase(), chain };
 }
 
+type LedgerEntry = {
+  ledgerName: string;
+  amount: number;        // signed: + Dr, - Cr (Tally Cr is negative in <AMOUNT>)
+  isDebit: boolean;
+  isPartyLedger: boolean;
+  billRefs: { name: string; type: string; amount: number }[];
+};
+
 type VoucherRow = {
   date: string;
   voucherNumber: string;
@@ -137,7 +190,39 @@ type VoucherRow = {
   isCancelled: boolean;
   isOptional: boolean;
   items: { name: string; qty: number; rate: number; amount: number }[];
+  ledgerEntries: LedgerEntry[];
 };
+
+function parseLedgerEntries(inner: string): LedgerEntry[] {
+  const entries: LedgerEntry[] = [];
+  const re = /<ALLLEDGERENTRIES\.LIST>([\s\S]*?)<\/ALLLEDGERENTRIES\.LIST>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(inner)) !== null) {
+    const blk = m[1];
+    const ledgerName = tag(blk, 'LEDGERNAME') || '';
+    const amountRaw = tag(blk, 'AMOUNT') || '';
+    const isDeemedPositive = /Yes/i.test(tag(blk, 'ISDEEMEDPOSITIVE') || '');
+    const isPartyLedger = /Yes/i.test(tag(blk, 'ISPARTYLEDGER') || '');
+    const amt = parseAmount(amountRaw); // Cr -> negative
+    const isDebit = isDeemedPositive || amt > 0;
+
+    const billRefs: LedgerEntry['billRefs'] = [];
+    const brRe = /<BILLALLOCATIONS\.LIST>([\s\S]*?)<\/BILLALLOCATIONS\.LIST>/gi;
+    let bm: RegExpExecArray | null;
+    while ((bm = brRe.exec(blk)) !== null) {
+      const bb = bm[1];
+      const billName = tag(bb, 'NAME') || '';
+      const billType = tag(bb, 'BILLTYPE') || '';
+      const billAmt = Math.abs(parseAmount(tag(bb, 'AMOUNT') || ''));
+      if (billName || billType) billRefs.push({ name: billName, type: billType, amount: billAmt });
+    }
+
+    if (ledgerName) {
+      entries.push({ ledgerName, amount: amt, isDebit, isPartyLedger, billRefs });
+    }
+  }
+  return entries;
+}
 
 function parseVouchers(xml: string): VoucherRow[] {
   const out: VoucherRow[] = [];
@@ -167,7 +252,9 @@ function parseVouchers(xml: string): VoucherRow[] {
       const amt = Math.abs(parseAmount(tag(ie, 'AMOUNT') || ''));
       if (stockName) items.push({ name: stockName, qty, rate, amount: amt });
     }
-    out.push({ date, voucherNumber, voucherType, party, amount, isCancelled, isOptional, items });
+
+    const ledgerEntries = parseLedgerEntries(inner);
+    out.push({ date, voucherNumber, voucherType, party, amount, isCancelled, isOptional, items, ledgerEntries });
   }
   return out;
 }
@@ -205,10 +292,6 @@ async function callTally(xml: string, timeoutMs = 25000): Promise<TallyResult> {
 }
 
 function classify(root: string, chain: string[], parent: string): 'debtor' | 'creditor' | 'bank' | 'other' {
-  // Build full ancestor set (lowercased): immediate parent + every step in the resolved chain + final root.
-  // This catches ledgers grouped under user-defined sub-groups of "Sundry Debtors" / "Sundry Creditors",
-  // even when intermediate groups are missing from Tally's response and the walk dead-ends at
-  // "Current Assets" or similar.
   const ancestors = new Set<string>();
   if (parent) ancestors.add(parent.trim().toLowerCase());
   for (const c of chain) ancestors.add((c || '').trim().toLowerCase());
@@ -226,7 +309,6 @@ function classify(root: string, chain: string[], parent: string): 'debtor' | 'cr
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
-  // Auth (regular client to validate the caller)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -247,23 +329,20 @@ Deno.serve(async (req) => {
   const userId = claims.claims.sub as string;
   const userEmail = (claims.claims.email as string) || null;
 
-  // Service-role client for snapshot writes (bypasses RLS)
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
-  // Date range: pull all available history
   const today = new Date();
   const fromTally = '19000101';
   const toTally = today.toISOString().slice(0, 10).replace(/-/g, '');
 
-  // Create the run row
   const { data: runRow, error: runErr } = await admin.from('tally_sync_runs').insert({
     status: 'running',
     triggered_by: userId,
     triggered_by_email: userEmail,
-    datasets: ['ledgers', 'sales', 'purchases'],
+    datasets: ['ledgers', 'sales', 'purchases', 'receipts', 'payments', 'contra', 'journal'],
     companies: COMPANIES,
   }).select('id').single();
 
@@ -281,9 +360,65 @@ Deno.serve(async (req) => {
     counts[company][dataset] = (counts[company][dataset] || 0) + n;
   };
 
-  // ---- per-company work, run in parallel under a wall-clock guard ----
+  // Insert vouchers + ledger entries + bill refs
+  async function insertVouchersBatch(slice: VoucherRow[], company: string, kind: VoucherKind) {
+    const voucherRows = slice.map(v => ({
+      sync_run_id: runId, company, kind,
+      voucher_type: v.voucherType, voucher_number: v.voucherNumber,
+      voucher_date: v.date && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : null,
+      party_name: v.party, amount: v.amount,
+      is_cancelled: v.isCancelled, is_optional: v.isOptional,
+    }));
+    const { data: inserted, error } = await admin
+      .from('tally_vouchers').insert(voucherRows).select('id');
+    if (error) throw new Error(`vouchers insert: ${error.message}`);
+
+    const itemRows: any[] = [];
+    const entryRows: any[] = [];
+    const billRows: any[] = [];
+    (inserted || []).forEach((row, idx) => {
+      const v = slice[idx];
+      for (const it of v.items) {
+        itemRows.push({
+          voucher_id: row.id, stock_item: it.name,
+          qty: it.qty, rate: it.rate, amount: it.amount,
+        });
+      }
+      for (const e of v.ledgerEntries) {
+        entryRows.push({
+          voucher_id: row.id,
+          ledger_name: e.ledgerName,
+          amount: e.amount,
+          is_debit: e.isDebit,
+          is_party_ledger: e.isPartyLedger,
+        });
+        for (const br of e.billRefs) {
+          billRows.push({
+            voucher_id: row.id,
+            ledger_name: e.ledgerName,
+            bill_name: br.name,
+            bill_type: br.type,
+            amount: br.amount,
+          });
+        }
+      }
+    });
+    for (let j = 0; j < itemRows.length; j += 1000) {
+      const { error: ie } = await admin.from('tally_voucher_items').insert(itemRows.slice(j, j + 1000));
+      if (ie) throw new Error(`items insert: ${ie.message}`);
+    }
+    for (let j = 0; j < entryRows.length; j += 1000) {
+      const { error: ee } = await admin.from('tally_voucher_ledger_entries').insert(entryRows.slice(j, j + 1000));
+      if (ee) throw new Error(`ledger_entries insert: ${ee.message}`);
+    }
+    for (let j = 0; j < billRows.length; j += 1000) {
+      const { error: be } = await admin.from('tally_voucher_bill_refs').insert(billRows.slice(j, j + 1000));
+      if (be) throw new Error(`bill_refs insert: ${be.message}`);
+    }
+  }
+
   const work = COMPANIES.map(async (company) => {
-    // 1) Groups + Ledgers (one logical dataset)
+    // 1) Groups + Ledgers
     try {
       const [gResp, lResp] = await Promise.all([
         callTally(buildGroupXml(company)),
@@ -301,7 +436,6 @@ Deno.serve(async (req) => {
             sync_run_id: runId, company,
             name: g.name, parent: g.parent, is_reserved: g.isReserved,
           }));
-          // chunked insert
           for (let i = 0; i < groupRows.length; i += 1000) {
             const { error } = await admin.from('tally_groups').insert(groupRows.slice(i, i + 1000));
             if (error) throw new Error(`groups insert: ${error.message}`);
@@ -317,6 +451,12 @@ Deno.serve(async (req) => {
             name: l.name, parent_group: l.parent, root_group: root,
             parent_chain: chain, closing_balance: l.closing,
             classification: classify(root, chain, l.parent),
+            mailing_name: l.mailingName || null,
+            address: l.address || null,
+            gstin: l.gstin || null,
+            contact_person: l.contact || null,
+            phone: l.phone || null,
+            email: l.email || null,
           };
         });
         for (let i = 0; i < ledgerRows.length; i += 1000) {
@@ -329,63 +469,36 @@ Deno.serve(async (req) => {
       errors.push({ company, dataset: 'ledgers', error: e?.message || String(e) });
     }
 
-    // 2 & 3) Sales + Purchase vouchers (independent)
-    for (const kind of ['sales', 'purchase'] as const) {
+    // 2) Vouchers per kind (sales, purchase, receipt, payment, contra, journal)
+    const kinds: VoucherKind[] = ['sales', 'purchase', 'receipt', 'payment', 'contra', 'journal'];
+    for (const kind of kinds) {
       try {
         const r = await callTally(buildVoucherXml(company, fromTally, toTally, kind));
         if (!r.ok) {
-          errors.push({ company, dataset: kind === 'sales' ? 'sales' : 'purchases', error: r.error || `HTTP ${r.status}` });
+          errors.push({ company, dataset: kind, error: r.error || `HTTP ${r.status}` });
           continue;
         }
         const vs = parseVouchers(r.text);
-        // Insert vouchers in chunks, then their items
         for (let i = 0; i < vs.length; i += 500) {
-          const slice = vs.slice(i, i + 500);
-          const voucherRows = slice.map(v => ({
-            sync_run_id: runId, company, kind,
-            voucher_type: v.voucherType, voucher_number: v.voucherNumber,
-            voucher_date: v.date && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : null,
-            party_name: v.party, amount: v.amount,
-            is_cancelled: v.isCancelled, is_optional: v.isOptional,
-          }));
-          const { data: inserted, error } = await admin
-            .from('tally_vouchers').insert(voucherRows).select('id');
-          if (error) throw new Error(`vouchers insert: ${error.message}`);
-
-          // items: map each inserted voucher to its parsed items (same order)
-          const itemRows: any[] = [];
-          (inserted || []).forEach((row, idx) => {
-            for (const it of slice[idx].items) {
-              itemRows.push({
-                voucher_id: row.id,
-                stock_item: it.name,
-                qty: it.qty, rate: it.rate, amount: it.amount,
-              });
-            }
-          });
-          for (let j = 0; j < itemRows.length; j += 1000) {
-            const { error: ie } = await admin.from('tally_voucher_items').insert(itemRows.slice(j, j + 1000));
-            if (ie) throw new Error(`items insert: ${ie.message}`);
-          }
+          await insertVouchersBatch(vs.slice(i, i + 500), company, kind);
         }
-        recordCount(company, kind === 'sales' ? 'sales' : 'purchases', vs.length);
+        recordCount(company, kind, vs.length);
       } catch (e: any) {
-        errors.push({ company, dataset: kind === 'sales' ? 'sales' : 'purchases', error: e?.message || String(e) });
+        errors.push({ company, dataset: kind, error: e?.message || String(e) });
       }
     }
   });
 
-  // 90s wall-clock guard (whole sync). If we hit it we still finalize what we have.
+  // 120s wall-clock guard (extended for additional voucher kinds).
   let timedOut = false;
   await Promise.race([
     Promise.all(work),
-    new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 90000)),
+    new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 120000)),
   ]);
   if (timedOut) {
-    errors.push({ company: '*', dataset: 'all', error: 'Backend wall-clock timeout (90s). Some datasets may be incomplete.' });
+    errors.push({ company: '*', dataset: 'all', error: 'Backend wall-clock timeout (120s). Some datasets may be incomplete.' });
   }
 
-  // Decide final status
   const totalInserted = Object.values(counts).reduce(
     (sum, byDs) => sum + Object.values(byDs).reduce((a, b) => a + b, 0), 0
   );
