@@ -64,9 +64,9 @@ export default function BusinessOverviewPage() {
   const [ledgersError, setLedgersError] = useState<string | null>(null);
   const [vouchersError, setVouchersError] = useState<string | null>(null);
 
-  const fetchDataset = async (dataset: 'ledgers' | 'vouchers') => {
+  const fetchDataset = async (dataset: 'ledgers' | 'vouchers', extra?: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke('tally-fetch', {
-      body: { dataset, fromDate, toDate },
+      body: { dataset, fromDate, toDate, ...(extra || {}) },
     });
     if (error) throw error;
     if ((data as any)?.error) throw new Error((data as any).error);
@@ -79,9 +79,18 @@ export default function BusinessOverviewPage() {
     setLedgersError(null);
     const t = toast.loading('Syncing Debtors & Creditors...');
     try {
-      const d = await fetchDataset('ledgers');
+      const d = await fetchDataset('ledgers', { debug: true });
       setLedgersData(d);
-      toast.success('Debtors & Creditors synced', { id: t });
+      const dbg = (d as any)?._debug;
+      if (dbg) {
+        // eslint-disable-next-line no-console
+        console.log('[tally-fetch debug]', dbg);
+      }
+      const total = (d.debtors?.length || 0) + ((d as any).creditors?.length || 0) + (d.banks?.length || 0);
+      toast.success(`Synced: ${d.debtors?.length || 0} debtors, ${(d as any).creditors?.length || 0} creditors, ${d.banks?.length || 0} banks`, { id: t });
+      if (total === 0) {
+        toast.message('No parties matched. Open the browser console to see Tally debug output.');
+      }
     } catch (e: any) {
       setLedgersError(e?.message || 'Sync failed');
       toast.error(e?.message || 'Sync failed', { id: t });
