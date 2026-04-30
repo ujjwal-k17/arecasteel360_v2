@@ -123,8 +123,18 @@ Deno.serve(async (req) => {
 
     const items = parseStockItems(text);
 
+    const debug = items.length === 0
+      ? {
+          rawLength: text.length,
+          rawSnippet: text.slice(0, 3000),
+          stockItemTagCount: (text.match(/<STOCKITEM\b/gi) || []).length,
+          tallyMessageTagCount: (text.match(/<TALLYMESSAGE\b/gi) || []).length,
+          contentType: tallyResp.headers.get('content-type') || null,
+        }
+      : undefined;
+
     return new Response(
-      JSON.stringify({ items, fetchedAt: new Date().toISOString(), count: items.length }),
+      JSON.stringify({ items, fetchedAt: new Date().toISOString(), count: items.length, debug }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (e: any) {
