@@ -539,22 +539,38 @@ function DebtorPaymentSummaryTab({
       const salesRep = ov?.sales_rep ?? null;
       const ledgerLow = d.name.toLowerCase();
       const dInvoices = sales.filter(v => v.company === d.company && (v.party_name || '').toLowerCase() === ledgerLow);
-      const dPayments = creditIndex.get(`${d.company}__${ledgerLow}`) || [];
-      const matches = fifoMatch(dInvoices, dPayments, cp);
+      // Outstanding from Tally ledger (Cr-side, stored negative). Walk invoices
+      // newest -> oldest, accumulating amounts until they cover outstanding.
+      // The oldest invoice in that set may be partially paid.
+      const outstandingAbs = Math.abs(Number(d.closing_balance) || 0);
+      const sortedDesc = [...dInvoices].sort((a, b) =>
+        (b.voucher_date || '').localeCompare(a.voucher_date || '')
+      );
+      let remaining = outstandingAbs;
       let overdue = 0;
       let overdueCount = 0;
-      for (const m of matches) {
-        const open = m.amount - m.paid;
-        // Overdue amount = unpaid balance on invoices past their due date (FIFO basis)
-        if (open > 0.0001 && m.dueDate && m.dueDate < today) {
-          overdue += open;
-          overdueCount += 1;
+      let unpaidInvoiceCount = 0;
+      for (const v of sortedDesc) {
+        if (remaining <= 0.0001) break;
+        const amt = Number(v.amount) || 0;
+        if (amt <= 0) continue;
+        const unpaidPortion = Math.min(amt, remaining);
+        remaining -= unpaidPortion;
+        unpaidInvoiceCount += 1;
+        if (v.voucher_date && cp != null) {
+          const due = new Date(v.voucher_date);
+          due.setDate(due.getDate() + cp);
+          const dueIso = due.toISOString().slice(0, 10);
+          if (dueIso < today) {
+            overdue += unpaidPortion;
+            overdueCount += 1;
+          }
         }
       }
       return {
         debtor: d, key: k, cp, salesRep,
         outstanding: d.closing_balance, // direct from Tally ledger balance
-        overdue, overdueCount, invoiceCount: matches.length,
+        overdue, overdueCount, invoiceCount: unpaidInvoiceCount,
       };
     }).filter(r =>
       r.salesRep !== 'IntraCompany' &&            // exclude intra-company debtors
