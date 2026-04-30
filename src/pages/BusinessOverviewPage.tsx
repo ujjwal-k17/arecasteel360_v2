@@ -170,8 +170,6 @@ export default function BusinessOverviewPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-        </div>
-      </div>
 
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm flex items-start gap-2">
