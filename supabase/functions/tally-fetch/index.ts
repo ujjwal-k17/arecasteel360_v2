@@ -258,7 +258,9 @@ function parseVouchers(xml: string): VoucherRow[] {
 }
 
 // ----------------- Tally call -----------------
-async function callTally(xml: string, timeoutMs = 90000): Promise<{ ok: boolean; text: string; status: number }> {
+type TallyCallResult = { ok: boolean; text: string; status: number; error?: string };
+
+async function callTally(xml: string, timeoutMs = 25000): Promise<TallyCallResult> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -270,6 +272,17 @@ async function callTally(xml: string, timeoutMs = 90000): Promise<{ ok: boolean;
     });
     const text = await resp.text();
     return { ok: resp.ok, text, status: resp.status };
+  } catch (e: any) {
+    let msg: string;
+    if (e?.name === 'AbortError') {
+      msg = `Tally timed out after ${Math.round(timeoutMs / 1000)}s`;
+    } else if (e instanceof TypeError) {
+      // Deno fetch raises TypeError for DNS / refused / unreachable
+      msg = `Cannot reach Tally at ${TALLY_URL} (${e.message || 'connection failed'})`;
+    } else {
+      msg = e?.message || String(e);
+    }
+    return { ok: false, text: '', status: 0, error: msg };
   } finally {
     clearTimeout(t);
   }
