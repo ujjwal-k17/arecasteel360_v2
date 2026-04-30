@@ -266,7 +266,7 @@ function parseVouchers(xml: string): VoucherRow[] {
 // ----------------- Tally call -----------------
 type TallyCallResult = { ok: boolean; text: string; status: number; error?: string };
 
-async function callTally(xml: string, timeoutMs = 25000): Promise<TallyCallResult> {
+async function callTally(xml: string, timeoutMs = 90000): Promise<TallyCallResult> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -513,13 +513,13 @@ Deno.serve(async (req) => {
     let timedOut = false;
     await Promise.race([
       allJobs,
-      new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 60000)),
+      new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, 140000)),
     ]);
     if (timedOut) {
       result.errors.push({
         company: '*',
         dataset: 'all',
-        error: 'Backend wall-clock timeout (60s). Tally is likely unreachable; returning partial results.',
+        error: 'Backend wall-clock timeout (140s). Tally is likely unreachable; returning partial results.',
       });
     }
 
