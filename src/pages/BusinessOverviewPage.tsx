@@ -363,6 +363,75 @@ function PartyTable({ rows, valueLabel, empty, absolute }: {
   );
 }
 
+function DebtorsTable({ rows, empty }: {
+  rows: { company: string; name: string; parent_group: string | null; parent_chain?: string[] | null; closing_balance: number }[];
+  empty: string;
+}) {
+  const [search, setSearch] = useState('');
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const base = q
+      ? rows.filter(r =>
+          r.name.toLowerCase().includes(q) ||
+          (r.parent_group || '').toLowerCase().includes(q) ||
+          r.company.toLowerCase().includes(q))
+      : rows;
+    return [...base].sort((a, b) => Math.abs(b.closing_balance) - Math.abs(a.closing_balance));
+  }, [rows, search]);
+
+  const total = filtered.reduce((s, r) => s + (r.closing_balance || 0), 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <Input
+          placeholder="Search by ledger, parent group or company..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <div className="text-xs text-muted-foreground">
+          Showing <span className="font-medium text-foreground">{filtered.length}</span> ledger{filtered.length === 1 ? '' : 's'} · Total{' '}
+          <span className="font-medium text-foreground">{fmtINR(total)}</span>
+        </div>
+      </div>
+      <div className="overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Company</TableHead>
+              <TableHead>Ledger Name</TableHead>
+              <TableHead>Parent Group</TableHead>
+              <TableHead>Group Path</TableHead>
+              <TableHead className="text-right">Outstanding</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{empty}</TableCell></TableRow>
+            ) : (
+              filtered.map((r, i) => {
+                const chain = (r.parent_chain && r.parent_chain.length > 0)
+                  ? r.parent_chain.join(' → ')
+                  : (r.parent_group || '—');
+                return (
+                  <TableRow key={i}>
+                    <TableCell><Badge variant="outline">{r.company}</Badge></TableCell>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.parent_group || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[360px] truncate" title={chain}>{chain}</TableCell>
+                    <TableCell className="text-right font-medium">{fmtINR(r.closing_balance)}</TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 function VoucherTable({ rows, partyLabel }: { rows: SnapshotVoucher[]; partyLabel: string }) {
   return (
     <div className="overflow-auto">
