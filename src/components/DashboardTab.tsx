@@ -421,6 +421,7 @@ export default function DashboardTab() {
 
   return (
     <div className="space-y-6">
+      <TallySyncSection />
       {/* === Order Summary === */}
       <Section title="Order Summary" subtitle={`Snapshot of open orders & ${monthLabel} activity`}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
