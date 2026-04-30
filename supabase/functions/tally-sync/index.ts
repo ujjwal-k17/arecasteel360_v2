@@ -10,17 +10,27 @@ const TALLY_URL = 'http://103.239.89.153:9000';
 
 const TALLY_XML = `<ENVELOPE>
   <HEADER>
-    <TALLYREQUEST>Export Data</TALLYREQUEST>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>ArecaStockItemSync</ID>
   </HEADER>
   <BODY>
-    <EXPORTDATA>
-      <REQUESTDESC>
-        <REPORTNAME>List of Stock Items</REPORTNAME>
-        <STATICVARIABLES>
-          <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-        </STATICVARIABLES>
-      </REQUESTDESC>
-    </EXPORTDATA>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="ArecaStockItemSync" ISMODIFY="No">
+            <TYPE>Stock Item</TYPE>
+            <NATIVEMETHOD>Name</NATIVEMETHOD>
+            <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
+            <NATIVEMETHOD>ClosingValue</NATIVEMETHOD>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
   </BODY>
 </ENVELOPE>`;
 
@@ -59,6 +69,11 @@ function parseStockItems(xml: string): Array<{ name: string; quantity: string; v
     items.push({ name, quantity, value });
   }
   return items;
+}
+
+function parseTallyLineError(xml: string): string | null {
+  const match = xml.match(/<LINEERROR>([\s\S]*?)<\/LINEERROR>/i);
+  return match ? decodeEntities(match[1].trim()) : null;
 }
 
 Deno.serve(async (req) => {
@@ -117,6 +132,21 @@ Deno.serve(async (req) => {
     if (!tallyResp.ok) {
       return new Response(
         JSON.stringify({ error: `Tally returned HTTP ${tallyResp.status}`, raw: text.slice(0, 500) }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const lineError = parseTallyLineError(text);
+    if (lineError) {
+      return new Response(
+        JSON.stringify({
+          error: `Tally error: ${lineError}`,
+          debug: {
+            rawLength: text.length,
+            rawSnippet: text.slice(0, 1000),
+            contentType: tallyResp.headers.get('content-type') || null,
+          },
+        }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
