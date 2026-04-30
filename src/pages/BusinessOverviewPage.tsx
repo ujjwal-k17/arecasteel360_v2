@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,42 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle, Stethoscope } from 'lucide-react';
+import { RefreshCw, Users, Landmark, Truck, ShoppingCart, AlertCircle, Stethoscope, Building2, CheckCircle2, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fmtNum } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useTallySnapshot, SnapshotVoucher } from '@/hooks/useTallySnapshot';
 
 const ALL = '__all__';
 
-type Debtor = { company: string; partyName: string; outstanding: number; overdue: number };
-type Bank = { company: string; accountName: string; balance: number };
-type Voucher = {
-  company: string;
-  date: string;
-  voucherNumber: string;
-  voucherType: string;
-  party?: string;
-  supplier?: string;
-  amount: number;
-  totalQty: number;
-  itemsSummary: string;
-  items: { name: string; qty: number; rate: number; amount: number }[];
-};
-
-type TallyResponse = {
-  debtors: Debtor[];
-  banks: Bank[];
-  dispatches: Voucher[];
-  purchases: Voucher[];
-  errors: { company: string; dataset: string; error: string }[];
-  fetchedAt: string;
-  fromDate: string;
-  toDate: string;
-  companies: string[];
-};
-
-const fmtINR = (n: number) =>
-  '₹ ' + Math.round(n).toLocaleString('en-IN');
+const fmtINR = (n: number) => '₹ ' + Math.round(n).toLocaleString('en-IN');
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const monthStartIso = () => {
@@ -53,75 +25,50 @@ const monthStartIso = () => {
 };
 
 export default function BusinessOverviewPage() {
+  const qc = useQueryClient();
+  const { data, isLoading, refetch } = useTallySnapshot();
+
   const [companyFilter, setCompanyFilter] = useState<string>(ALL);
   const [fromDate, setFromDate] = useState<string>(monthStartIso());
   const [toDate, setToDate] = useState<string>(todayIso());
 
-  const [ledgersData, setLedgersData] = useState<TallyResponse | null>(null);
-  const [vouchersData, setVouchersData] = useState<TallyResponse | null>(null);
-  const [ledgersLoading, setLedgersLoading] = useState(false);
-  const [vouchersLoading, setVouchersLoading] = useState(false);
-  const [ledgersError, setLedgersError] = useState<string | null>(null);
-  const [vouchersError, setVouchersError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
-  const fetchDataset = async (dataset: 'ledgers' | 'vouchers', extra?: Record<string, unknown>) => {
-    const { data, error } = await supabase.functions.invoke('tally-fetch', {
-      body: { dataset, fromDate, toDate, ...(extra || {}) },
-    });
-    if (error) {
-      const msg = (error as any)?.message || String(error);
-      // Transport-level failure (worker killed, network blip, etc.) — give a friendlier hint.
-      if (/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(msg)) {
-        throw new Error(
-          'Backend timed out reaching Tally. Check that Tally on the cloud RDP is running and port 9000 is open to the internet.'
-        );
-      }
-      throw new Error(msg);
-    }
-    if ((data as any)?.error) throw new Error((data as any).error);
-    return data as TallyResponse;
-  };
-
-  const handleSyncLedgers = async () => {
-    if (ledgersLoading) return;
-    setLedgersLoading(true);
-    setLedgersError(null);
-    const t = toast.loading('Syncing Debtors & Creditors...');
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    const t = toast.loading('Syncing from Tally — this can take up to a minute...');
     try {
-      const d = await fetchDataset('ledgers', { debug: true });
-      setLedgersData(d);
-      const dbg = (d as any)?._debug;
-      if (dbg) {
-        // eslint-disable-next-line no-console
-        console.log('[tally-fetch debug]', dbg);
+      const { data: result, error } = await supabase.functions.invoke('tally-sync', { body: {} });
+      if (error) {
+        const msg = (error as any)?.message || String(error);
+        if (/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(msg)) {
+          throw new Error('Backend timed out reaching Tally. Check that Tally on the cloud RDP is running and port 9000 is open to the internet.');
+        }
+        throw new Error(msg);
       }
-      const total = (d.debtors?.length || 0) + ((d as any).creditors?.length || 0) + (d.banks?.length || 0);
-      toast.success(`Synced: ${d.debtors?.length || 0} debtors, ${(d as any).creditors?.length || 0} creditors, ${d.banks?.length || 0} banks`, { id: t });
-      if (total === 0) {
-        toast.message('No parties matched. Open the browser console to see Tally debug output.');
+      if ((result as any)?.error) throw new Error((result as any).error);
+      const status = (result as any)?.status as string;
+      const counts = (result as any)?.counts as Record<string, Record<string, number>>;
+      const errCount = ((result as any)?.errors || []).length;
+      const totalLedgers = Object.values(counts || {}).reduce((s, c) => s + (c.ledgers || 0), 0);
+      const totalSales = Object.values(counts || {}).reduce((s, c) => s + (c.sales || 0), 0);
+      const totalPurchases = Object.values(counts || {}).reduce((s, c) => s + (c.purchases || 0), 0);
+      if (status === 'success') {
+        toast.success(`Synced: ${totalLedgers} ledgers, ${totalSales} sales, ${totalPurchases} purchases`, { id: t });
+      } else if (status === 'partial') {
+        toast.warning(`Partial sync: ${totalLedgers} ledgers, ${totalSales} sales, ${totalPurchases} purchases — ${errCount} errors`, { id: t });
+      } else {
+        toast.error(`Sync failed — ${errCount} errors. Previous snapshot still active.`, { id: t });
       }
+      await qc.invalidateQueries({ queryKey: ['tally-snapshot'] });
+      await refetch();
     } catch (e: any) {
-      setLedgersError(e?.message || 'Sync failed');
       toast.error(e?.message || 'Sync failed', { id: t });
+      // Refresh anyway so partial run row shows up
+      await qc.invalidateQueries({ queryKey: ['tally-snapshot'] });
     } finally {
-      setLedgersLoading(false);
-    }
-  };
-
-  const handleSyncVouchers = async () => {
-    if (vouchersLoading) return;
-    setVouchersLoading(true);
-    setVouchersError(null);
-    const t = toast.loading('Syncing Dispatches & Purchases...');
-    try {
-      const d = await fetchDataset('vouchers');
-      setVouchersData(d);
-      toast.success('Dispatches & Purchases synced', { id: t });
-    } catch (e: any) {
-      setVouchersError(e?.message || 'Sync failed');
-      toast.error(e?.message || 'Sync failed', { id: t });
-    } finally {
-      setVouchersLoading(false);
+      setSyncing(false);
     }
   };
 
@@ -134,9 +81,9 @@ export default function BusinessOverviewPage() {
     setDiagLoading(true);
     setDiagResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('tally-diagnose', { body: {} });
+      const { data: r, error } = await supabase.functions.invoke('tally-diagnose', { body: {} });
       if (error) throw error;
-      setDiagResult(data);
+      setDiagResult(r);
     } catch (e: any) {
       setDiagResult({ error: e?.message || String(e) });
     } finally {
@@ -144,44 +91,36 @@ export default function BusinessOverviewPage() {
     }
   };
 
-  const companies = useMemo(() => {
-    const set = new Set<string>([
-      ...(ledgersData?.companies || []),
-      ...(vouchersData?.companies || []),
-    ]);
-    return Array.from(set);
-  }, [ledgersData, vouchersData]);
-
-  const filterByCompany = <T extends { company: string }>(arr: T[] | undefined): T[] =>
+  const companies = data?.companies || [];
+  const filterCo = <T extends { company: string }>(arr: T[] | undefined): T[] =>
     (arr || []).filter(r => companyFilter === ALL || r.company === companyFilter);
 
-  const debtors = filterByCompany<Debtor>(ledgersData?.debtors);
-  const banks = filterByCompany<Bank>(ledgersData?.banks);
-  const dispatches = filterByCompany<Voucher>(vouchersData?.dispatches);
-  const purchases = filterByCompany<Voucher>(vouchersData?.purchases);
+  const debtors = filterCo(data?.debtors);
+  const creditors = filterCo(data?.creditors);
+  const banks = filterCo(data?.banks);
 
-  const totalDebtors = useMemo(() => debtors.reduce((s, d) => s + (d.outstanding || 0), 0), [debtors]);
-  const totalBank = useMemo(() => banks.reduce((s, b) => s + (b.balance || 0), 0), [banks]);
-  const totalDispatch = useMemo(() => dispatches.reduce((s, v) => s + (v.amount || 0), 0), [dispatches]);
-  const totalPurchase = useMemo(() => purchases.reduce((s, v) => s + (v.amount || 0), 0), [purchases]);
+  // Date-range filter only applied to vouchers
+  const inRange = (v: SnapshotVoucher) =>
+    v.voucher_date && v.voucher_date >= fromDate && v.voucher_date <= toDate;
+  const sales = filterCo(data?.sales).filter(inRange);
+  const purchases = filterCo(data?.purchases).filter(inRange);
 
-  const fmtTime = (iso?: string) =>
-    iso ? new Date(iso).toLocaleString('en-IN') : 'not yet';
+  const totalDebtors = useMemo(() => debtors.reduce((s, d) => s + (d.closing_balance || 0), 0), [debtors]);
+  const totalCreditors = useMemo(() => creditors.reduce((s, d) => s + (d.closing_balance || 0), 0), [creditors]);
+  const totalBank = useMemo(() => banks.reduce((s, b) => s + (b.closing_balance || 0), 0), [banks]);
+  const totalSales = useMemo(() => sales.reduce((s, v) => s + (v.amount || 0), 0), [sales]);
+  const totalPurchases = useMemo(() => purchases.reduce((s, v) => s + (v.amount || 0), 0), [purchases]);
 
-  const combinedErrors = [
-    ...(ledgersData?.errors || []),
-    ...(vouchersData?.errors || []),
-  ];
+  const lastRun = data?.lastRun;
+  const fmtTime = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
   return (
     <div className="container py-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Business Overview</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Debtors & Creditors: {fmtTime(ledgersData?.fetchedAt)} · Dispatches & Purchases: {fmtTime(vouchersData?.fetchedAt)}
-          </p>
+          <SyncStatusBanner lastRun={lastRun || null} fmtTime={fmtTime} />
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
@@ -202,13 +141,9 @@ export default function BusinessOverviewPage() {
             <Stethoscope className={`h-4 w-4 mr-2 ${diagLoading ? 'animate-pulse' : ''}`} />
             Test Connection
           </Button>
-          <Button onClick={handleSyncLedgers} disabled={ledgersLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${ledgersLoading ? 'animate-spin' : ''}`} />
-            Sync Debtors & Creditors
-          </Button>
-          <Button onClick={handleSyncVouchers} disabled={vouchersLoading} variant="secondary">
-            <RefreshCw className={`h-4 w-4 mr-2 ${vouchersLoading ? 'animate-spin' : ''}`} />
-            Sync Dispatches & Purchases
+          <Button onClick={handleSync} disabled={syncing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync from Tally'}
           </Button>
         </div>
       </div>
@@ -231,114 +166,39 @@ export default function BusinessOverviewPage() {
         </DialogContent>
       </Dialog>
 
-      {(ledgersError || vouchersError) && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
-          <div className="space-y-1">
-            <div className="font-medium">Failed to fetch from Tally</div>
-            {ledgersError && <div className="text-muted-foreground">Debtors & Creditors: {ledgersError}</div>}
-            {vouchersError && <div className="text-muted-foreground">Dispatches & Purchases: {vouchersError}</div>}
-          </div>
-        </div>
-      )}
-
-      {combinedErrors.length > 0 && (
+      {lastRun && (lastRun.errors || []).length > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
           <div className="font-medium mb-1 flex items-center gap-2">
             <AlertCircle className="h-3.5 w-3.5" />
-            Some companies/datasets returned warnings
+            Last sync had {(lastRun.errors || []).length} warning(s)
           </div>
           <ul className="list-disc pl-5 space-y-0.5 text-muted-foreground">
-            {combinedErrors.map((e, i) => (
+            {(lastRun.errors || []).map((e, i) => (
               <li key={i}>
                 <span className="font-medium">{e.company}</span> · {e.dataset}: {e.error}
               </li>
             ))}
           </ul>
+          <div className="text-[11px] text-muted-foreground mt-1">
+            Datasets that failed retain data from the previous successful sync.
+          </div>
         </div>
       )}
 
-
-      {(ledgersData as any)?._debug && (
-        <details
-          className="rounded-md border bg-muted/30 px-3 py-2 text-xs"
-          open={(ledgersData?.debtors?.length || 0) === 0 || combinedErrors.length > 0}
-        >
-          <summary className="cursor-pointer font-medium">
-            Sync diagnostics ({Object.keys((ledgersData as any)._debug.companies || {}).length} companies)
-          </summary>
-          <div className="mt-2 space-y-3">
-            {Object.entries((ledgersData as any)._debug.companies || {}).map(([company, info]: [string, any]) => (
-              <div key={company} className="rounded border bg-background p-2 space-y-1">
-                <div className="font-medium">{company}</div>
-                {info.exception && (
-                  <div className="text-destructive">Exception: {info.exception}</div>
-                )}
-                {info.ledgerHttp && <div>Ledger HTTP: {info.ledgerHttp}</div>}
-                {info.groupHttp && <div>Group HTTP: {info.groupHttp}</div>}
-                {typeof info.ledgerCount === 'number' && (
-                  <div>
-                    Ledgers: {info.ledgerCount} · Groups: {info.groupCount} · Debtors: {info.debtors} · Creditors: {info.creditors} · Banks: {info.banks}
-                  </div>
-                )}
-                {Array.isArray(info.sampleLedgers) && info.sampleLedgers.length > 0 && (
-                  <div>
-                    <div className="font-medium mt-1">Sample ledgers:</div>
-                    <ul className="list-disc pl-5 text-muted-foreground">
-                      {info.sampleLedgers.slice(0, 5).map((s: any, i: number) => (
-                        <li key={i}>
-                          <span className="font-medium">{s.name}</span> — parent: <em>{s.parent || '(none)'}</em> → root: <em>{s.root || '(none)'}</em> · {s.closing}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {info.ledgerSample && !info.ledgerCount && (
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-muted-foreground">Raw ledger response (first 600 chars)</summary>
-                    <pre className="mt-1 whitespace-pre-wrap break-all text-[10px] bg-muted p-2 rounded">{info.ledgerSample}</pre>
-                  </details>
-                )}
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard
-          icon={<Users className="h-4 w-4" />}
-          label="Total Debtors Outstanding"
-          value={fmtINR(totalDebtors)}
-          sub={`${debtors.length} parties`}
-        />
-        <SummaryCard
-          icon={<Landmark className="h-4 w-4" />}
-          label="Total Bank Balance"
-          value={fmtINR(totalBank)}
-          sub={`${banks.length} accounts`}
-        />
-        <SummaryCard
-          icon={<Truck className="h-4 w-4" />}
-          label="Dispatches in Range"
-          value={fmtINR(totalDispatch)}
-          sub={`${dispatches.length} vouchers`}
-        />
-        <SummaryCard
-          icon={<ShoppingCart className="h-4 w-4" />}
-          label="Purchases in Range"
-          value={fmtINR(totalPurchase)}
-          sub={`${purchases.length} vouchers`}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <SummaryCard icon={<Users className="h-4 w-4" />} label="Debtors O/S" value={fmtINR(totalDebtors)} sub={`${debtors.length} parties`} />
+        <SummaryCard icon={<Building2 className="h-4 w-4" />} label="Creditors O/S" value={fmtINR(Math.abs(totalCreditors))} sub={`${creditors.length} parties`} />
+        <SummaryCard icon={<Landmark className="h-4 w-4" />} label="Bank Balance" value={fmtINR(totalBank)} sub={`${banks.length} accounts`} />
+        <SummaryCard icon={<Truck className="h-4 w-4" />} label="Sales (range)" value={fmtINR(totalSales)} sub={`${sales.length} vouchers`} />
+        <SummaryCard icon={<ShoppingCart className="h-4 w-4" />} label="Purchases (range)" value={fmtINR(totalPurchases)} sub={`${purchases.length} vouchers`} />
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="debtors">
         <TabsList>
           <TabsTrigger value="debtors">Debtors</TabsTrigger>
+          <TabsTrigger value="creditors">Creditors</TabsTrigger>
           <TabsTrigger value="banks">Banks</TabsTrigger>
-          <TabsTrigger value="dispatches">Dispatches</TabsTrigger>
+          <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="purchases">Purchases</TabsTrigger>
         </TabsList>
 
@@ -346,32 +206,16 @@ export default function BusinessOverviewPage() {
           <Card>
             <CardHeader><CardTitle className="text-lg">Debtor Balances</CardTitle></CardHeader>
             <CardContent>
-              <div className="overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Party Name</TableHead>
-                      <TableHead className="text-right">Outstanding</TableHead>
-                      <TableHead className="text-right">Overdue</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {debtors.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No data</TableCell></TableRow>
-                    ) : (
-                      [...debtors].sort((a, b) => b.outstanding - a.outstanding).map((d, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Badge variant="outline">{d.company}</Badge></TableCell>
-                          <TableCell>{d.partyName}</TableCell>
-                          <TableCell className="text-right font-medium">{fmtINR(d.outstanding)}</TableCell>
-                          <TableCell className="text-right">{fmtINR(d.overdue)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              <PartyTable rows={debtors} valueLabel="Outstanding" empty={isLoading ? 'Loading...' : 'No data — click Sync from Tally'} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="creditors">
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Creditor Balances</CardTitle></CardHeader>
+            <CardContent>
+              <PartyTable rows={creditors} valueLabel="Outstanding" empty={isLoading ? 'Loading...' : 'No data — click Sync from Tally'} absolute />
             </CardContent>
           </Card>
         </TabsContent>
@@ -380,44 +224,21 @@ export default function BusinessOverviewPage() {
           <Card>
             <CardHeader><CardTitle className="text-lg">Bank Balances</CardTitle></CardHeader>
             <CardContent>
-              <div className="overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {banks.length === 0 ? (
-                      <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No data</TableCell></TableRow>
-                    ) : (
-                      [...banks].sort((a, b) => b.balance - a.balance).map((b, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Badge variant="outline">{b.company}</Badge></TableCell>
-                          <TableCell>{b.accountName}</TableCell>
-                          <TableCell className="text-right font-medium">{fmtINR(b.balance)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              <PartyTable rows={banks} valueLabel="Balance" empty={isLoading ? 'Loading...' : 'No data — click Sync from Tally'} />
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="dispatches">
+        <TabsContent value="sales">
           <Card>
             <CardHeader>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <CardTitle className="text-lg">Dispatch / Sales Vouchers</CardTitle>
+                <CardTitle className="text-lg">Sales Vouchers</CardTitle>
                 <DateRange fromDate={fromDate} toDate={toDate} setFromDate={setFromDate} setToDate={setToDate} />
               </div>
             </CardHeader>
             <CardContent>
-              <VoucherTable rows={dispatches} partyLabel="Party" />
+              <VoucherTable rows={sales} partyLabel="Party" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -440,6 +261,30 @@ export default function BusinessOverviewPage() {
   );
 }
 
+function SyncStatusBanner({ lastRun, fmtTime }: { lastRun: any; fmtTime: (s?: string | null) => string }) {
+  if (!lastRun) {
+    return (
+      <p className="text-xs text-muted-foreground mt-1">
+        No sync yet. Click <span className="font-medium">Sync from Tally</span> to import data.
+      </p>
+    );
+  }
+  const status = lastRun.status as string;
+  const isOk = status === 'success';
+  const isPartial = status === 'partial';
+  const isRunning = status === 'running';
+  const Icon = isOk ? CheckCircle2 : isPartial ? AlertCircle : isRunning ? RefreshCw : XCircle;
+  const color = isOk ? 'text-emerald-600' : isPartial ? 'text-amber-600' : 'text-destructive';
+  return (
+    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+      <Icon className={`h-3.5 w-3.5 ${color} ${isRunning ? 'animate-spin' : ''}`} />
+      Last synced: <span className="font-medium text-foreground">{fmtTime(lastRun.finished_at || lastRun.started_at)}</span>
+      <span className={color}>· {status}</span>
+      {lastRun.triggered_by_email && <span className="text-muted-foreground">· by {lastRun.triggered_by_email}</span>}
+    </p>
+  );
+}
+
 function SummaryCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
     <Card>
@@ -457,11 +302,8 @@ function SummaryCard({ icon, label, value, sub }: { icon: React.ReactNode; label
   );
 }
 
-function DateRange({
-  fromDate, toDate, setFromDate, setToDate,
-}: {
-  fromDate: string; toDate: string;
-  setFromDate: (s: string) => void; setToDate: (s: string) => void;
+function DateRange({ fromDate, toDate, setFromDate, setToDate }: {
+  fromDate: string; toDate: string; setFromDate: (s: string) => void; setToDate: (s: string) => void;
 }) {
   return (
     <div className="flex items-end gap-2">
@@ -477,7 +319,43 @@ function DateRange({
   );
 }
 
-function VoucherTable({ rows, partyLabel }: { rows: Voucher[]; partyLabel: string }) {
+function PartyTable({ rows, valueLabel, empty, absolute }: {
+  rows: { company: string; name: string; closing_balance: number }[];
+  valueLabel: string;
+  empty: string;
+  absolute?: boolean;
+}) {
+  return (
+    <div className="overflow-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Company</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead className="text-right">{valueLabel}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
+            <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">{empty}</TableCell></TableRow>
+          ) : (
+            [...rows].sort((a, b) => Math.abs(b.closing_balance) - Math.abs(a.closing_balance)).map((r, i) => (
+              <TableRow key={i}>
+                <TableCell><Badge variant="outline">{r.company}</Badge></TableCell>
+                <TableCell>{r.name}</TableCell>
+                <TableCell className="text-right font-medium">
+                  {fmtINR(absolute ? Math.abs(r.closing_balance) : r.closing_balance)}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function VoucherTable({ rows, partyLabel }: { rows: SnapshotVoucher[]; partyLabel: string }) {
   return (
     <div className="overflow-auto">
       <Table>
@@ -487,23 +365,19 @@ function VoucherTable({ rows, partyLabel }: { rows: Voucher[]; partyLabel: strin
             <TableHead>Date</TableHead>
             <TableHead>Voucher #</TableHead>
             <TableHead>{partyLabel}</TableHead>
-            <TableHead>Items</TableHead>
-            <TableHead className="text-right">Qty</TableHead>
             <TableHead className="text-right">Value</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length === 0 ? (
-            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No data</TableCell></TableRow>
+            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No vouchers in selected range</TableCell></TableRow>
           ) : (
-            [...rows].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((v, i) => (
-              <TableRow key={i}>
+            rows.map((v) => (
+              <TableRow key={v.id}>
                 <TableCell><Badge variant="outline">{v.company}</Badge></TableCell>
-                <TableCell>{v.date}</TableCell>
-                <TableCell>{v.voucherNumber}</TableCell>
-                <TableCell>{v.party || v.supplier}</TableCell>
-                <TableCell className="max-w-[320px] truncate" title={v.itemsSummary}>{v.itemsSummary || '—'}</TableCell>
-                <TableCell className="text-right">{fmtNum(v.totalQty || 0)}</TableCell>
+                <TableCell>{v.voucher_date || '—'}</TableCell>
+                <TableCell>{v.voucher_number || '—'}</TableCell>
+                <TableCell>{v.party_name || '—'}</TableCell>
                 <TableCell className="text-right font-medium">{fmtINR(v.amount)}</TableCell>
               </TableRow>
             ))
@@ -535,16 +409,13 @@ function DiagSummary({ result }: { result: any }) {
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
           <div className="font-medium">Tally is not reachable</div>
           <div className="text-muted-foreground mt-1">
-            The server at this IP/port did not respond. Check that Tally is running with "Act as Server" enabled on port 9000, the right companies are loaded, and port 9000 is open in the firewall.
+            Check that Tally is running with "Act as Server" enabled on port 9000, and port 9000 is open in the firewall.
           </div>
         </div>
       )}
       {reachable && (
         <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs">
           <div className="font-medium">Tally is reachable</div>
-          <div className="text-muted-foreground mt-1">
-            Check the response snippet below to confirm the company names match what we're requesting.
-          </div>
         </div>
       )}
     </div>

@@ -1133,6 +1133,238 @@ export type Database = {
         }
         Relationships: []
       }
+      tally_groups: {
+        Row: {
+          company: string
+          created_at: string
+          id: string
+          is_reserved: boolean | null
+          name: string
+          parent: string | null
+          sync_run_id: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          id?: string
+          is_reserved?: boolean | null
+          name: string
+          parent?: string | null
+          sync_run_id: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          id?: string
+          is_reserved?: boolean | null
+          name?: string
+          parent?: string | null
+          sync_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_groups_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tally_ledgers: {
+        Row: {
+          classification: string
+          closing_balance: number
+          company: string
+          created_at: string
+          id: string
+          name: string
+          parent_chain: string[]
+          parent_group: string | null
+          root_group: string | null
+          sync_run_id: string
+        }
+        Insert: {
+          classification?: string
+          closing_balance?: number
+          company: string
+          created_at?: string
+          id?: string
+          name: string
+          parent_chain?: string[]
+          parent_group?: string | null
+          root_group?: string | null
+          sync_run_id: string
+        }
+        Update: {
+          classification?: string
+          closing_balance?: number
+          company?: string
+          created_at?: string
+          id?: string
+          name?: string
+          parent_chain?: string[]
+          parent_group?: string | null
+          root_group?: string | null
+          sync_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tally_sync_runs: {
+        Row: {
+          companies: string[]
+          counts: Json
+          created_at: string
+          datasets: string[]
+          errors: Json
+          finished_at: string | null
+          id: string
+          started_at: string
+          status: string
+          triggered_by: string | null
+          triggered_by_email: string | null
+        }
+        Insert: {
+          companies?: string[]
+          counts?: Json
+          created_at?: string
+          datasets?: string[]
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          triggered_by?: string | null
+          triggered_by_email?: string | null
+        }
+        Update: {
+          companies?: string[]
+          counts?: Json
+          created_at?: string
+          datasets?: string[]
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          triggered_by?: string | null
+          triggered_by_email?: string | null
+        }
+        Relationships: []
+      }
+      tally_voucher_items: {
+        Row: {
+          amount: number | null
+          created_at: string
+          id: string
+          qty: number | null
+          rate: number | null
+          stock_item: string | null
+          voucher_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          qty?: number | null
+          rate?: number | null
+          stock_item?: string | null
+          voucher_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          qty?: number | null
+          rate?: number | null
+          stock_item?: string | null
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_voucher_items_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "tally_vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_items_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tally_voucher_items_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "v_tally_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tally_vouchers: {
+        Row: {
+          amount: number
+          company: string
+          created_at: string
+          id: string
+          is_cancelled: boolean | null
+          is_optional: boolean | null
+          kind: string
+          party_name: string | null
+          sync_run_id: string
+          voucher_date: string | null
+          voucher_number: string | null
+          voucher_type: string | null
+        }
+        Insert: {
+          amount?: number
+          company: string
+          created_at?: string
+          id?: string
+          is_cancelled?: boolean | null
+          is_optional?: boolean | null
+          kind: string
+          party_name?: string | null
+          sync_run_id: string
+          voucher_date?: string | null
+          voucher_number?: string | null
+          voucher_type?: string | null
+        }
+        Update: {
+          amount?: number
+          company?: string
+          created_at?: string
+          id?: string
+          is_cancelled?: boolean | null
+          is_optional?: boolean | null
+          kind?: string
+          party_name?: string | null
+          sync_run_id?: string
+          voucher_date?: string | null
+          voucher_number?: string | null
+          voucher_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_vouchers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transporter_freight: {
         Row: {
           comments: string | null
@@ -1556,7 +1788,135 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_tally_active_runs: {
+        Row: {
+          company: string | null
+          dataset: string | null
+          finished_at: string | null
+          status: string | null
+          sync_run_id: string | null
+        }
+        Relationships: []
+      }
+      v_tally_banks: {
+        Row: {
+          classification: string | null
+          closing_balance: number | null
+          company: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          parent_chain: string[] | null
+          parent_group: string | null
+          root_group: string | null
+          sync_run_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_tally_creditors: {
+        Row: {
+          classification: string | null
+          closing_balance: number | null
+          company: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          parent_chain: string[] | null
+          parent_group: string | null
+          root_group: string | null
+          sync_run_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_tally_debtors: {
+        Row: {
+          classification: string | null
+          closing_balance: number | null
+          company: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          parent_chain: string[] | null
+          parent_group: string | null
+          root_group: string | null
+          sync_run_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_tally_purchases: {
+        Row: {
+          amount: number | null
+          company: string | null
+          created_at: string | null
+          id: string | null
+          is_cancelled: boolean | null
+          is_optional: boolean | null
+          kind: string | null
+          party_name: string | null
+          sync_run_id: string | null
+          voucher_date: string | null
+          voucher_number: string | null
+          voucher_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_vouchers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_tally_sales: {
+        Row: {
+          amount: number | null
+          company: string | null
+          created_at: string | null
+          id: string | null
+          is_cancelled: boolean | null
+          is_optional: boolean | null
+          kind: string | null
+          party_name: string | null
+          sync_run_id: string | null
+          voucher_date: string | null
+          voucher_number: string | null
+          voucher_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tally_vouchers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
