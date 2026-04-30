@@ -144,8 +144,12 @@ function parseLedgers(xml: string): LedgerRow[] {
     const parent = tag(inner, 'PARENT') || '';
     const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
     if (!name) continue;
-    // Address can be a list of <ADDRESS> entries inside <LEDGERMAILINGDETAILS.LIST> or top-level
-    const addrParts = tagAll(inner, 'ADDRESS').map(cleanAddressPart).filter(Boolean);
+    // Tally returns address as: <ADDRESS.LIST TYPE="String"> <ADDRESS>line1</ADDRESS> <ADDRESS>line2</ADDRESS> </ADDRESS.LIST>
+    // We only want the innermost <ADDRESS> lines — exclude any that themselves contain nested <ADDRESS> tags (the wrapper).
+    const addrParts = tagAll(inner, 'ADDRESS')
+      .filter(a => !/<ADDRESS\b/i.test(a))
+      .map(cleanAddressPart)
+      .filter(Boolean);
     out.push({
       name, parent, closing: parseAmount(closingRaw),
       mailingName: tag(inner, 'MAILINGNAME') || tag(inner, 'LEDGERMAILINGNAME') || '',
