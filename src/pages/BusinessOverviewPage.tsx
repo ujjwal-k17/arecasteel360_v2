@@ -311,12 +311,13 @@ function fifoMatch(
 // ============================================================
 
 function DebtorSummaryModule({
-  debtors, sales, receipts, billRefs, overrides, isLoading, onChanged,
+  debtors, sales, receipts, billRefs, debtorCredits, overrides, isLoading, onChanged,
 }: {
   debtors: SnapshotLedger[];
   sales: SnapshotVoucher[];
   receipts: SnapshotVoucher[];
   billRefs: SnapshotBillRef[];
+  debtorCredits: SnapshotDebtorCredit[];
   overrides: DebtorOverride[];
   isLoading: boolean;
   onChanged: () => void;
@@ -341,6 +342,7 @@ function DebtorSummaryModule({
           sales={sales}
           receipts={receipts}
           billRefs={billRefs}
+          debtorCredits={debtorCredits}
           overrides={overrides}
           isLoading={isLoading}
         />
