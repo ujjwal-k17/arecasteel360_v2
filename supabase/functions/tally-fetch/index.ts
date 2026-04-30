@@ -162,14 +162,7 @@ type LedgerRow = {
   parent: string;
   closing: number;
   raw: string;
-  isDebtor: boolean;
-  isCreditor: boolean;
-  isBank: boolean;
 };
-
-function parseYesNo(s: string | null): boolean {
-  return !!s && /^\s*yes\s*$/i.test(s);
-}
 
 function parseLedgers(xml: string): LedgerRow[] {
   const out: LedgerRow[] = [];
@@ -182,13 +175,42 @@ function parseLedgers(xml: string): LedgerRow[] {
     const name = nameAttr ? decodeEntities(nameAttr[1]) : (tag(inner, 'NAME') || '');
     const parent = tag(inner, 'PARENT') || '';
     const closingRaw = tag(inner, 'CLOSINGBALANCE') || '';
-    const isDebtor = parseYesNo(tag(inner, 'ISDEBTOR'));
-    const isCreditor = parseYesNo(tag(inner, 'ISCREDITOR'));
-    const isBank = parseYesNo(tag(inner, 'ISBANK')) || parseYesNo(tag(inner, 'ISBANKOD'));
     if (!name) continue;
-    out.push({ name, parent, closing: parseAmount(closingRaw), raw: closingRaw, isDebtor, isCreditor, isBank });
+    out.push({ name, parent, closing: parseAmount(closingRaw), raw: closingRaw });
   }
   return out;
+}
+
+type GroupRow = { name: string; parent: string };
+
+function parseGroups(xml: string): GroupRow[] {
+  const out: GroupRow[] = [];
+  const blockRe = /<GROUP\b([^>]*)>([\s\S]*?)<\/GROUP>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = blockRe.exec(xml)) !== null) {
+    const attrs = m[1] || '';
+    const inner = m[2] || '';
+    const nameAttr = attrs.match(/NAME\s*=\s*"([^"]*)"/i);
+    const name = nameAttr ? decodeEntities(nameAttr[1]) : (tag(inner, 'NAME') || '');
+    const parent = tag(inner, 'PARENT') || '';
+    if (!name) continue;
+    out.push({ name, parent });
+  }
+  return out;
+}
+
+// Walk parent chain in groupMap until we hit a reserved primary group
+// or run out of parents. Returns the final ancestor name (lowercased).
+function rootGroupOf(parent: string, groupMap: Map<string, string>): string {
+  const seen = new Set<string>();
+  let cur = (parent || '').trim();
+  while (cur && !seen.has(cur.toLowerCase())) {
+    seen.add(cur.toLowerCase());
+    const next = groupMap.get(cur.toLowerCase());
+    if (!next) break;
+    cur = next.trim();
+  }
+  return (cur || '').toLowerCase();
 }
 
 type VoucherRow = {
