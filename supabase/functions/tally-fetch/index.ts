@@ -310,6 +310,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const dataset = (body.dataset || 'all') as 'debtors' | 'banks' | 'ledgers' | 'dispatches' | 'purchases' | 'vouchers' | 'all';
+    const debug = body.debug === true;
     const fromDate = body.fromDate as string | undefined; // ISO
     const toDate = body.toDate as string | undefined; // ISO
 
@@ -322,6 +323,7 @@ Deno.serve(async (req) => {
 
     const result: any = {
       debtors: [],
+      creditors: [],
       banks: [],
       dispatches: [],
       purchases: [],
@@ -331,8 +333,8 @@ Deno.serve(async (req) => {
       toDate: toIso,
       companies: COMPANIES,
     };
+    const debugInfo: any = debug ? { companies: {} } : null;
 
-    // Build all jobs and run in parallel — keeps total wall time ~ longest single call
     type Job =
       | { kind: 'ledgers'; company: string }
       | { kind: 'sales'; company: string }
@@ -354,39 +356,70 @@ Deno.serve(async (req) => {
     await Promise.all(jobs.map(async (job) => {
       try {
         if (job.kind === 'ledgers') {
-          const r = await callTally(buildLedgerXml(job.company));
-          if (!r.ok) {
-            result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${r.status}` });
+          // Fetch groups + ledgers in parallel for this company
+          const [gResp, lResp] = await Promise.all([
+            callTally(buildGroupXml(job.company)),
+            callTally(buildLedgerXml(job.company)),
+          ]);
+          if (!lResp.ok) {
+            result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${lResp.status}` });
             return;
           }
-          const ledgers = parseLedgers(r.text);
+          const groups = gResp.ok ? parseGroups(gResp.text) : [];
+          const groupMap = new Map<string, string>();
+          for (const g of groups) groupMap.set(g.name.toLowerCase(), g.parent);
+
+          const ledgers = parseLedgers(lResp.text);
+
+          let dCount = 0, cCount = 0, bCount = 0;
+          const sample: any[] = [];
+
           for (const l of ledgers) {
+            const root = rootGroupOf(l.parent, groupMap);
             const parent = (l.parent || '').toLowerCase();
-            // Primary signal: Tally walks the group hierarchy via $$IsLedOfGrp.
-            // Fallback: keyword match on parent name (covers older Tally
-            // versions that may not honour COMPUTE in collection exports).
-            const looksLikeDebtor =
-              l.isDebtor ||
+
+            const isDebtor =
+              root === 'sundry debtors' ||
               parent.includes('sundry debtor') ||
               parent.includes('debtor') ||
               parent.includes('receivable');
-            const looksLikeBank =
-              l.isBank ||
+            const isCreditor =
+              root === 'sundry creditors' ||
+              parent.includes('sundry creditor') ||
+              parent.includes('creditor') ||
+              parent.includes('payable');
+            const isBank =
+              root === 'bank accounts' ||
+              root === 'bank od a/c' ||
+              root === 'bank occ a/c' ||
               parent.includes('bank');
-            if (looksLikeDebtor) {
-              result.debtors.push({
-                company: job.company,
-                partyName: l.name,
-                outstanding: l.closing,
-                overdue: 0,
-              });
-            } else if (looksLikeBank) {
-              result.banks.push({
-                company: job.company,
-                accountName: l.name,
-                balance: l.closing,
-              });
+
+            if (debug && sample.length < 8) {
+              sample.push({ name: l.name, parent: l.parent, root, closing: l.closing });
             }
+
+            if (isDebtor) {
+              dCount++;
+              result.debtors.push({ company: job.company, partyName: l.name, outstanding: l.closing, overdue: 0 });
+            } else if (isCreditor) {
+              cCount++;
+              result.creditors.push({ company: job.company, partyName: l.name, outstanding: l.closing });
+            } else if (isBank) {
+              bCount++;
+              result.banks.push({ company: job.company, accountName: l.name, balance: l.closing });
+            }
+          }
+
+          if (debug) {
+            debugInfo.companies[job.company] = {
+              ledgerCount: ledgers.length,
+              groupCount: groups.length,
+              debtors: dCount,
+              creditors: cCount,
+              banks: bCount,
+              sampleLedgers: sample,
+              sampleGroups: groups.slice(0, 8),
+            };
           }
         } else {
           const filter = job.kind === 'sales' ? 'sales' : 'purchase';
