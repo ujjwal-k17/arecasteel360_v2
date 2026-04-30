@@ -68,7 +68,16 @@ export default function BusinessOverviewPage() {
     const { data, error } = await supabase.functions.invoke('tally-fetch', {
       body: { dataset, fromDate, toDate, ...(extra || {}) },
     });
-    if (error) throw error;
+    if (error) {
+      const msg = (error as any)?.message || String(error);
+      // Transport-level failure (worker killed, network blip, etc.) — give a friendlier hint.
+      if (/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(msg)) {
+        throw new Error(
+          'Backend timed out reaching Tally. Check that Tally on the cloud RDP is running and port 9000 is open to the internet.'
+        );
+      }
+      throw new Error(msg);
+    }
     if ((data as any)?.error) throw new Error((data as any).error);
     return data as TallyResponse;
   };
