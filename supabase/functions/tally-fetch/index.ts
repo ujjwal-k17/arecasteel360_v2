@@ -193,7 +193,7 @@ function parseVouchers(xml: string): VoucherRow[] {
 }
 
 // ----------------- Tally call -----------------
-async function callTally(xml: string, timeoutMs = 20000): Promise<{ ok: boolean; text: string; status: number }> {
+async function callTally(xml: string, timeoutMs = 90000): Promise<{ ok: boolean; text: string; status: number }> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
