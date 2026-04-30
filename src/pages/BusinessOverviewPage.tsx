@@ -615,6 +615,18 @@ function DebtorPaymentSummaryTab({
           </div>
           <Input placeholder="Search name / GSTIN..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
         </CardHeader>
+        <div className="px-6">
+          <Tabs value={repTab} onValueChange={setRepTab}>
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="__all__">All ({rows.length})</TabsTrigger>
+              {repTabValues.map(v => (
+                <TabsTrigger key={v} value={v}>
+                  {v === '__unassigned__' ? 'Unassigned' : v} ({repCounts.get(v) || 0})
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
         <CardContent>
           <div className="overflow-auto">
             <Table>
