@@ -320,6 +320,7 @@ function DebtorSummaryModule({
 }) {
   const [search, setSearch] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement | null>(null);
 
   const overrideMap = useMemo(() => {
     const m = new Map<DebtorKey, DebtorOverride>();
