@@ -57,27 +57,53 @@ export default function BusinessOverviewPage() {
   const [fromDate, setFromDate] = useState<string>(monthStartIso());
   const [toDate, setToDate] = useState<string>(todayIso());
 
-  const { data, isFetching, refetch, error } = useQuery<TallyResponse>({
-    queryKey: ['tally-fetch', fromDate, toDate],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('tally-fetch', {
-        body: { dataset: 'all', fromDate, toDate },
-      });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      return data as TallyResponse;
-    },
-    staleTime: 60_000,
-    retry: false,
-  });
+  const [ledgersData, setLedgersData] = useState<TallyResponse | null>(null);
+  const [vouchersData, setVouchersData] = useState<TallyResponse | null>(null);
+  const [ledgersLoading, setLedgersLoading] = useState(false);
+  const [vouchersLoading, setVouchersLoading] = useState(false);
+  const [ledgersError, setLedgersError] = useState<string | null>(null);
+  const [vouchersError, setVouchersError] = useState<string | null>(null);
 
-  const handleSync = async () => {
-    const t = toast.loading('Syncing from Tally...');
+  const fetchDataset = async (dataset: 'ledgers' | 'vouchers') => {
+    const { data, error } = await supabase.functions.invoke('tally-fetch', {
+      body: { dataset, fromDate, toDate },
+    });
+    if (error) throw error;
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return data as TallyResponse;
+  };
+
+  const handleSyncLedgers = async () => {
+    if (ledgersLoading) return;
+    setLedgersLoading(true);
+    setLedgersError(null);
+    const t = toast.loading('Syncing Debtors & Creditors...');
     try {
-      await refetch();
-      toast.success('Synced from Tally', { id: t });
+      const d = await fetchDataset('ledgers');
+      setLedgersData(d);
+      toast.success('Debtors & Creditors synced', { id: t });
     } catch (e: any) {
+      setLedgersError(e?.message || 'Sync failed');
       toast.error(e?.message || 'Sync failed', { id: t });
+    } finally {
+      setLedgersLoading(false);
+    }
+  };
+
+  const handleSyncVouchers = async () => {
+    if (vouchersLoading) return;
+    setVouchersLoading(true);
+    setVouchersError(null);
+    const t = toast.loading('Syncing Dispatches & Purchases...');
+    try {
+      const d = await fetchDataset('vouchers');
+      setVouchersData(d);
+      toast.success('Dispatches & Purchases synced', { id: t });
+    } catch (e: any) {
+      setVouchersError(e?.message || 'Sync failed');
+      toast.error(e?.message || 'Sync failed', { id: t });
+    } finally {
+      setVouchersLoading(false);
     }
   };
 
