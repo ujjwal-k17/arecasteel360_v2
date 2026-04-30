@@ -193,9 +193,9 @@ function parseVouchers(xml: string): VoucherRow[] {
 }
 
 // ----------------- Tally call -----------------
-async function callTally(xml: string): Promise<{ ok: boolean; text: string; status: number }> {
+async function callTally(xml: string, timeoutMs = 20000): Promise<{ ok: boolean; text: string; status: number }> {
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 45000);
+  const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const resp = await fetch(TALLY_URL, {
       method: 'POST',
@@ -267,92 +267,86 @@ Deno.serve(async (req) => {
       companies: COMPANIES,
     };
 
+    // Build all jobs and run in parallel — keeps total wall time ~ longest single call
+    type Job =
+      | { kind: 'ledgers'; company: string }
+      | { kind: 'sales'; company: string }
+      | { kind: 'purchase'; company: string };
+
+    const jobs: Job[] = [];
     for (const company of COMPANIES) {
-      // Ledgers (debtors + banks)
       if (dataset === 'all' || dataset === 'debtors' || dataset === 'banks') {
-        try {
-          const r = await callTally(buildLedgerXml(company));
-          if (!r.ok) {
-            result.errors.push({ company, dataset: 'ledgers', error: `HTTP ${r.status}` });
-          } else {
-            const ledgers = parseLedgers(r.text);
-            for (const l of ledgers) {
-              const parent = (l.parent || '').toLowerCase();
-              if (parent.includes('sundry debtor')) {
-                result.debtors.push({
-                  company,
-                  partyName: l.name,
-                  outstanding: l.closing,
-                  overdue: 0, // overdue requires bill-wise breakdown; populated below if available
-                });
-              } else if (parent.includes('bank')) {
-                result.banks.push({
-                  company,
-                  accountName: l.name,
-                  balance: l.closing,
-                });
-              }
-            }
-          }
-        } catch (e: any) {
-          result.errors.push({ company, dataset: 'ledgers', error: e?.message || String(e) });
-        }
+        jobs.push({ kind: 'ledgers', company });
       }
-
-      // Sales vouchers (dispatches)
       if (dataset === 'all' || dataset === 'dispatches') {
-        try {
-          const r = await callTally(buildVoucherXml(company, fromTally, toTally, 'sales'));
-          if (!r.ok) {
-            result.errors.push({ company, dataset: 'dispatches', error: `HTTP ${r.status}` });
-          } else {
-            const vs = parseVouchers(r.text);
-            for (const v of vs) {
-              result.dispatches.push({
-                company,
-                date: v.date,
-                voucherNumber: v.voucherNumber,
-                voucherType: v.voucherType,
-                party: v.party,
-                amount: v.amount,
-                items: v.items,
-                totalQty: v.items.reduce((s, i) => s + (i.qty || 0), 0),
-                itemsSummary: v.items.map(i => i.name).filter(Boolean).join(', '),
-              });
-            }
-          }
-        } catch (e: any) {
-          result.errors.push({ company, dataset: 'dispatches', error: e?.message || String(e) });
-        }
+        jobs.push({ kind: 'sales', company });
       }
-
-      // Purchase vouchers
       if (dataset === 'all' || dataset === 'purchases') {
-        try {
-          const r = await callTally(buildVoucherXml(company, fromTally, toTally, 'purchase'));
-          if (!r.ok) {
-            result.errors.push({ company, dataset: 'purchases', error: `HTTP ${r.status}` });
-          } else {
-            const vs = parseVouchers(r.text);
-            for (const v of vs) {
-              result.purchases.push({
-                company,
-                date: v.date,
-                voucherNumber: v.voucherNumber,
-                voucherType: v.voucherType,
-                supplier: v.party,
-                amount: v.amount,
-                items: v.items,
-                totalQty: v.items.reduce((s, i) => s + (i.qty || 0), 0),
-                itemsSummary: v.items.map(i => i.name).filter(Boolean).join(', '),
-              });
-            }
-          }
-        } catch (e: any) {
-          result.errors.push({ company, dataset: 'purchases', error: e?.message || String(e) });
-        }
+        jobs.push({ kind: 'purchase', company });
       }
     }
+
+    await Promise.all(jobs.map(async (job) => {
+      try {
+        if (job.kind === 'ledgers') {
+          const r = await callTally(buildLedgerXml(job.company));
+          if (!r.ok) {
+            result.errors.push({ company: job.company, dataset: 'ledgers', error: `HTTP ${r.status}` });
+            return;
+          }
+          const ledgers = parseLedgers(r.text);
+          for (const l of ledgers) {
+            const parent = (l.parent || '').toLowerCase();
+            if (parent.includes('sundry debtor')) {
+              result.debtors.push({
+                company: job.company,
+                partyName: l.name,
+                outstanding: l.closing,
+                overdue: 0,
+              });
+            } else if (parent.includes('bank')) {
+              result.banks.push({
+                company: job.company,
+                accountName: l.name,
+                balance: l.closing,
+              });
+            }
+          }
+        } else {
+          const filter = job.kind === 'sales' ? 'sales' : 'purchase';
+          const r = await callTally(buildVoucherXml(job.company, fromTally, toTally, filter));
+          const dsName = filter === 'sales' ? 'dispatches' : 'purchases';
+          if (!r.ok) {
+            result.errors.push({ company: job.company, dataset: dsName, error: `HTTP ${r.status}` });
+            return;
+          }
+          const vs = parseVouchers(r.text);
+          for (const v of vs) {
+            const row: any = {
+              company: job.company,
+              date: v.date,
+              voucherNumber: v.voucherNumber,
+              voucherType: v.voucherType,
+              amount: v.amount,
+              items: v.items,
+              totalQty: v.items.reduce((s, i) => s + (i.qty || 0), 0),
+              itemsSummary: v.items.map(i => i.name).filter(Boolean).join(', '),
+            };
+            if (filter === 'sales') {
+              row.party = v.party;
+              result.dispatches.push(row);
+            } else {
+              row.supplier = v.party;
+              result.purchases.push(row);
+            }
+          }
+        }
+      } catch (e: any) {
+        const dsName = job.kind === 'ledgers' ? 'ledgers' : (job.kind === 'sales' ? 'dispatches' : 'purchases');
+        const msg = e?.name === 'AbortError' ? 'Tally timed out (20s)' : (e?.message || String(e));
+        result.errors.push({ company: job.company, dataset: dsName, error: msg });
+      }
+    }));
 
     return new Response(JSON.stringify(result), {
       status: 200,
