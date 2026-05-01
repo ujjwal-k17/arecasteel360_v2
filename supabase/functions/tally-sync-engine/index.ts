@@ -442,30 +442,51 @@ Deno.serve(async (req) => {
 
   await sleep(INTER_STEP_GAP_MS);
 
-  // Step 4 — Vouchers (Day Book)
+  // Step 4 — Vouchers (Day Book) — split into weekly chunks to avoid Tally
+  // gateway truncating large XML responses. Each weekly slice is fetched
+  // separately, parsed, then upserted (so overlapping ranges don't dupe).
   let voucherCount = 0;
   try {
-    const voucherXml = buildDayBookXml(company_name, from_date, to_date);
-    const res = await tallyRequestWithRetry(tallyUrl, voucherXml, 'vouchers');
-    if (!res.ok) {
-      errors.push(res.error);
-    } else {
-      const rows = parseVouchers(res.text, company_name, sync_type, syncedAtIso);
-      if (rows.length > 0) {
-        const up = await upsertInChunks(
-          supabase,
-          'tally_vouchers',
-          rows,
-          'company_name,voucher_number',
-        );
-        voucherCount = up.inserted;
-        totalRecords += up.inserted;
-        if (up.error) errors.push(`voucher upsert: ${up.error}`);
-        await supabase
-          .from('tally_sync_log')
-          .update({ records_fetched: totalRecords })
-          .eq('id', logId);
+    const weeklyRanges = buildWeeklyRanges(from_date, to_date);
+    console.log(`[vouchers] ${company_name}: ${weeklyRanges.length} weekly chunk(s) from ${from_date} to ${to_date}`);
+    const seenVoucherKeys = new Set<string>();
+    const combinedRows: VoucherRow[] = [];
+
+    for (let i = 0; i < weeklyRanges.length; i++) {
+      const [wf, wt] = weeklyRanges[i];
+      const label = `vouchers ${wf}-${wt} (${i + 1}/${weeklyRanges.length})`;
+      const voucherXml = buildDayBookXml(company_name, wf, wt);
+      const res = await tallyRequestWithRetry(tallyUrl, voucherXml, label);
+      if (!res.ok) {
+        errors.push(res.error);
+      } else {
+        const rows = parseVouchers(res.text, company_name, sync_type, syncedAtIso);
+        for (const r of rows) {
+          const key = `${r.company_name}::${r.voucher_number}`;
+          if (seenVoucherKeys.has(key)) continue;
+          seenVoucherKeys.add(key);
+          combinedRows.push(r);
+        }
+        console.log(`[${label}] parsed ${rows.length}, combined ${combinedRows.length}`);
       }
+      // 2-second gap between weekly requests (skip after final)
+      if (i < weeklyRanges.length - 1) await sleep(INTER_STEP_GAP_MS);
+    }
+
+    if (combinedRows.length > 0) {
+      const up = await upsertInChunks(
+        supabase,
+        'tally_vouchers',
+        combinedRows,
+        'company_name,voucher_number',
+      );
+      voucherCount = up.inserted;
+      totalRecords += up.inserted;
+      if (up.error) errors.push(`voucher upsert: ${up.error}`);
+      await supabase
+        .from('tally_sync_log')
+        .update({ records_fetched: totalRecords })
+        .eq('id', logId);
     }
   } catch (e: any) {
     errors.push(`vouchers: ${e?.message || String(e)}`);
