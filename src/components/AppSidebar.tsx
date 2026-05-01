@@ -1,4 +1,4 @@
-import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard, Settings, LogOut, BarChart3 } from 'lucide-react';
+import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard, Settings, LogOut } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 
 const modules = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, page: 'dashboard' },
-  { title: 'Tally Sync', url: '/business-overview', icon: BarChart3, page: 'business-overview' },
   { title: 'Inventory', url: '/inventory', icon: Package, page: 'inventory' },
   { title: 'Consumables', url: '/consumables', icon: Wrench, page: 'consumables' },
   { title: 'Order Book', url: '/order-book', icon: ClipboardList, page: 'order-book' },

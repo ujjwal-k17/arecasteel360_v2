@@ -18,7 +18,6 @@ import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
 import SetupPage from "./pages/SetupPage";
-import BusinessOverviewPage from "./pages/BusinessOverviewPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,7 +47,6 @@ const App = () => (
               
               <Route path="/petty-cash" element={<ProtectedRoute page="petty-cash"><PettyCashPage /></ProtectedRoute>} />
               <Route path="/freight" element={<ProtectedRoute page="freight"><FreightPage /></ProtectedRoute>} />
-              <Route path="/business-overview" element={<ProtectedRoute page="business-overview"><BusinessOverviewPage /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute page="admin"><AdminPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
