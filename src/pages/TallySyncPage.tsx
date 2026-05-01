@@ -151,6 +151,21 @@ export default function TallySyncPage() {
 
   const triggerSync = useMutation({
     mutationFn: async (fn: SyncFn) => {
+      // Historical sync processes in small batches per call to avoid the
+      // 150s edge-function timeout. Loop until the function reports done.
+      if (fn === 'sync-historical') {
+        let lastData: any = null;
+        let safety = 200; // hard cap to avoid runaway loops
+        while (safety-- > 0) {
+          const { data, error } = await supabase.functions.invoke(fn, { body: {} });
+          if (error) throw error;
+          lastData = data;
+          qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
+          qc.invalidateQueries({ queryKey: ['tally-counts'] });
+          if (data?.done) break;
+        }
+        return { fn, data: lastData } as { fn: SyncFn; data: any };
+      }
       const { data, error } = await supabase.functions.invoke(fn, { body: {} });
       if (error) throw error;
       return { fn, data } as { fn: SyncFn; data: any };
@@ -162,7 +177,9 @@ export default function TallySyncPage() {
       const label =
         fn === 'sync-current-month' ? 'Current month' :
         fn === 'sync-last-month' ? 'Last month' : 'Historical';
-      if (fail === 0 && total > 0) {
+      if (fn === 'sync-historical') {
+        toast.success(`${label} sync complete`);
+      } else if (fail === 0 && total > 0) {
         toast.success(`${label} sync complete — ${ok} of ${total} companies OK`);
       } else if (ok > 0 && fail > 0) {
         const firstErr = (data?.results ?? []).find((r: any) => !r.ok)?.error;
