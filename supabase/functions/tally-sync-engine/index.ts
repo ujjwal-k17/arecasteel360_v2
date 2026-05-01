@@ -461,6 +461,23 @@ Deno.serve(async (req) => {
   const syncedAtIso = new Date().toISOString();
   const asOfIso = tallyDateToIso(to_date)!;
 
+  // Step 2.5 — Activate company in Tally (Set Company), then 2s gap.
+  // Tally needs the target company to be the "current company" before reports
+  // will return data for it.
+  try {
+    const setXml = buildSetCompanyXml(company_name);
+    const setRes = await tallyRequestWithRetry(tallyUrl, setXml, 'set-company');
+    if (!setRes.ok) {
+      // Non-fatal: log but continue (some Tally setups already have it active).
+      console.log(`[set-company] ${company_name}: ${setRes.error}`);
+    } else {
+      console.log(`[set-company] ${company_name}: ok`);
+    }
+  } catch (e: any) {
+    console.log(`[set-company] ${company_name}: ${e?.message || String(e)}`);
+  }
+  await sleep(INTER_STEP_GAP_MS);
+
   // Step 3 — Ledger balances
   let ledgerCount = 0;
   try {
