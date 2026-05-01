@@ -199,12 +199,13 @@ function buildLedgerXml(company: string): string {
 function buildDayBookXml(company: string, fromDate: string, toDate: string): string {
   return `<ENVELOPE>
   <HEADER>
-    <TALLYREQUEST>Export Data</TALLYREQUEST>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>VoucherCollection</ID>
   </HEADER>
   <BODY>
-    <EXPORTDATA>
-      <REQUESTDESC>
-        <REPORTNAME>Day Book</REPORTNAME>
+    <DESC>
         <STATICVARIABLES>
           <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
           <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
@@ -212,8 +213,17 @@ function buildDayBookXml(company: string, fromDate: string, toDate: string): str
           <SVTODATE>${escapeXml(toDate)}</SVTODATE>
           <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
         </STATICVARIABLES>
-      </REQUESTDESC>
-    </EXPORTDATA>
+        <TDL>
+          <TDLMESSAGE>
+            <COLLECTION NAME="VoucherCollection" ISMODIFY="No">
+              <TYPE>Voucher</TYPE>
+              <FETCH>DATE,VOUCHERTYPENAME,VOUCHERNUMBER,PARTYLEDGERNAME,PARTYNAME,NARRATION,AMOUNT,MASTERID,ISCANCELLED,ALLLEDGERENTRIES.*,ALLINVENTORYENTRIES.*,INVENTORYENTRIES.*</FETCH>
+              <FILTER>DateFilter</FILTER>
+            </COLLECTION>
+            <SYSTEM TYPE="Formulae" NAME="DateFilter">$Date &gt;= $$Date:##SVFromDate AND $Date &lt;= $$Date:##SVToDate</SYSTEM>
+          </TDLMESSAGE>
+        </TDL>
+    </DESC>
   </BODY>
 </ENVELOPE>`;
 }
@@ -276,11 +286,12 @@ function parseVouchers(xml: string, companyName: string, syncType: string | null
 
     const voucherNumber = getTagText(b, 'VOUCHERNUMBER') || getTagText(b, 'MASTERID');
     if (!voucherNumber) continue;
-    if (seen.has(voucherNumber)) continue;
-    seen.add(voucherNumber);
-
     const voucherType = getTagText(b, 'VOUCHERTYPENAME');
     const dateIso = tallyDateToIso(getTagText(b, 'DATE'));
+    const voucherKey = `${dateIso || ''}::${voucherType || ''}::${voucherNumber}`;
+    if (seen.has(voucherKey)) continue;
+    seen.add(voucherKey);
+
     const partyName = getTagText(b, 'PARTYLEDGERNAME') || getTagText(b, 'PARTYNAME');
     const narration = getTagText(b, 'NARRATION');
     const amount = Math.abs(parseTallyAmount(getTagText(b, 'AMOUNT')));
@@ -549,7 +560,7 @@ Deno.serve(async (req) => {
         supabase,
         'tally_vouchers',
         combinedRows,
-        'company_name,voucher_number',
+        'company_name,voucher_type,voucher_number,date',
       );
       voucherCount = up.inserted;
       totalRecords += up.inserted;
