@@ -1,4 +1,4 @@
-import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard, Settings, LogOut } from 'lucide-react';
+import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard, Settings, LogOut, RefreshCcw } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +25,7 @@ const modules = [
   
   { title: 'Petty Cash', url: '/petty-cash', icon: Wallet, page: 'petty-cash' },
   { title: 'Transportation', url: '/freight', icon: Truck, page: 'freight' },
+  { title: 'Tally Sync', url: '/tally-sync', icon: RefreshCcw, page: 'tally-sync' },
 ];
 
 export function AppSidebar() {
