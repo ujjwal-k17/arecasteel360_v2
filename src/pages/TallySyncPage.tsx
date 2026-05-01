@@ -159,12 +159,20 @@ export default function TallySyncPage() {
         let lastData: any = null;
         let safety = 200; // hard cap to avoid runaway loops
         while (safety-- > 0) {
+          if (pausedRef.current) {
+            toast.info('Historical sync paused');
+            break;
+          }
           const { data, error } = await supabase.functions.invoke(fn, { body: {} });
           if (error) throw error;
           lastData = data;
           qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
           qc.invalidateQueries({ queryKey: ['tally-counts'] });
           if (data?.done) break;
+          if (pausedRef.current) {
+            toast.info('Historical sync paused');
+            break;
+          }
         }
         return { fn, data: lastData } as { fn: SyncFn; data: any };
       }
