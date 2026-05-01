@@ -1133,6 +1133,174 @@ export type Database = {
         }
         Relationships: []
       }
+      tally_companies: {
+        Row: {
+          company_name: string
+          created_at: string
+          id: string
+          is_active: boolean
+          tally_url: string
+        }
+        Insert: {
+          company_name: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          tally_url?: string
+        }
+        Update: {
+          company_name?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          tally_url?: string
+        }
+        Relationships: []
+      }
+      tally_ledger_balances: {
+        Row: {
+          as_of_date: string
+          closing_balance: number | null
+          company_name: string
+          id: string
+          ledger_group: string | null
+          ledger_name: string
+          synced_at: string
+        }
+        Insert: {
+          as_of_date: string
+          closing_balance?: number | null
+          company_name: string
+          id?: string
+          ledger_group?: string | null
+          ledger_name: string
+          synced_at?: string
+        }
+        Update: {
+          as_of_date?: string
+          closing_balance?: number | null
+          company_name?: string
+          id?: string
+          ledger_group?: string | null
+          ledger_name?: string
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      tally_stock_items: {
+        Row: {
+          as_of_date: string
+          closing_qty: number | null
+          closing_value: number | null
+          company_name: string
+          id: string
+          item_name: string
+          synced_at: string
+          unit: string | null
+        }
+        Insert: {
+          as_of_date: string
+          closing_qty?: number | null
+          closing_value?: number | null
+          company_name: string
+          id?: string
+          item_name: string
+          synced_at?: string
+          unit?: string | null
+        }
+        Update: {
+          as_of_date?: string
+          closing_qty?: number | null
+          closing_value?: number | null
+          company_name?: string
+          id?: string
+          item_name?: string
+          synced_at?: string
+          unit?: string | null
+        }
+        Relationships: []
+      }
+      tally_sync_log: {
+        Row: {
+          chunk_label: string | null
+          company_name: string | null
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          last_successful_chunk: string | null
+          records_fetched: number | null
+          started_at: string
+          status: string
+          sync_type: string | null
+        }
+        Insert: {
+          chunk_label?: string | null
+          company_name?: string | null
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          last_successful_chunk?: string | null
+          records_fetched?: number | null
+          started_at?: string
+          status?: string
+          sync_type?: string | null
+        }
+        Update: {
+          chunk_label?: string | null
+          company_name?: string | null
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          last_successful_chunk?: string | null
+          records_fetched?: number | null
+          started_at?: string
+          status?: string
+          sync_type?: string | null
+        }
+        Relationships: []
+      }
+      tally_vouchers: {
+        Row: {
+          amount: number | null
+          company_name: string
+          date: string | null
+          id: string
+          line_items: Json | null
+          narration: string | null
+          party_name: string | null
+          sync_type: string | null
+          synced_at: string
+          voucher_number: string
+          voucher_type: string | null
+        }
+        Insert: {
+          amount?: number | null
+          company_name: string
+          date?: string | null
+          id?: string
+          line_items?: Json | null
+          narration?: string | null
+          party_name?: string | null
+          sync_type?: string | null
+          synced_at?: string
+          voucher_number: string
+          voucher_type?: string | null
+        }
+        Update: {
+          amount?: number | null
+          company_name?: string
+          date?: string | null
+          id?: string
+          line_items?: Json | null
+          narration?: string | null
+          party_name?: string | null
+          sync_type?: string | null
+          synced_at?: string
+          voucher_number?: string
+          voucher_type?: string | null
+        }
+        Relationships: []
+      }
       transporter_freight: {
         Row: {
           comments: string | null
