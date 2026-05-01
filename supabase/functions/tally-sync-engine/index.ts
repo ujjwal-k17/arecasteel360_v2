@@ -177,21 +177,32 @@ function buildSetCompanyXml(company: string): string {
 }
 
 function buildLedgerXml(company: string): string {
+  // Use TDL Collection — REPORTNAME "Ledger" returns a master form template
+  // (not actual data). A Collection of TYPE Ledger with FETCH returns the
+  // real ledger master rows with closing balances.
   return `<ENVELOPE>
   <HEADER>
-    <TALLYREQUEST>Export Data</TALLYREQUEST>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>LedgerCollection</ID>
   </HEADER>
   <BODY>
-    <EXPORTDATA>
-      <REQUESTDESC>
-        <REPORTNAME>Ledger</REPORTNAME>
-        <STATICVARIABLES>
-          <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-          <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
-          <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
-        </STATICVARIABLES>
-      </REQUESTDESC>
-    </EXPORTDATA>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+        <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="LedgerCollection" ISMODIFY="No">
+            <TYPE>Ledger</TYPE>
+            <FETCH>NAME,PARENT,CLOSINGBALANCE,OPENINGBALANCE</FETCH>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
   </BODY>
 </ENVELOPE>`;
 }
