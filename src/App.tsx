@@ -18,6 +18,7 @@ import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
 import SetupPage from "./pages/SetupPage";
+import TallySyncPage from "./pages/TallySyncPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/petty-cash" element={<ProtectedRoute page="petty-cash"><PettyCashPage /></ProtectedRoute>} />
               <Route path="/freight" element={<ProtectedRoute page="freight"><FreightPage /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute page="admin"><AdminPage /></ProtectedRoute>} />
+              <Route path="/tally-sync" element={<ProtectedRoute page="tally-sync"><TallySyncPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
