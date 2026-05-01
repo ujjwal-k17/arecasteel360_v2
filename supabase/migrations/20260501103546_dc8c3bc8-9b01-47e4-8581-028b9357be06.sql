@@ -1,0 +1,1 @@
+DELETE FROM public.tally_sync_log WHERE sync_type = 'historical';
