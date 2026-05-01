@@ -160,6 +160,21 @@ async function tallyRequestWithRetry(url: string, xml: string, label: string): P
 
 // ---------- XML builders ----------
 
+function buildSetCompanyXml(company: string): string {
+  return `<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Set Company</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
 function buildLedgerXml(company: string): string {
   return `<ENVELOPE>
   <HEADER>
@@ -168,7 +183,7 @@ function buildLedgerXml(company: string): string {
   <BODY>
     <EXPORTDATA>
       <REQUESTDESC>
-        <REPORTNAME>List of Ledgers</REPORTNAME>
+        <REPORTNAME>Ledger</REPORTNAME>
         <STATICVARIABLES>
           <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
           <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
@@ -445,6 +460,23 @@ Deno.serve(async (req) => {
   let totalRecords = 0;
   const syncedAtIso = new Date().toISOString();
   const asOfIso = tallyDateToIso(to_date)!;
+
+  // Step 2.5 — Activate company in Tally (Set Company), then 2s gap.
+  // Tally needs the target company to be the "current company" before reports
+  // will return data for it.
+  try {
+    const setXml = buildSetCompanyXml(company_name);
+    const setRes = await tallyRequestWithRetry(tallyUrl, setXml, 'set-company');
+    if (!setRes.ok) {
+      // Non-fatal: log but continue (some Tally setups already have it active).
+      console.log(`[set-company] ${company_name}: ${setRes.error}`);
+    } else {
+      console.log(`[set-company] ${company_name}: ok`);
+    }
+  } catch (e: any) {
+    console.log(`[set-company] ${company_name}: ${e?.message || String(e)}`);
+  }
+  await sleep(INTER_STEP_GAP_MS);
 
   // Step 3 — Ledger balances
   let ledgerCount = 0;
