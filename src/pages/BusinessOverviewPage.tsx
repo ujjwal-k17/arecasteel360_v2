@@ -44,51 +44,56 @@ export default function BusinessOverviewPage() {
   const [toDate, setToDate] = useState<string>(todayIso());
 
   const [syncing, setSyncing] = useState(false);
-  const [syncAllOpen, setSyncAllOpen] = useState(false);
-  type ChunkProgress = {
-    label: string;
-    fromDate: string;
-    toDate: string;
-    status: 'pending' | 'running' | 'done' | 'error';
-    counts?: number;
-    error?: string;
-  };
-  const [chunkProgress, setChunkProgress] = useState<ChunkProgress[]>([]);
+  const [historicOpen, setHistoricOpen] = useState(false);
 
-  // Build 90-day chunks from a start date up to today (oldest first).
-  const buildChunks = (startDate: string): { fromDate: string; toDate: string; label: string }[] => {
-    const out: { fromDate: string; toDate: string; label: string }[] = [];
-    const todayMs = new Date().getTime();
-    let cursor = new Date(startDate).getTime();
-    const day = 24 * 60 * 60 * 1000;
-    while (cursor <= todayMs) {
-      const from = new Date(cursor);
-      const toMs = Math.min(cursor + 90 * day - 1, todayMs);
-      const to = new Date(toMs);
-      const fromIso = from.toISOString().slice(0, 10);
-      const toIso = to.toISOString().slice(0, 10);
-      const label = `${from.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} → ${to.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`;
-      out.push({ fromDate: fromIso, toDate: toIso, label });
-      cursor = toMs + 1;
+  type Quarter = { key: string; label: string; fromDate: string; toDate: string };
+
+  // Build all FY-quarter windows from Apr 2022 → current quarter (oldest first).
+  const buildQuarters = (): Quarter[] => {
+    const out: Quarter[] = [];
+    const today = new Date();
+    const startYear = 2022; // April 2022
+    // Walk year by year, emit Apr-Jun, Jul-Sep, Oct-Dec, Jan-Mar (next calendar year)
+    for (let y = startYear; y <= today.getFullYear(); y++) {
+      const fyLabelShort = `FY${String((y + 1) % 100).padStart(2, '0')}`; // Apr y → Mar y+1
+      const quarters: { qNum: number; mFrom: number; yFrom: number; mTo: number; yTo: number; mNames: string }[] = [
+        { qNum: 1, mFrom: 3, yFrom: y, mTo: 5, yTo: y, mNames: 'Apr–Jun' },
+        { qNum: 2, mFrom: 6, yFrom: y, mTo: 8, yTo: y, mNames: 'Jul–Sep' },
+        { qNum: 3, mFrom: 9, yFrom: y, mTo: 11, yTo: y, mNames: 'Oct–Dec' },
+        { qNum: 4, mFrom: 0, yFrom: y + 1, mTo: 2, yTo: y + 1, mNames: 'Jan–Mar' },
+      ];
+      for (const q of quarters) {
+        const from = new Date(q.yFrom, q.mFrom, 1);
+        const to = new Date(q.yTo, q.mTo + 1, 0); // last day of mTo
+        if (from > today) continue;
+        const fromIso = `${q.yFrom}-${String(q.mFrom + 1).padStart(2, '0')}-01`;
+        const toIso = to.toISOString().slice(0, 10);
+        const yearLabel = q.qNum === 4 ? `${q.yFrom}` : `${q.yFrom}`;
+        out.push({
+          key: `${y}-Q${q.qNum}`,
+          label: `Q${q.qNum} ${fyLabelShort} (${q.mNames} ${yearLabel})`,
+          fromDate: fromIso,
+          toDate: toIso,
+        });
+      }
     }
     return out;
   };
 
-  const sumCounts = (counts: Record<string, Record<string, number>> | undefined) =>
-    Object.values(counts || {}).reduce((s, c) => s + Object.values(c).reduce((a, b) => a + b, 0), 0);
+  const [historicQuarter, setHistoricQuarter] = useState<string>('');
 
-  // ---- Sync 30 Days: single call with a tight window.
-  const handleSync30Days = async () => {
+  const runSyncWindow = async (opts: { fromDate: string; toDate: string; includeLedgers: boolean; label: string }) => {
     if (syncing) return;
     setSyncing(true);
-    const t = toast.loading('Syncing last 30 days from Tally...');
+    const t = toast.loading(`Syncing ${opts.label} from Tally...`);
     try {
-      const today = new Date();
-      const from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const fromDate = from.toISOString().slice(0, 10);
-      const toDate = today.toISOString().slice(0, 10);
       const { data: result, error } = await supabase.functions.invoke('tally-sync', {
-        body: { fromDate, toDate, includeLedgers: true, chunkLabel: 'Last 30 days' },
+        body: {
+          fromDate: opts.fromDate,
+          toDate: opts.toDate,
+          includeLedgers: opts.includeLedgers,
+          chunkLabel: opts.label,
+        },
       });
       if (error) {
         const msg = (error as any)?.message || String(error);
@@ -103,9 +108,9 @@ export default function BusinessOverviewPage() {
       const errCount = ((result as any)?.errors || []).length;
       const tot = (k: string) => Object.values(counts || {}).reduce((s, c) => s + (c[k] || 0), 0);
       const summary = `${tot('ledgers')} ledgers, ${tot('sales')} sales, ${tot('receipt')} receipts, ${tot('payment') + tot('contra') + tot('journal')} bank/other`;
-      if (status === 'success') toast.success(`Synced — ${summary}`, { id: t });
-      else if (status === 'partial') toast.warning(`Partial sync — ${summary} · ${errCount} errors`, { id: t });
-      else toast.error(`Sync failed — ${errCount} errors. Previous snapshot still active.`, { id: t });
+      if (status === 'success') toast.success(`Synced ${opts.label} — ${summary}`, { id: t });
+      else if (status === 'partial') toast.warning(`Partial sync of ${opts.label} — ${summary} · ${errCount} errors`, { id: t });
+      else toast.error(`Sync failed for ${opts.label} — ${errCount} errors. Previous snapshot still active.`, { id: t });
       await qc.invalidateQueries({ queryKey: ['tally-snapshot'] });
       await refetch();
     } catch (e: any) {
@@ -116,81 +121,21 @@ export default function BusinessOverviewPage() {
     }
   };
 
-  // ---- Sync All: chunked 90-day windows from 2022-04-01 → today, client-orchestrated.
-  const handleSyncAll = async () => {
-    if (syncing) return;
-    setSyncAllOpen(false);
-    setSyncing(true);
-    const chunks = buildChunks('2022-04-01');
-    const initial: ChunkProgress[] = chunks.map(c => ({
-      label: c.label, fromDate: c.fromDate, toDate: c.toDate, status: 'pending' as const,
-    }));
-    setChunkProgress(initial);
-    const t = toast.loading(`Starting full sync — ${chunks.length} chunks queued...`);
+  // Sync Current Month: 1st of current month → today. Includes ledgers (closing balances).
+  const handleSyncCurrentMonth = async () => {
+    const fromDate = monthStartIso();
+    const toDate = todayIso();
+    const monthLabel = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    await runSyncWindow({ fromDate, toDate, includeLedgers: true, label: monthLabel });
+  };
 
-    let runId: string | undefined;
-    let priorCumulative = 0;
-    let chunkErrors = 0;
-
-    try {
-      for (let i = 0; i < chunks.length; i++) {
-        const c = chunks[i];
-        const isFirst = i === 0;
-        const isLast = i === chunks.length - 1;
-        setChunkProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'running' } : p));
-        toast.loading(`Syncing ${c.label} (${i + 1}/${chunks.length})...`, { id: t });
-
-        try {
-          const { data: result, error } = await supabase.functions.invoke('tally-sync', {
-            body: {
-              runId,
-              fromDate: c.fromDate,
-              toDate: c.toDate,
-              includeLedgers: isFirst, // ledgers fetched once with the first chunk
-              finalize: isLast,
-              chunkLabel: c.label,
-            },
-          });
-          if (error) throw new Error((error as any)?.message || String(error));
-          if ((result as any)?.error) throw new Error((result as any).error);
-          if (!runId) runId = (result as any)?.runId as string;
-          const counts = (result as any)?.counts as Record<string, Record<string, number>> | undefined;
-          const cumulative = sumCounts(counts);
-          const thisChunkInserted = Math.max(0, cumulative - priorCumulative);
-          priorCumulative = cumulative;
-          setChunkProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'done', counts: thisChunkInserted } : p));
-        } catch (e: any) {
-          chunkErrors++;
-          const msg = e?.message || String(e);
-          setChunkProgress(prev => prev.map((p, idx) => idx === i ? { ...p, status: 'error', error: msg } : p));
-          // Continue with remaining chunks — partial data is better than none.
-        }
-      }
-
-      // Ensure the run is finalized even if the last chunk errored before finalize ran.
-      if (runId) {
-        await supabase.functions.invoke('tally-sync', {
-          body: {
-            runId,
-            fromDate: chunks[chunks.length - 1].fromDate,
-            toDate: chunks[chunks.length - 1].toDate,
-            includeLedgers: false,
-            finalize: true,
-            chunkLabel: 'finalize',
-          },
-        }).catch(() => { /* best effort */ });
-      }
-
-      if (chunkErrors === 0) toast.success(`Full sync complete — ${chunks.length} chunks synced`, { id: t });
-      else toast.warning(`Sync finished with ${chunkErrors} chunk error(s) of ${chunks.length}`, { id: t });
-      await qc.invalidateQueries({ queryKey: ['tally-snapshot'] });
-      await refetch();
-    } catch (e: any) {
-      toast.error(e?.message || 'Sync failed', { id: t });
-      await qc.invalidateQueries({ queryKey: ['tally-snapshot'] });
-    } finally {
-      setSyncing(false);
-    }
+  // Sync Historic: user-selected quarter. Vouchers only (closing balances are refreshed by Sync Current Month).
+  const handleSyncHistoric = async () => {
+    if (!historicQuarter) return;
+    const q = buildQuarters().find(x => x.key === historicQuarter);
+    if (!q) return;
+    setHistoricOpen(false);
+    await runSyncWindow({ fromDate: q.fromDate, toDate: q.toDate, includeLedgers: false, label: q.label });
   };
 
 
