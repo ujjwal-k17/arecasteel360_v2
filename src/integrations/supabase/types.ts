@@ -1283,9 +1283,11 @@ export type Database = {
           datasets: string[]
           errors: Json
           finished_at: string | null
+          from_date: string | null
           id: string
           started_at: string
           status: string
+          to_date: string | null
           triggered_by: string | null
           triggered_by_email: string | null
         }
@@ -1296,9 +1298,11 @@ export type Database = {
           datasets?: string[]
           errors?: Json
           finished_at?: string | null
+          from_date?: string | null
           id?: string
           started_at?: string
           status?: string
+          to_date?: string | null
           triggered_by?: string | null
           triggered_by_email?: string | null
         }
@@ -1309,9 +1313,11 @@ export type Database = {
           datasets?: string[]
           errors?: Json
           finished_at?: string | null
+          from_date?: string | null
           id?: string
           started_at?: string
           status?: string
+          to_date?: string | null
           triggered_by?: string | null
           triggered_by_email?: string | null
         }
@@ -1999,7 +2005,15 @@ export type Database = {
           status: string | null
           sync_run_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "tally_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_tally_bank_txns: {
         Row: {
@@ -2009,8 +2023,6 @@ export type Database = {
           bank_ledger: string | null
           company: string | null
           id: string | null
-          is_cancelled: boolean | null
-          is_optional: boolean | null
           kind: string | null
           party_name: string | null
           voucher_date: string | null
@@ -2019,101 +2031,11 @@ export type Database = {
         }
         Relationships: []
       }
-      v_tally_banks: {
-        Row: {
-          address: string | null
-          classification: string | null
-          closing_balance: number | null
-          company: string | null
-          contact_person: string | null
-          created_at: string | null
-          email: string | null
-          gstin: string | null
-          id: string | null
-          mailing_name: string | null
-          name: string | null
-          parent_chain: string[] | null
-          parent_group: string | null
-          phone: string | null
-          root_group: string | null
-          sync_run_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
-            columns: ["sync_run_id"]
-            isOneToOne: false
-            referencedRelation: "tally_sync_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      v_tally_creditors: {
-        Row: {
-          address: string | null
-          classification: string | null
-          closing_balance: number | null
-          company: string | null
-          contact_person: string | null
-          created_at: string | null
-          email: string | null
-          gstin: string | null
-          id: string | null
-          mailing_name: string | null
-          name: string | null
-          parent_chain: string[] | null
-          parent_group: string | null
-          phone: string | null
-          root_group: string | null
-          sync_run_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
-            columns: ["sync_run_id"]
-            isOneToOne: false
-            referencedRelation: "tally_sync_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      v_tally_debtors: {
-        Row: {
-          address: string | null
-          classification: string | null
-          closing_balance: number | null
-          company: string | null
-          contact_person: string | null
-          created_at: string | null
-          email: string | null
-          gstin: string | null
-          id: string | null
-          mailing_name: string | null
-          name: string | null
-          parent_chain: string[] | null
-          parent_group: string | null
-          phone: string | null
-          root_group: string | null
-          sync_run_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tally_ledgers_sync_run_id_fkey"
-            columns: ["sync_run_id"]
-            isOneToOne: false
-            referencedRelation: "tally_sync_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       v_tally_purchases: {
         Row: {
           amount: number | null
           company: string | null
-          created_at: string | null
           id: string | null
-          is_cancelled: boolean | null
-          is_optional: boolean | null
           kind: string | null
           party_name: string | null
           sync_run_id: string | null
@@ -2135,10 +2057,7 @@ export type Database = {
         Row: {
           amount: number | null
           company: string | null
-          created_at: string | null
           id: string | null
-          is_cancelled: boolean | null
-          is_optional: boolean | null
           kind: string | null
           party_name: string | null
           sync_run_id: string | null
@@ -2160,10 +2079,7 @@ export type Database = {
         Row: {
           amount: number | null
           company: string | null
-          created_at: string | null
           id: string | null
-          is_cancelled: boolean | null
-          is_optional: boolean | null
           kind: string | null
           party_name: string | null
           sync_run_id: string | null
