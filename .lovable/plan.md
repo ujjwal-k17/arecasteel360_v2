@@ -1,78 +1,81 @@
-# Why every week shows the same record count per company
+# Split Historical Sync into Previous FY and Current FY (YTD)
 
-## Root cause (confirmed from data)
+Today (1 May 2026) the previous financial year is **FY 2025-26 (1 Apr 2025 – 31 Mar 2026)** and the current financial year (YTD) is **FY 2026-27 (1 Apr 2026 – today)**.
 
-The `records_fetched` column in `tally_sync_log` is being inflated by **ledger masters that get re-fetched and re-stored on every chunk**. Voucher counts (the thing that actually varies week-to-week) are tiny or zero for these archive companies, so the totals look identical.
+Goal: replace the single "Sync Full Year History" button with two distinct buttons, each with its own backend chunk window, sync type, and progress tracking. Keep "Sync Current Month" and "Sync Last Month" as-is.
 
-Evidence from the database right now:
+## Backend changes
 
-| Company | Reported per chunk | Ledger masters | Vouchers in entire DB |
-|---|---|---|---|
-| Areca Gzb FY-2022-23 | **2067** every week | 2067 | 1,208 (all dated Apr 2026) |
-| Areca Delhi FY-2022-23 | **846** every week | 846 | 131 (all dated Apr 2026) |
-| RUKMINI ISPAT GZB | **48** every week | 48 | 29 (all dated Apr 2026) |
+### 1. Rename + narrow `sync-historical` → previous FY only
 
-The number reported per chunk = the company's ledger master count, exactly.
+`supabase/functions/sync-historical/index.ts`:
+- Change `buildChunks()` window to **1 Apr (current year - 1) → 31 Mar (current year)** when month >= April, else previous-previous FY. Use a helper that computes the previous FY boundaries dynamically from `new Date()` so it auto-rolls over each April 1.
+- This produces ~52 weekly chunks (matching the existing `histTotal = 52` UI constant).
+- Sync type label remains `historical` (so existing log rows continue to make sense), but we will treat it semantically as "Previous FY" in UI.
 
-## Why it happens
+### 2. New edge function `sync-current-fy`
 
-In `tally-sync-engine/index.ts`:
+Create `supabase/functions/sync-current-fy/index.ts` — copy of `sync-historical` with two differences:
+- Chunk window: **1 Apr (current FY start) → today** (computed dynamically).
+- Sync type written to `tally_sync_log`: `current_fy`.
+- Pause control: reads `tally_sync_control` row with `sync_type = 'current_fy'` (separate from historical so the two can pause independently).
+- `last_successful_chunk` resume logic filters on `sync_type = 'current_fy'`.
+- `fetch_ledgers` only on the very first chunk of a fresh run, same as historical.
 
-1. **Step 3 — Ledger fetch** uses `buildLedgerXml()` which is a **TDL Collection of TYPE Ledger** with no date filter. Tally always returns the full master list (e.g. 2067 ledgers for Gzb).
-2. These rows are upserted into `tally_ledger_balances` with conflict key `(company_name, ledger_name, as_of_date)` — and `as_of_date` is set to the **chunk's `to_date`**. So every weekly chunk creates a fresh snapshot of all 2067 ledgers (visible in the `tally_ledger_balances` table — 24 distinct `as_of_date` snapshots, each with the same row count).
-3. `totalRecords += up.inserted` adds the full ledger count to `records_fetched` for **every chunk**.
-4. **Step 4 — Vouchers** is correctly date-filtered, but for FY-2022-23 archive companies, the 2025-26 window has 0 vouchers, so it adds nothing visible to the total.
+The `tally_sync_control` table already supports arbitrary `sync_type` values (text PK), no migration needed.
 
-So the symptom "same number every week" is mathematically `ledger_count + 0 vouchers = ledger_count`, repeated identically each chunk.
+### 3. Deploy both functions
 
-## Two issues to fix
+Deploy `sync-historical` (updated) and `sync-current-fy` (new).
 
-### A. The reported number is misleading
-`records_fetched` should reflect **what was actually new for that chunk** — i.e. vouchers (which are date-bound) — not the always-constant ledger master list.
+## Frontend changes — `src/pages/TallySyncPage.tsx`
 
-### B. Ledger snapshots are being duplicated 24× per company
-Storing 2067 identical ledger rows under 24 different `as_of_date` values for the same historical sync run wastes space and is not what was intended. The ledger master is a single point-in-time list per company; one snapshot per sync run is enough.
+### Buttons row
+Replace the single orange "Sync Full Year History" button with two buttons:
+1. **Sync Previous FY** (orange) — calls `sync-historical`. Confirmation dialog text updated to show actual date range "1 Apr 2025 – 31 Mar 2026" (computed dynamically).
+2. **Sync Current FY (YTD)** (purple/indigo) — calls new `sync-current-fy`. Confirmation dialog shows "1 Apr 2026 – today".
 
-## Plan
+Keep "Sync Current Month" (green) and "Sync Last Month" (blue) unchanged.
 
-### 1. `supabase/functions/tally-sync-engine/index.ts`
+### State & types
+- Extend `SyncFn` union: `'sync-current-month' | 'sync-last-month' | 'sync-historical' | 'sync-current-fy'`.
+- Add a second `pausedRef` + `paused` state for current-FY sync, OR generalize to `pausedRefs: Record<'historical' | 'current_fy', boolean>`. Cleanest: keep two separate small states (`pausedHist`, `pausedCurrFy`) since they're independent.
+- The `triggerSync` mutation's loop branch must apply to both `sync-historical` and `sync-current-fy` (both are chunked). Refactor the `if (fn === 'sync-historical')` check to `if (fn === 'sync-historical' || fn === 'sync-current-fy')` and use the matching control row + pause ref based on `fn`.
 
-- **Track ledger and voucher counts separately** in the log row instead of summing them into one `records_fetched`.
-  - Keep `records_fetched` = voucher count only (the meaningful per-chunk figure).
-  - Append a one-line summary like `"ledgers: 2067, vouchers: 14"` into `error_message` only if it helps debugging — or better, store both in the existing JSON response and stop double-counting in the log.
-- **Skip ledger fetch on weekly historical chunks**. Ledgers are a master snapshot, not weekly data:
-  - If `sync_type === 'historical'` AND `chunk_label` does not end in something marker-like (e.g. first chunk only), skip the ledger fetch entirely.
-  - Simplest rule: fetch ledgers only when the engine is called with `sync_type` of `current_month`, `last_month`, or the **first** historical chunk. For `historical` calls after the first, skip Step 3.
-  - The decision can be made by `sync-historical/index.ts` by passing a new flag `fetch_ledgers: boolean` in the body (true only for the first chunk of the run, false otherwise). The engine reads `body.fetch_ledgers` (default `true` for backward compat).
+### Status cards row
+Replace the single "Historical Sync" card with two cards side-by-side:
+- **Previous FY Sync** — completed chunks / total chunks for `sync_type = 'historical'`.
+- **Current FY Sync (YTD)** — completed chunks / total for `sync_type = 'current_fy'`.
 
-### 2. `supabase/functions/sync-historical/index.ts`
+Compute total chunks dynamically per type (52 for previous FY; weeks-elapsed-since-Apr-1 for current FY).
 
-- For each company in the per-call loop, set `fetch_ledgers: true` only for the **first chunk in this invocation when no prior successful chunk exists** (i.e. brand-new historical run for that company). For all subsequent chunks, set `fetch_ledgers: false`.
-- This eliminates 23 redundant ledger fetches per company per full historical run and gives accurate per-chunk voucher counts.
+The grid becomes 5 cards on md+; switch to `md:grid-cols-5` (or wrap to 2 rows) so layout doesn't break.
 
-### 3. Optional cleanup (one-time)
+### Progress bar row
+The single running-historical card needs to handle whichever chunked sync is running. Show one progress card per running sync type (only one will run at a time in practice, but support both). Each shows its own pause/resume buttons targeting the correct `tally_sync_control` row.
 
-After the fix is deployed, optionally collapse the duplicate ledger snapshots:
+### Sync log filter
+Add a new filter option in the Sync Type dropdown: `current_fy` → label "Current FY".
 
-```sql
--- Keep only the latest as_of_date per (company, ledger)
-DELETE FROM tally_ledger_balances a
-USING tally_ledger_balances b
-WHERE a.company_name = b.company_name
-  AND a.ledger_name = b.ledger_name
-  AND a.as_of_date < b.as_of_date;
+## Date helper
+
+Add a small helper in the page (or shared util in the function) to compute FY boundaries from a given date:
+```
+fyStart(date) = Apr 1 of (year if month>=Apr else year-1)
+prevFyStart/end = previous FY's [Apr 1, Mar 31]
+currFyStart = current FY's Apr 1
 ```
 
-Run this only if you confirm the duplicate snapshots aren't useful as a history.
+## Out of scope
+- No DB migration (the existing `tally_sync_control` table works for any `sync_type`).
+- No changes to `sync-current-month` / `sync-last-month`.
+- Existing `tally_vouchers` data is preserved.
+- Existing `tally_sync_log` rows with `sync_type = 'historical'` referencing 2024-W14 etc. will simply not match the new window; they're harmless. Optionally clear them with `DELETE FROM tally_sync_log WHERE sync_type = 'historical'` for a clean restart — recommended to keep progress UI accurate.
 
-## Expected outcome after fix
+## Files
 
-- Each historical chunk's `records_fetched` will reflect **only that week's voucher count** — so most archive-company chunks will show `0`, and weeks with actual activity will show real numbers.
-- `tally_ledger_balances` will gain at most one new snapshot per historical run per company (instead of 24+).
-- `sync-last-month` and `sync-current-month` behavior is unchanged (they still fetch ledgers).
-
-## Technical notes
-
-- Default `fetch_ledgers = true` keeps the engine backward-compatible with any caller that doesn't pass the flag.
-- No DB schema change required.
-- No frontend change required (`TallySyncPage` already reads `records_fetched` from the log; the meaning just becomes accurate).
+- Edit `supabase/functions/sync-historical/index.ts` — dynamic previous-FY window.
+- New `supabase/functions/sync-current-fy/index.ts`.
+- Edit `src/pages/TallySyncPage.tsx` — two buttons, two status cards, support both chunked syncs in mutation/pause logic, new filter option, dynamic confirmation text.
+- Run `DELETE FROM tally_sync_log WHERE sync_type = 'historical'` to reset (optional but recommended).
+- Deploy `sync-historical` and `sync-current-fy`.

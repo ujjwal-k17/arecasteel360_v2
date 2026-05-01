@@ -36,9 +36,30 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { toast } from 'sonner';
 import { AlertTriangle, RefreshCcw, Pause, Play, Loader2 } from 'lucide-react';
 
-type SyncFn = 'sync-current-month' | 'sync-last-month' | 'sync-historical';
+type SyncFn = 'sync-current-month' | 'sync-last-month' | 'sync-historical' | 'sync-current-fy';
 
 const TALLY_URL = 'http://103.239.89.153:9000';
+
+// FY = India fiscal year, Apr 1 -> Mar 31
+function getFyWindows() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const fyStartYear = m >= 3 ? y : y - 1;
+  const prevFyStart = new Date(fyStartYear - 1, 3, 1);
+  const prevFyEnd = new Date(fyStartYear, 2, 31);
+  const currFyStart = new Date(fyStartYear, 3, 1);
+  return { prevFyStart, prevFyEnd, currFyStart, currFyEnd: now };
+}
+
+function fmtDate(d: Date) {
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function weeksBetween(start: Date, end: Date) {
+  const ms = end.getTime() - start.getTime();
+  return Math.max(1, Math.ceil(ms / (7 * 24 * 3600 * 1000)));
+}
 
 function formatDateTime(iso?: string | null) {
   if (!iso) return '—';
@@ -50,15 +71,34 @@ function hoursAgo(iso?: string | null) {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
 }
 
+const CHUNKED_SYNCS = {
+  'sync-historical': { syncType: 'historical', label: 'Previous FY' },
+  'sync-current-fy': { syncType: 'current_fy', label: 'Current FY (YTD)' },
+} as const;
+
 export default function TallySyncPage() {
   const qc = useQueryClient();
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCompany, setFilterCompany] = useState<string>('all');
-  const [paused, setPaused] = useState(false);
-  const pausedRef = useRef(false);
-  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
-  // Connection ping every 60s
+  // Independent pause states for each chunked sync
+  const [pausedHist, setPausedHist] = useState(false);
+  const [pausedCurrFy, setPausedCurrFy] = useState(false);
+  const pausedHistRef = useRef(false);
+  const pausedCurrFyRef = useRef(false);
+  useEffect(() => { pausedHistRef.current = pausedHist; }, [pausedHist]);
+  useEffect(() => { pausedCurrFyRef.current = pausedCurrFy; }, [pausedCurrFy]);
+
+  const fyWindows = useMemo(() => getFyWindows(), []);
+  const prevFyTotal = useMemo(
+    () => weeksBetween(fyWindows.prevFyStart, fyWindows.prevFyEnd),
+    [fyWindows]
+  );
+  const currFyTotal = useMemo(
+    () => weeksBetween(fyWindows.currFyStart, fyWindows.currFyEnd),
+    [fyWindows]
+  );
+
   const ping = useQuery({
     queryKey: ['tally-ping'],
     queryFn: async () => {
@@ -72,7 +112,6 @@ export default function TallySyncPage() {
     staleTime: 30000,
   });
 
-  // Sync log
   const logQ = useQuery({
     queryKey: ['tally-sync-log'],
     queryFn: async () => {
@@ -87,7 +126,6 @@ export default function TallySyncPage() {
     refetchInterval: 5000,
   });
 
-  // Companies
   const companiesQ = useQuery({
     queryKey: ['tally-companies'],
     queryFn: async () => {
@@ -101,7 +139,6 @@ export default function TallySyncPage() {
     },
   });
 
-  // Counts
   const countsQ = useQuery({
     queryKey: ['tally-counts'],
     queryFn: async () => {
@@ -131,39 +168,43 @@ export default function TallySyncPage() {
     () => logs.find((r) => r.sync_type === 'historical' && r.status === 'running'),
     [logs]
   );
+  const runningCurrFy = useMemo(
+    () => logs.find((r) => r.sync_type === 'current_fy' && r.status === 'running'),
+    [logs]
+  );
 
-  const completedHistoricalChunks = useMemo(() => {
-    const set = new Set<string>();
+  const completedChunksByType = useMemo(() => {
+    const map: Record<string, Set<string>> = { historical: new Set(), current_fy: new Set() };
     for (const r of logs) {
-      if (r.sync_type === 'historical' && r.status === 'completed' && r.chunk_label) {
-        set.add(r.chunk_label);
+      if (r.status === 'completed' && r.chunk_label && map[r.sync_type]) {
+        map[r.sync_type].add(r.chunk_label);
       }
     }
-    return set.size;
+    return { historical: map.historical.size, current_fy: map.current_fy.size };
   }, [logs]);
 
   const lastFailed = useMemo(() => logs.find((r) => r.status === 'failed'), [logs]);
-
   const lastSuccess = useMemo(
     () => logs.find((r) => r.status === 'completed' && r.completed_at),
     [logs]
   );
-
   const lastSuccessHours = hoursAgo(lastSuccess?.completed_at);
 
   const triggerSync = useMutation({
     mutationFn: async (fn: SyncFn) => {
-      // Historical sync processes in small batches per call to avoid the
-      // 150s edge-function timeout. Loop until the function reports done.
-      if (fn === 'sync-historical') {
+      if (fn === 'sync-historical' || fn === 'sync-current-fy') {
+        const syncType = CHUNKED_SYNCS[fn].syncType;
+        const pauseRef = fn === 'sync-historical' ? pausedHistRef : pausedCurrFyRef;
+
         await supabase
           .from('tally_sync_control')
-          .upsert({ sync_type: 'historical', is_paused: false }, { onConflict: 'sync_type' });
+          .upsert({ sync_type: syncType, is_paused: false }, { onConflict: 'sync_type' });
+
         let lastData: any = null;
-        let safety = 200; // hard cap to avoid runaway loops
+        let safety = 200;
         while (safety-- > 0) {
-          if (pausedRef.current) {
-            toast.info('Historical sync paused');
+          if (pauseRef.current) {
+            toast.info(`${CHUNKED_SYNCS[fn].label} sync paused`);
             break;
           }
           const { data, error } = await supabase.functions.invoke(fn, { body: {} });
@@ -172,12 +213,12 @@ export default function TallySyncPage() {
           qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
           qc.invalidateQueries({ queryKey: ['tally-counts'] });
           if (data?.paused) {
-            toast.info('Historical sync paused');
+            toast.info(`${CHUNKED_SYNCS[fn].label} sync paused`);
             break;
           }
           if (data?.done) break;
-          if (pausedRef.current) {
-            toast.info('Historical sync paused');
+          if (pauseRef.current) {
+            toast.info(`${CHUNKED_SYNCS[fn].label} sync paused`);
             break;
           }
         }
@@ -193,8 +234,9 @@ export default function TallySyncPage() {
       const total = ok + fail;
       const label =
         fn === 'sync-current-month' ? 'Current month' :
-        fn === 'sync-last-month' ? 'Last month' : 'Historical';
-      if (fn === 'sync-historical') {
+        fn === 'sync-last-month' ? 'Last month' :
+        fn === 'sync-historical' ? 'Previous FY' : 'Current FY (YTD)';
+      if (fn === 'sync-historical' || fn === 'sync-current-fy') {
         toast.success(`${label} sync complete`);
       } else if (fail === 0 && total > 0) {
         toast.success(`${label} sync complete — ${ok} of ${total} companies OK`);
@@ -217,7 +259,6 @@ export default function TallySyncPage() {
     ? ((triggerSync.variables as SyncFn | undefined) ?? null)
     : null;
 
-  // Filtered logs
   const filteredLogs = useMemo(() => {
     return logs.filter((r) => {
       if (filterType !== 'all' && r.sync_type !== filterType) return false;
@@ -228,36 +269,42 @@ export default function TallySyncPage() {
 
   const lastAutoSync = lastByType['current_month']?.completed_at;
 
-  // Historical progress
-  const histTotal = 52;
-  const histCurrent = completedHistoricalChunks;
-  const histPct = Math.min(100, Math.round((histCurrent / histTotal) * 100));
+  // Per-FY progress
+  const histCurrent = completedChunksByType.historical;
+  const histPct = Math.min(100, Math.round((histCurrent / Math.max(prevFyTotal, 1)) * 100));
   const histStatus =
-    runningHistorical
-      ? 'in_progress'
-      : histCurrent >= histTotal
-      ? 'completed'
-      : histCurrent > 0
-      ? 'paused'
-      : 'not_started';
+    runningHistorical ? 'in_progress' :
+    histCurrent >= prevFyTotal ? 'completed' :
+    histCurrent > 0 ? 'paused' : 'not_started';
+
+  const currFyCurrent = completedChunksByType.current_fy;
+  const currFyPct = Math.min(100, Math.round((currFyCurrent / Math.max(currFyTotal, 1)) * 100));
+  const currFyStatus =
+    runningCurrFy ? 'in_progress' :
+    currFyCurrent >= currFyTotal ? 'completed' :
+    currFyCurrent > 0 ? 'paused' : 'not_started';
 
   const retryFailed = () => {
     if (!lastFailed) return;
-    const map: Record<string, any> = {
+    const map: Record<string, SyncFn> = {
       current_month: 'sync-current-month',
       last_month: 'sync-last-month',
       historical: 'sync-historical',
+      current_fy: 'sync-current-fy',
     };
     const fn = map[lastFailed.sync_type];
     if (fn) triggerSync.mutate(fn);
   };
+
+  const prevFyLabel = `${fmtDate(fyWindows.prevFyStart)} – ${fmtDate(fyWindows.prevFyEnd)}`;
+  const currFyLabel = `${fmtDate(fyWindows.currFyStart)} – ${fmtDate(fyWindows.currFyEnd)}`;
 
   return (
     <TooltipProvider>
       <div className="p-6 space-y-4">
         <h1 className="text-2xl font-semibold">Tally Sync</h1>
 
-        {/* Row 1 — Connection status */}
+        {/* Connection status */}
         <Card>
           <CardContent className="flex items-center gap-3 py-4">
             <span
@@ -274,7 +321,7 @@ export default function TallySyncPage() {
           </CardContent>
         </Card>
 
-        {/* Row 2 — Sync buttons */}
+        {/* Sync buttons */}
         <Card>
           <CardContent className="py-4 space-y-3">
             <div className="flex flex-wrap gap-3">
@@ -294,6 +341,7 @@ export default function TallySyncPage() {
                 {runningFn === 'sync-last-month' && <Loader2 className="h-4 w-4 animate-spin" />}
                 Sync Last Month
               </Button>
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -301,21 +349,61 @@ export default function TallySyncPage() {
                     disabled={runningFn === 'sync-historical'}
                   >
                     {runningFn === 'sync-historical' && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Sync Full Year History
+                    Sync Previous FY
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Start full historical sync?</AlertDialogTitle>
+                    <AlertDialogTitle>Sync Previous FY?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This fetches all data from April 2024 to March 2025 and runs for 15-20
-                      minutes in the background. It will resume automatically if interrupted.
+                      This fetches all data from {prevFyLabel} ({prevFyTotal} weekly chunks)
+                      and runs for 15-20 minutes in the background. It will resume automatically
+                      if interrupted. Start now?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        setPausedHist(false);
+                        pausedHistRef.current = false;
+                        triggerSync.mutate('sync-historical');
+                      }}
+                    >
+                      Start now
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    disabled={runningFn === 'sync-current-fy'}
+                  >
+                    {runningFn === 'sync-current-fy' && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Sync Current FY (YTD)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Sync Current FY (YTD)?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This fetches all data from {currFyLabel} (~{currFyTotal} weekly chunks)
+                      and runs in the background. It will resume automatically if interrupted.
                       Start now?
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => triggerSync.mutate('sync-historical')}>
+                    <AlertDialogAction
+                      onClick={() => {
+                        setPausedCurrFy(false);
+                        pausedCurrFyRef.current = false;
+                        triggerSync.mutate('sync-current-fy');
+                      }}
+                    >
                       Start now
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -329,8 +417,8 @@ export default function TallySyncPage() {
           </CardContent>
         </Card>
 
-        {/* Row 3 — Status cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        {/* Status cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <StatusCard
             title="Current Month Sync"
             time={lastByType['current_month']?.completed_at}
@@ -343,15 +431,30 @@ export default function TallySyncPage() {
           />
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Historical Sync</CardTitle>
+              <CardTitle className="text-sm">Previous FY Sync</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-lg font-semibold">
                 {histStatus === 'not_started' && 'Not Started'}
-                {histStatus === 'in_progress' && `In Progress (${histCurrent} of ${histTotal} weeks)`}
-                {histStatus === 'paused' && `Paused (${histCurrent} of ${histTotal} weeks)`}
+                {histStatus === 'in_progress' && `In Progress (${histCurrent} of ${prevFyTotal})`}
+                {histStatus === 'paused' && `Paused (${histCurrent} of ${prevFyTotal})`}
                 {histStatus === 'completed' && 'Completed'}
               </div>
+              <div className="text-xs text-muted-foreground">{prevFyLabel}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Current FY Sync (YTD)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-lg font-semibold">
+                {currFyStatus === 'not_started' && 'Not Started'}
+                {currFyStatus === 'in_progress' && `In Progress (${currFyCurrent} of ${currFyTotal})`}
+                {currFyStatus === 'paused' && `Paused (${currFyCurrent} of ${currFyTotal})`}
+                {currFyStatus === 'completed' && 'Completed'}
+              </div>
+              <div className="text-xs text-muted-foreground">{currFyLabel}</div>
             </CardContent>
           </Card>
           <Card>
@@ -370,67 +473,63 @@ export default function TallySyncPage() {
           </Card>
         </div>
 
-        {/* Row 4 — Historical progress bar */}
+        {/* Progress bars */}
         {runningHistorical && (
-          <Card>
-            <CardContent className="py-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-sm">
-                  Syncing {runningHistorical.chunk_label ?? '—'} ({histCurrent} of {histTotal}) —
-                  Company: {runningHistorical.company_name ?? '—'}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      setPaused(true);
-                      pausedRef.current = true;
-                      const { error } = await supabase
-                        .from('tally_sync_control')
-                        .upsert({ sync_type: 'historical', is_paused: true }, { onConflict: 'sync_type' });
-                      if (error) toast.error(`Could not pause sync — ${error.message}`);
-                      toast.info('Will pause after current chunk completes');
-                    }}
-                    disabled={paused}
-                  >
-                    <Pause className="h-3 w-3 mr-1" />
-                    Pause
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setPaused(false);
-                      pausedRef.current = false;
-                      triggerSync.mutate('sync-historical');
-                    }}
-                  >
-                    <Play className="h-3 w-3 mr-1" />
-                    Resume
-                  </Button>
-                </div>
-              </div>
-              <Progress value={histPct} />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{histPct}%</span>
-                <span>
-                  Estimated time remaining: ~{Math.max(0, (histTotal - histCurrent) * 0.4).toFixed(0)} min
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+          <ProgressCard
+            title="Previous FY"
+            chunkLabel={runningHistorical.chunk_label}
+            companyName={runningHistorical.company_name}
+            current={histCurrent}
+            total={prevFyTotal}
+            pct={histPct}
+            paused={pausedHist}
+            onPause={async () => {
+              setPausedHist(true);
+              pausedHistRef.current = true;
+              const { error } = await supabase
+                .from('tally_sync_control')
+                .upsert({ sync_type: 'historical', is_paused: true }, { onConflict: 'sync_type' });
+              if (error) toast.error(`Could not pause sync — ${error.message}`);
+              toast.info('Will pause after current chunk completes');
+            }}
+            onResume={() => {
+              setPausedHist(false);
+              pausedHistRef.current = false;
+              triggerSync.mutate('sync-historical');
+            }}
+          />
+        )}
+        {runningCurrFy && (
+          <ProgressCard
+            title="Current FY (YTD)"
+            chunkLabel={runningCurrFy.chunk_label}
+            companyName={runningCurrFy.company_name}
+            current={currFyCurrent}
+            total={currFyTotal}
+            pct={currFyPct}
+            paused={pausedCurrFy}
+            onPause={async () => {
+              setPausedCurrFy(true);
+              pausedCurrFyRef.current = true;
+              const { error } = await supabase
+                .from('tally_sync_control')
+                .upsert({ sync_type: 'current_fy', is_paused: true }, { onConflict: 'sync_type' });
+              if (error) toast.error(`Could not pause sync — ${error.message}`);
+              toast.info('Will pause after current chunk completes');
+            }}
+            onResume={() => {
+              setPausedCurrFy(false);
+              pausedCurrFyRef.current = false;
+              triggerSync.mutate('sync-current-fy');
+            }}
+          />
         )}
 
-        {/* Row 6 — Error banner */}
+        {/* Error banner */}
         {lastFailed &&
           (!lastSuccess ||
             new Date(lastFailed.started_at) > new Date(lastSuccess.completed_at ?? 0)) && (
-            <Alert
-              variant="destructive"
-              className="cursor-pointer"
-              onClick={retryFailed}
-            >
+            <Alert variant="destructive" className="cursor-pointer" onClick={retryFailed}>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 Sync failed at {formatDateTime(lastFailed.started_at)} —{' '}
@@ -439,7 +538,7 @@ export default function TallySyncPage() {
             </Alert>
           )}
 
-        {/* Row 7 — Data freshness warning */}
+        {/* Stale-data warning */}
         {lastSuccessHours !== null && lastSuccessHours > 8 && (
           <Alert
             className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 cursor-pointer"
@@ -452,20 +551,21 @@ export default function TallySyncPage() {
           </Alert>
         )}
 
-        {/* Row 5 — Sync log table */}
+        {/* Sync log */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-sm">Sync Log (last 50)</CardTitle>
             <div className="flex gap-2">
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[160px] h-8">
+                <SelectTrigger className="w-[180px] h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All sync types</SelectItem>
                   <SelectItem value="current_month">Current month</SelectItem>
                   <SelectItem value="last_month">Last month</SelectItem>
-                  <SelectItem value="historical">Historical</SelectItem>
+                  <SelectItem value="historical">Previous FY</SelectItem>
+                  <SelectItem value="current_fy">Current FY (YTD)</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterCompany} onValueChange={setFilterCompany}>
@@ -518,10 +618,13 @@ export default function TallySyncPage() {
                       : r.status === 'failed'
                       ? 'bg-red-500/15 text-red-700 dark:text-red-400'
                       : 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400';
+                  const typeLabel =
+                    r.sync_type === 'historical' ? 'previous_fy' :
+                    r.sync_type ?? '—';
                   const row = (
                     <TableRow key={r.id}>
                       <TableCell className="text-xs">{formatDateTime(r.started_at)}</TableCell>
-                      <TableCell className="text-xs">{r.sync_type ?? '—'}</TableCell>
+                      <TableCell className="text-xs">{typeLabel}</TableCell>
                       <TableCell className="text-xs">{r.company_name ?? '—'}</TableCell>
                       <TableCell className="text-xs">{r.chunk_label ?? '—'}</TableCell>
                       <TableCell className="text-right text-xs">
@@ -575,6 +678,56 @@ function StatusCard({
           {(records ?? 0).toLocaleString('en-IN')} records
         </div>
         <div className="text-xs text-muted-foreground">Last synced: {formatDateTime(time)}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProgressCard({
+  title,
+  chunkLabel,
+  companyName,
+  current,
+  total,
+  pct,
+  paused,
+  onPause,
+  onResume,
+}: {
+  title: string;
+  chunkLabel?: string | null;
+  companyName?: string | null;
+  current: number;
+  total: number;
+  pct: number;
+  paused: boolean;
+  onPause: () => void | Promise<void>;
+  onResume: () => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="py-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-sm">
+            <span className="font-medium">{title}:</span> Syncing {chunkLabel ?? '—'} ({current} of{' '}
+            {total}) — Company: {companyName ?? '—'}
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={onPause} disabled={paused}>
+              <Pause className="h-3 w-3 mr-1" />
+              Pause
+            </Button>
+            <Button size="sm" variant="outline" onClick={onResume}>
+              <Play className="h-3 w-3 mr-1" />
+              Resume
+            </Button>
+          </div>
+        </div>
+        <Progress value={pct} />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>{pct}%</span>
+          <span>Estimated time remaining: ~{Math.max(0, (total - current) * 0.4).toFixed(0)} min</span>
+        </div>
       </CardContent>
     </Card>
   );

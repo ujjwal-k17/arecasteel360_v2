@@ -6,9 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Max chunks to process per invocation (per company). Keep low so we never
-// approach the 150s edge-function idle timeout.
 const CHUNKS_PER_CALL = 3;
+const SYNC_TYPE = "current_fy";
 
 function fmt(d: Date): string {
   const y = d.getFullYear();
@@ -31,23 +30,17 @@ function isoWeek(d: Date): { year: number; week: number } {
   return { year: target.getUTCFullYear(), week };
 }
 
-// Compute previous FY (Apr 1 .. Mar 31) based on today.
-// India FY: Apr 1 -> Mar 31. If today >= Apr 1, current FY started this year;
-// previous FY is [Apr 1 (year-1), Mar 31 (year)].
-// If today < Apr 1 (Jan/Feb/Mar), current FY started last year;
-// previous FY is [Apr 1 (year-2), Mar 31 (year-1)].
-function previousFyWindow(): { start: Date; end: Date } {
+// Current FY: Apr 1 of current FY -> today.
+function currentFyWindow(): { start: Date; end: Date } {
   const now = new Date();
   const y = now.getFullYear();
-  const m = now.getMonth(); // 0=Jan, 3=Apr
-  if (m >= 3) {
-    return { start: new Date(y - 1, 3, 1), end: new Date(y, 2, 31) };
-  }
-  return { start: new Date(y - 2, 3, 1), end: new Date(y - 1, 2, 31) };
+  const m = now.getMonth();
+  const fyStartYear = m >= 3 ? y : y - 1;
+  return { start: new Date(fyStartYear, 3, 1), end: now };
 }
 
 function buildChunks() {
-  const { start, end } = previousFyWindow();
+  const { start, end } = currentFyWindow();
   const chunks: { label: string; from: string; to: string }[] = [];
   let cursor = new Date(start);
   while (cursor <= end) {
@@ -84,7 +77,7 @@ async function isPaused(supabase: any) {
   const { data } = await supabase
     .from("tally_sync_control")
     .select("is_paused")
-    .eq("sync_type", "historical")
+    .eq("sync_type", SYNC_TYPE)
     .maybeSingle();
   return data?.is_paused === true;
 }
@@ -113,7 +106,7 @@ Deno.serve(async (req) => {
         .from("tally_sync_log")
         .select("last_successful_chunk, completed_at")
         .eq("company_name", c.company_name)
-        .eq("sync_type", "historical")
+        .eq("sync_type", SYNC_TYPE)
         .eq("status", "completed")
         .not("last_successful_chunk", "is", null)
         .order("completed_at", { ascending: false })
@@ -159,7 +152,7 @@ Deno.serve(async (req) => {
             company_name: c.company_name,
             from_date: ch.from,
             to_date: ch.to,
-            sync_type: "historical",
+            sync_type: SYNC_TYPE,
             chunk_label: ch.label,
             fetch_ledgers,
           });
