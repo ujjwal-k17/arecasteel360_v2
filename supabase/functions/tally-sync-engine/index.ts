@@ -544,7 +544,7 @@ Deno.serve(async (req) => {
       } else {
         const rows = parseVouchers(res.text, company_name, sync_type, syncedAtIso);
         for (const r of rows) {
-          const key = `${r.company_name}::${r.voucher_number}`;
+          const key = `${r.company_name}::${r.date || ''}::${r.voucher_type || ''}::${r.voucher_number}`;
           if (seenVoucherKeys.has(key)) continue;
           seenVoucherKeys.add(key);
           combinedRows.push(r);
