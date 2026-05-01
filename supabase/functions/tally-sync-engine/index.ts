@@ -507,34 +507,36 @@ Deno.serve(async (req) => {
   }
   await sleep(INTER_STEP_GAP_MS);
 
-  // Step 3 — Ledger balances
+  // Step 3 — Ledger balances (skipped when fetch_ledgers=false, e.g. for
+  // historical chunks after the first one — ledgers are a master snapshot,
+  // not weekly data, and re-fetching duplicates rows and inflates counts).
   let ledgerCount = 0;
-  try {
-    const ledgerXml = buildLedgerXml(company_name);
-    const res = await tallyRequestWithRetry(tallyUrl, ledgerXml, 'ledgers');
-    if (!res.ok) {
-      errors.push(res.error);
-    } else {
-      const rows = parseLedgers(res.text, company_name, asOfIso, syncedAtIso);
-      if (rows.length > 0) {
-        const up = await upsertInChunks(
-          supabase,
-          'tally_ledger_balances',
-          rows,
-          'company_name,ledger_name,as_of_date',
-        );
-        ledgerCount = up.inserted;
-        totalRecords += up.inserted;
-        if (up.error) errors.push(`ledger upsert: ${up.error}`);
-        // Save partial progress immediately
-        await supabase
-          .from('tally_sync_log')
-          .update({ records_fetched: totalRecords })
-          .eq('id', logId);
+  if (fetch_ledgers) {
+    try {
+      const ledgerXml = buildLedgerXml(company_name);
+      const res = await tallyRequestWithRetry(tallyUrl, ledgerXml, 'ledgers');
+      if (!res.ok) {
+        errors.push(res.error);
+      } else {
+        const rows = parseLedgers(res.text, company_name, asOfIso, syncedAtIso);
+        if (rows.length > 0) {
+          const up = await upsertInChunks(
+            supabase,
+            'tally_ledger_balances',
+            rows,
+            'company_name,ledger_name,as_of_date',
+          );
+          ledgerCount = up.inserted;
+          // NOTE: deliberately not added to totalRecords — records_fetched
+          // tracks vouchers (the per-chunk varying number) only.
+          if (up.error) errors.push(`ledger upsert: ${up.error}`);
+        }
       }
+    } catch (e: any) {
+      errors.push(`ledgers: ${e?.message || String(e)}`);
     }
-  } catch (e: any) {
-    errors.push(`ledgers: ${e?.message || String(e)}`);
+  } else {
+    console.log(`[ledgers] ${company_name}: skipped (fetch_ledgers=false)`);
   }
 
   await sleep(INTER_STEP_GAP_MS);
