@@ -379,6 +379,10 @@ Deno.serve(async (req) => {
   const to_date: string | undefined = body?.to_date?.toString().trim();
   const sync_type: string | null = body?.sync_type ?? null;
   const chunk_label: string | null = body?.chunk_label ?? null;
+  // Whether to fetch ledger masters this call. Default true for backward
+  // compatibility (sync-current-month / sync-last-month). Historical chunks
+  // pass false after the first chunk to avoid re-fetching the same master list.
+  const fetch_ledgers: boolean = body?.fetch_ledgers !== false;
 
   if (!company_name || !from_date || !to_date) {
     return new Response(

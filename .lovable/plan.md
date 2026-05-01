@@ -1,65 +1,78 @@
-# Fix: Sync buttons not producing log rows
+# Why every week shows the same record count per company
 
-## Root cause
+## Root cause (confirmed from data)
 
-The buttons on `/tally-sync` DO call the orchestrator edge functions — confirmed by edge logs at 08:13 and 08:14 UTC today. The orchestrators (`sync-current-month`, `sync-last-month`, `sync-historical`) return HTTP 200, so the UI shows a success toast. But no rows appear in `tally_sync_log` because of an auth bug **inside** the orchestrators:
+The `records_fetched` column in `tally_sync_log` is being inflated by **ledger masters that get re-fetched and re-stored on every chunk**. Voucher counts (the thing that actually varies week-to-week) are tiny or zero for these archive companies, so the totals look identical.
 
-1. Each orchestrator loops over active companies and calls `supabase.functions.invoke('tally-sync-engine', { body })` using a **service-role** Supabase client.
-2. `supabase.functions.invoke` from inside an edge function does NOT forward an `Authorization: Bearer <user-jwt>` header.
-3. `tally-sync-engine` (lines 321–342) hard-rejects requests without a valid user JWT with HTTP 401.
-4. The orchestrator catches the 401 per-company silently into a `results` array and returns `{ success: true, results: [...] }`, so the UI sees success while the engine never ran — no log row is ever inserted.
+Evidence from the database right now:
 
-The single existing log row (`RUKMINI ISPAT GZB`, 07:55) was from your earlier direct manual test, not from any orchestrator click.
+| Company | Reported per chunk | Ledger masters | Vouchers in entire DB |
+|---|---|---|---|
+| Areca Gzb FY-2022-23 | **2067** every week | 2067 | 1,208 (all dated Apr 2026) |
+| Areca Delhi FY-2022-23 | **846** every week | 846 | 131 (all dated Apr 2026) |
+| RUKMINI ISPAT GZB | **48** every week | 48 | 29 (all dated Apr 2026) |
 
-## Fix
+The number reported per chunk = the company's ledger master count, exactly.
 
-### 1. Engine: accept service-role calls from other edge functions
+## Why it happens
 
-In `supabase/functions/tally-sync-engine/index.ts`, replace the strict user-JWT-only auth (lines 320–342) with: accept EITHER a service-role bearer token OR a valid user JWT. This lets orchestrators invoke it server-to-server while still blocking unauthenticated public calls.
+In `tally-sync-engine/index.ts`:
 
-```text
-authHeader required → Bearer <token>
-if token === SUPABASE_SERVICE_ROLE_KEY  → allow (internal call)
-else                                    → verify user via userClient.auth.getUser(token); reject if invalid
+1. **Step 3 — Ledger fetch** uses `buildLedgerXml()` which is a **TDL Collection of TYPE Ledger** with no date filter. Tally always returns the full master list (e.g. 2067 ledgers for Gzb).
+2. These rows are upserted into `tally_ledger_balances` with conflict key `(company_name, ledger_name, as_of_date)` — and `as_of_date` is set to the **chunk's `to_date`**. So every weekly chunk creates a fresh snapshot of all 2067 ledgers (visible in the `tally_ledger_balances` table — 24 distinct `as_of_date` snapshots, each with the same row count).
+3. `totalRecords += up.inserted` adds the full ledger count to `records_fetched` for **every chunk**.
+4. **Step 4 — Vouchers** is correctly date-filtered, but for FY-2022-23 archive companies, the 2025-26 window has 0 vouchers, so it adds nothing visible to the total.
+
+So the symptom "same number every week" is mathematically `ledger_count + 0 vouchers = ledger_count`, repeated identically each chunk.
+
+## Two issues to fix
+
+### A. The reported number is misleading
+`records_fetched` should reflect **what was actually new for that chunk** — i.e. vouchers (which are date-bound) — not the always-constant ledger master list.
+
+### B. Ledger snapshots are being duplicated 24× per company
+Storing 2067 identical ledger rows under 24 different `as_of_date` values for the same historical sync run wastes space and is not what was intended. The ledger master is a single point-in-time list per company; one snapshot per sync run is enough.
+
+## Plan
+
+### 1. `supabase/functions/tally-sync-engine/index.ts`
+
+- **Track ledger and voucher counts separately** in the log row instead of summing them into one `records_fetched`.
+  - Keep `records_fetched` = voucher count only (the meaningful per-chunk figure).
+  - Append a one-line summary like `"ledgers: 2067, vouchers: 14"` into `error_message` only if it helps debugging — or better, store both in the existing JSON response and stop double-counting in the log.
+- **Skip ledger fetch on weekly historical chunks**. Ledgers are a master snapshot, not weekly data:
+  - If `sync_type === 'historical'` AND `chunk_label` does not end in something marker-like (e.g. first chunk only), skip the ledger fetch entirely.
+  - Simplest rule: fetch ledgers only when the engine is called with `sync_type` of `current_month`, `last_month`, or the **first** historical chunk. For `historical` calls after the first, skip Step 3.
+  - The decision can be made by `sync-historical/index.ts` by passing a new flag `fetch_ledgers: boolean` in the body (true only for the first chunk of the run, false otherwise). The engine reads `body.fetch_ledgers` (default `true` for backward compat).
+
+### 2. `supabase/functions/sync-historical/index.ts`
+
+- For each company in the per-call loop, set `fetch_ledgers: true` only for the **first chunk in this invocation when no prior successful chunk exists** (i.e. brand-new historical run for that company). For all subsequent chunks, set `fetch_ledgers: false`.
+- This eliminates 23 redundant ledger fetches per company per full historical run and gives accurate per-chunk voucher counts.
+
+### 3. Optional cleanup (one-time)
+
+After the fix is deployed, optionally collapse the duplicate ledger snapshots:
+
+```sql
+-- Keep only the latest as_of_date per (company, ledger)
+DELETE FROM tally_ledger_balances a
+USING tally_ledger_balances b
+WHERE a.company_name = b.company_name
+  AND a.ledger_name = b.ledger_name
+  AND a.as_of_date < b.as_of_date;
 ```
 
-### 2. Orchestrators: forward service-role token when invoking the engine
+Run this only if you confirm the duplicate snapshots aren't useful as a history.
 
-In all three orchestrators (`sync-current-month`, `sync-last-month`, `sync-historical`), replace `supabase.functions.invoke('tally-sync-engine', { body })` with a direct `fetch` to the function URL, including:
+## Expected outcome after fix
 
-- `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-- `apikey: ${SUPABASE_SERVICE_ROLE_KEY}`
-- `Content-Type: application/json`
+- Each historical chunk's `records_fetched` will reflect **only that week's voucher count** — so most archive-company chunks will show `0`, and weeks with actual activity will show real numbers.
+- `tally_ledger_balances` will gain at most one new snapshot per historical run per company (instead of 24+).
+- `sync-last-month` and `sync-current-month` behavior is unchanged (they still fetch ledgers).
 
-Use `${SUPABASE_URL}/functions/v1/tally-sync-engine` as the URL. Parse the JSON response and treat non-2xx as an error so the per-company `results[]` honestly reflects engine failures.
+## Technical notes
 
-### 3. Front-end polish on `src/pages/TallySyncPage.tsx`
-
-The mutation already shows toasts and invalidates the log query, but improve UX:
-
-- Add a `Loader2` spinner inside each of the three sync buttons while `triggerSync.isPending && triggerSync.variables === '<that-fn-name>'`. Track which button is running via the mutation's `variables` field.
-- Disable only the button that is currently running (instead of all three).
-- After mutation success, show toast that includes per-company outcome counts parsed from the response, e.g. `"Sync started for 3 companies — 3 ok, 0 failed"`. If any company failed, use `toast.warning` and include the first error message.
-- On error, surface the orchestrator error message in `toast.error`.
-- Already in place and kept: 5s auto-refetch of `tally_sync_log`, query invalidation on success.
-
-### 4. Verification
-
-After deploy, click **Sync Last Month**. Within ~30 seconds expect:
-
-- One new `running` row in `tally_sync_log` per active company (3 rows: Delhi FY-2022-23, Gzb FY-2022-23, RUKMINI ISPAT GZB).
-- Each row transitions to `completed` (with `records_fetched`) or `failed` (with `error_message`).
-- Sync Log table on the page reflects this without manual refresh.
-
-## Technical details
-
-**Files to change**
-- `supabase/functions/tally-sync-engine/index.ts` — relax auth to accept service-role token.
-- `supabase/functions/sync-current-month/index.ts` — replace `functions.invoke` with `fetch` + service-role bearer.
-- `supabase/functions/sync-last-month/index.ts` — same change.
-- `supabase/functions/sync-historical/index.ts` — same change.
-- `src/pages/TallySyncPage.tsx` — per-button spinner, granular disabled state, richer success/error toasts.
-
-**No DB migration required.** No changes to RLS, schema, or `tally_companies`.
-
-**No secret changes required.** `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` are already available to all edge functions.
+- Default `fetch_ledgers = true` keeps the engine backward-compatible with any caller that doesn't pass the flag.
+- No DB schema change required.
+- No frontend change required (`TallySyncPage` already reads `records_fetched` from the log; the meaning just becomes accurate).
