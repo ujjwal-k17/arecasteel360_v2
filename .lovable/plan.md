@@ -1,70 +1,65 @@
-## Goal
+# Fix: Sync buttons not producing log rows
 
-Replace timeout-prone "Sync All" with a manual, period-by-period sync model:
+## Root cause
 
-- **Sync Current Month** — refreshes only the current month's vouchers + ledgers.
-- **Sync Historic Data** — opens a dialog where the user picks one quarter (Apr 1, 2025 onwards, plus older quarters back to Apr 2022) and syncs only that quarter.
+The buttons on `/tally-sync` DO call the orchestrator edge functions — confirmed by edge logs at 08:13 and 08:14 UTC today. The orchestrators (`sync-current-month`, `sync-last-month`, `sync-historical`) return HTTP 200, so the UI shows a success toast. But no rows appear in `tally_sync_log` because of an auth bug **inside** the orchestrators:
 
-Each click syncs **only the chosen window** (no full-history loop), so each invocation stays well under the edge-function timeout.
+1. Each orchestrator loops over active companies and calls `supabase.functions.invoke('tally-sync-engine', { body })` using a **service-role** Supabase client.
+2. `supabase.functions.invoke` from inside an edge function does NOT forward an `Authorization: Bearer <user-jwt>` header.
+3. `tally-sync-engine` (lines 321–342) hard-rejects requests without a valid user JWT with HTTP 401.
+4. The orchestrator catches the 401 per-company silently into a `results` array and returns `{ success: true, results: [...] }`, so the UI sees success while the engine never ran — no log row is ever inserted.
 
-## Important: Data-merging caveat (please read before approving)
+The single existing log row (`RUKMINI ISPAT GZB`, 07:55) was from your earlier direct manual test, not from any orchestrator click.
 
-The current snapshot views (`v_tally_active_runs` → `v_tally_sales` etc.) pick **only the single most recent successful run per (company, dataset)**. That means today, if you "Sync Current Month", the resulting run becomes "the active run" and the views will show **only that month's vouchers** — earlier quarters silently disappear from the UI until you re-sync them.
+## Fix
 
-For per-period syncs to actually merge, we need to change how the views resolve "active data":
+### 1. Engine: accept service-role calls from other edge functions
 
-**Proposed fix:** switch the active-run logic from "latest run per company" to "latest run per (company, voucher_date window)". Concretely, for each voucher we keep the most recent run that covered its date — implemented by stamping each run with its `from_date` / `to_date` and resolving per-voucher via the run that has the latest `finished_at` among runs whose window contains that voucher's date.
-
-Without this change, partial-period syncs will not work as you expect — they'll wipe other periods from the views.
-
-## Implementation Plan
-
-### 1. Database migration (active-run resolution by date window)
-
-- Add `from_date date`, `to_date date` columns to `tally_sync_runs` (nullable; populated by edge function on insert).
-- Rewrite `v_tally_active_runs` and the dependent views (`v_tally_sales`, `v_tally_purchases`, `v_tally_receipts`, `v_tally_bank_txns`) so that for each voucher they pick the run with the latest `finished_at` among successful/partial runs whose `[from_date, to_date]` window contains `voucher_date`.
-- Ledgers stay "latest run per company" (closing balances are always whole-company, not date-scoped). So "Sync Current Month" will still update closing balances, while older quarters' vouchers remain visible from their own earlier runs.
-
-### 2. Edge function (`supabase/functions/tally-sync/index.ts`)
-
-- On insert into `tally_sync_runs`, also write `from_date` and `to_date` from the request body.
-- No other behaviour change — it already accepts `fromDate`/`toDate`/`includeLedgers` and writes vouchers scoped to that window.
-
-### 3. UI (`src/pages/BusinessOverviewPage.tsx`)
-
-Replace the existing two buttons + Sync All dialog with:
-
-- **`Sync Current Month`** button
-  - Window: 1st of current month → today.
-  - `includeLedgers: true` (so closing balances refresh).
-  - Single edge-function call. No chunking.
-  - Toast with summary on completion.
-
-- **`Sync Historic Data`** button → opens a dialog
-  - Dialog shows a dropdown of quarters from **Apr 2022 → current quarter** (Indian FY quarters: Apr–Jun, Jul–Sep, Oct–Dec, Jan–Mar), labelled e.g. "Q1 FY26 (Apr–Jun 2025)".
-  - User picks one quarter, clicks **Sync Quarter**.
-  - Single edge-function call for that 90-ish-day window.
-  - `includeLedgers: false` (closing balances are not period-scoped; Sync Current Month handles those).
-  - Progress shown as a simple inline status row (Running → Done / Error with count).
-
-- Remove the old `buildChunks` loop, the multi-chunk progress panel, and the "Sync All" confirmation dialog. Keep the diagnostics ("Diagnose Tally") button untouched.
-
-### 4. Behaviour summary after the change
+In `supabase/functions/tally-sync-engine/index.ts`, replace the strict user-JWT-only auth (lines 320–342) with: accept EITHER a service-role bearer token OR a valid user JWT. This lets orchestrators invoke it server-to-server while still blocking unauthenticated public calls.
 
 ```text
-Sync Current Month  → updates Nov 2026 vouchers + all closing balances
-Sync Historic Data  → user picks Q2 FY26 → updates Jul–Sep 2025 vouchers only
-                       Earlier quarters' data remains intact in the views.
+authHeader required → Bearer <token>
+if token === SUPABASE_SERVICE_ROLE_KEY  → allow (internal call)
+else                                    → verify user via userClient.auth.getUser(token); reject if invalid
 ```
 
-## Files touched
+### 2. Orchestrators: forward service-role token when invoking the engine
 
-- New SQL migration: alter `tally_sync_runs`, redefine 5 views.
-- `supabase/functions/tally-sync/index.ts` — write `from_date`/`to_date` on run insert.
-- `src/pages/BusinessOverviewPage.tsx` — replace sync UI + handlers, add quarter-picker dialog.
+In all three orchestrators (`sync-current-month`, `sync-last-month`, `sync-historical`), replace `supabase.functions.invoke('tally-sync-engine', { body })` with a direct `fetch` to the function URL, including:
 
-## Decisions I need from you
+- `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+- `apikey: ${SUPABASE_SERVICE_ROLE_KEY}`
+- `Content-Type: application/json`
 
-1. **Approve the view rewrite** (Section 1)? Without it, per-period syncs will overwrite other periods in the UI. This is the only safe way to make your proposal work.
-2. **Quarter range** — start the dropdown from **Apr 2022** (matching today's Sync All baseline) and go to current quarter? Or only from **Apr 2025** as your message implies, with older quarters hidden?
-3. **Should "Sync Current Month" also include the previous month's last few days** (e.g. current month – 7 days) to safely catch back-dated entries? Or strictly 1st of current month?
+Use `${SUPABASE_URL}/functions/v1/tally-sync-engine` as the URL. Parse the JSON response and treat non-2xx as an error so the per-company `results[]` honestly reflects engine failures.
+
+### 3. Front-end polish on `src/pages/TallySyncPage.tsx`
+
+The mutation already shows toasts and invalidates the log query, but improve UX:
+
+- Add a `Loader2` spinner inside each of the three sync buttons while `triggerSync.isPending && triggerSync.variables === '<that-fn-name>'`. Track which button is running via the mutation's `variables` field.
+- Disable only the button that is currently running (instead of all three).
+- After mutation success, show toast that includes per-company outcome counts parsed from the response, e.g. `"Sync started for 3 companies — 3 ok, 0 failed"`. If any company failed, use `toast.warning` and include the first error message.
+- On error, surface the orchestrator error message in `toast.error`.
+- Already in place and kept: 5s auto-refetch of `tally_sync_log`, query invalidation on success.
+
+### 4. Verification
+
+After deploy, click **Sync Last Month**. Within ~30 seconds expect:
+
+- One new `running` row in `tally_sync_log` per active company (3 rows: Delhi FY-2022-23, Gzb FY-2022-23, RUKMINI ISPAT GZB).
+- Each row transitions to `completed` (with `records_fetched`) or `failed` (with `error_message`).
+- Sync Log table on the page reflects this without manual refresh.
+
+## Technical details
+
+**Files to change**
+- `supabase/functions/tally-sync-engine/index.ts` — relax auth to accept service-role token.
+- `supabase/functions/sync-current-month/index.ts` — replace `functions.invoke` with `fetch` + service-role bearer.
+- `supabase/functions/sync-last-month/index.ts` — same change.
+- `supabase/functions/sync-historical/index.ts` — same change.
+- `src/pages/TallySyncPage.tsx` — per-button spinner, granular disabled state, richer success/error toasts.
+
+**No DB migration required.** No changes to RLS, schema, or `tally_companies`.
+
+**No secret changes required.** `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` are already available to all edge functions.

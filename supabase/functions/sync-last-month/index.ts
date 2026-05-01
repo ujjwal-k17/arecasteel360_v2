@@ -13,14 +13,32 @@ function fmt(d: Date): string {
   return `${y}${m}${day}`;
 }
 
+async function callEngine(supabaseUrl: string, serviceKey: string, body: any) {
+  const resp = await fetch(`${supabaseUrl}/functions/v1/tally-sync-engine`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await resp.text();
+  let data: any = null;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!resp.ok) {
+    throw new Error(data?.error || `HTTP ${resp.status}`);
+  }
+  return data;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
 
     const now = new Date();
     const firstOfPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -39,27 +57,24 @@ Deno.serve(async (req) => {
     const results: any[] = [];
     for (const c of companies ?? []) {
       try {
-        const { data, error: invErr } = await supabase.functions.invoke(
-          "tally-sync-engine",
-          {
-            body: {
-              company_name: c.company_name,
-              from_date,
-              to_date,
-              sync_type: "last_month",
-              chunk_label,
-            },
-          }
-        );
-        if (invErr) throw invErr;
+        const data = await callEngine(supabaseUrl, serviceKey, {
+          company_name: c.company_name,
+          from_date,
+          to_date,
+          sync_type: "last_month",
+          chunk_label,
+        });
         results.push({ company: c.company_name, ok: true, data });
       } catch (e) {
-        results.push({ company: c.company_name, ok: false, error: String(e) });
+        results.push({ company: c.company_name, ok: false, error: String(e?.message || e) });
       }
     }
 
+    const ok_count = results.filter((r) => r.ok).length;
+    const fail_count = results.length - ok_count;
+
     return new Response(
-      JSON.stringify({ success: true, from_date, to_date, results }),
+      JSON.stringify({ success: true, from_date, to_date, ok_count, fail_count, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
