@@ -75,6 +75,42 @@ function tallyDateToIso(d: string | null | undefined): string | null {
   return null;
 }
 
+// YYYYMMDD <-> Date (UTC) helpers
+function yyyymmddToDate(s: string): Date {
+  const y = Number(s.slice(0, 4));
+  const m = Number(s.slice(4, 6)) - 1;
+  const d = Number(s.slice(6, 8));
+  return new Date(Date.UTC(y, m, d));
+}
+function dateToYyyymmdd(d: Date): string {
+  const y = d.getUTCFullYear().toString().padStart(4, '0');
+  const m = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = d.getUTCDate().toString().padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+// Split [from, to] (inclusive, YYYYMMDD) into ~7-day windows.
+// Example for 20260401..20260430 ->
+//   [20260401,20260407], [20260408,20260414], [20260415,20260421],
+//   [20260422,20260428], [20260429,20260430]
+function buildWeeklyRanges(from: string, to: string): Array<[string, string]> {
+  const start = yyyymmddToDate(from);
+  const end = yyyymmddToDate(to);
+  if (end.getTime() < start.getTime()) return [];
+  const out: Array<[string, string]> = [];
+  let cur = start;
+  while (cur.getTime() <= end.getTime()) {
+    const next = new Date(cur.getTime());
+    next.setUTCDate(next.getUTCDate() + 6); // 7-day inclusive window
+    const sliceEnd = next.getTime() > end.getTime() ? end : next;
+    out.push([dateToYyyymmdd(cur), dateToYyyymmdd(sliceEnd)]);
+    const after = new Date(sliceEnd.getTime());
+    after.setUTCDate(after.getUTCDate() + 1);
+    cur = after;
+  }
+  return out;
+}
+
 // Pull NAME from either <NAME> child or NAME="..." attribute
 function extractNameAttr(block: string): string | null {
   const child = getTagText(block, 'NAME');
