@@ -2031,6 +2031,141 @@ export type Database = {
         }
         Relationships: []
       }
+      v_tally_banks: {
+        Row: {
+          address: string | null
+          closing_balance: number | null
+          company: string | null
+          contact_person: string | null
+          email: string | null
+          gstin: string | null
+          mailing_name: string | null
+          name: string | null
+          parent_chain: string[] | null
+          parent_group: string | null
+          phone: string | null
+          root_group: string | null
+        }
+        Insert: {
+          address?: string | null
+          closing_balance?: number | null
+          company?: string | null
+          contact_person?: string | null
+          email?: string | null
+          gstin?: string | null
+          mailing_name?: string | null
+          name?: string | null
+          parent_chain?: string[] | null
+          parent_group?: string | null
+          phone?: string | null
+          root_group?: string | null
+        }
+        Update: {
+          address?: string | null
+          closing_balance?: number | null
+          company?: string | null
+          contact_person?: string | null
+          email?: string | null
+          gstin?: string | null
+          mailing_name?: string | null
+          name?: string | null
+          parent_chain?: string[] | null
+          parent_group?: string | null
+          phone?: string | null
+          root_group?: string | null
+        }
+        Relationships: []
+      }
+      v_tally_creditors: {
+        Row: {
+          address: string | null
+          closing_balance: number | null
+          company: string | null
+          contact_person: string | null
+          email: string | null
+          gstin: string | null
+          mailing_name: string | null
+          name: string | null
+          parent_chain: string[] | null
+          parent_group: string | null
+          phone: string | null
+          root_group: string | null
+        }
+        Insert: {
+          address?: string | null
+          closing_balance?: number | null
+          company?: string | null
+          contact_person?: string | null
+          email?: string | null
+          gstin?: string | null
+          mailing_name?: string | null
+          name?: string | null
+          parent_chain?: string[] | null
+          parent_group?: string | null
+          phone?: string | null
+          root_group?: string | null
+        }
+        Update: {
+          address?: string | null
+          closing_balance?: number | null
+          company?: string | null
+          contact_person?: string | null
+          email?: string | null
+          gstin?: string | null
+          mailing_name?: string | null
+          name?: string | null
+          parent_chain?: string[] | null
+          parent_group?: string | null
+          phone?: string | null
+          root_group?: string | null
+        }
+        Relationships: []
+      }
+      v_tally_debtors: {
+        Row: {
+          address: string | null
+          closing_balance: number | null
+          company: string | null
+          contact_person: string | null
+          email: string | null
+          gstin: string | null
+          mailing_name: string | null
+          name: string | null
+          parent_chain: string[] | null
+          parent_group: string | null
+          phone: string | null
+          root_group: string | null
+        }
+        Insert: {
+          address?: string | null
+          closing_balance?: number | null
+          company?: string | null
+          contact_person?: string | null
+          email?: string | null
+          gstin?: string | null
+          mailing_name?: string | null
+          name?: string | null
+          parent_chain?: string[] | null
+          parent_group?: string | null
+          phone?: string | null
+          root_group?: string | null
+        }
+        Update: {
+          address?: string | null
+          closing_balance?: number | null
+          company?: string | null
+          contact_person?: string | null
+          email?: string | null
+          gstin?: string | null
+          mailing_name?: string | null
+          name?: string | null
+          parent_chain?: string[] | null
+          parent_group?: string | null
+          phone?: string | null
+          root_group?: string | null
+        }
+        Relationships: []
+      }
       v_tally_purchases: {
         Row: {
           amount: number | null
