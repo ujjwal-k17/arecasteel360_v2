@@ -34,8 +34,12 @@ function isoWeek(d: Date): { year: number; week: number } {
 }
 
 function buildChunks() {
-  const start = new Date(2025, 3, 1); // 01 Apr 2025
-  const end = new Date(2026, 2, 31); // 31 Mar 2026
+  // Historical window: covers FY 2024-25 and FY 2025-26 fully.
+  // Note: Tally returns voucher dates in the calendar year matching the
+  // transaction (e.g. FY 2025-26 vouchers from Apr 2025 onward, but in this
+  // dataset transactions are dated Apr 2026+). Widen window to be safe.
+  const start = new Date(2024, 3, 1); // 01 Apr 2024
+  const end = new Date(2027, 2, 31); // 31 Mar 2027
   const chunks: { label: string; from: string; to: string }[] = [];
   let cursor = new Date(start);
   while (cursor <= end) {
