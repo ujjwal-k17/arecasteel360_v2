@@ -156,6 +156,9 @@ export default function TallySyncPage() {
       // Historical sync processes in small batches per call to avoid the
       // 150s edge-function timeout. Loop until the function reports done.
       if (fn === 'sync-historical') {
+        await supabase
+          .from('tally_sync_control')
+          .upsert({ sync_type: 'historical', is_paused: false }, { onConflict: 'sync_type' });
         let lastData: any = null;
         let safety = 200; // hard cap to avoid runaway loops
         while (safety-- > 0) {
@@ -168,6 +171,10 @@ export default function TallySyncPage() {
           lastData = data;
           qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
           qc.invalidateQueries({ queryKey: ['tally-counts'] });
+          if (data?.paused) {
+            toast.info('Historical sync paused');
+            break;
+          }
           if (data?.done) break;
           if (pausedRef.current) {
             toast.info('Historical sync paused');
@@ -376,8 +383,13 @@ export default function TallySyncPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
+                    onClick={async () => {
                       setPaused(true);
+                      pausedRef.current = true;
+                      const { error } = await supabase
+                        .from('tally_sync_control')
+                        .upsert({ sync_type: 'historical', is_paused: true }, { onConflict: 'sync_type' });
+                      if (error) toast.error(`Could not pause sync — ${error.message}`);
                       toast.info('Will pause after current chunk completes');
                     }}
                     disabled={paused}
@@ -390,6 +402,7 @@ export default function TallySyncPage() {
                     variant="outline"
                     onClick={() => {
                       setPaused(false);
+                      pausedRef.current = false;
                       triggerSync.mutate('sync-historical');
                     }}
                   >
