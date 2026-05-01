@@ -75,6 +75,42 @@ function tallyDateToIso(d: string | null | undefined): string | null {
   return null;
 }
 
+// YYYYMMDD <-> Date (UTC) helpers
+function yyyymmddToDate(s: string): Date {
+  const y = Number(s.slice(0, 4));
+  const m = Number(s.slice(4, 6)) - 1;
+  const d = Number(s.slice(6, 8));
+  return new Date(Date.UTC(y, m, d));
+}
+function dateToYyyymmdd(d: Date): string {
+  const y = d.getUTCFullYear().toString().padStart(4, '0');
+  const m = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = d.getUTCDate().toString().padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+// Split [from, to] (inclusive, YYYYMMDD) into ~7-day windows.
+// Example for 20260401..20260430 ->
+//   [20260401,20260407], [20260408,20260414], [20260415,20260421],
+//   [20260422,20260428], [20260429,20260430]
+function buildWeeklyRanges(from: string, to: string): Array<[string, string]> {
+  const start = yyyymmddToDate(from);
+  const end = yyyymmddToDate(to);
+  if (end.getTime() < start.getTime()) return [];
+  const out: Array<[string, string]> = [];
+  let cur = start;
+  while (cur.getTime() <= end.getTime()) {
+    const next = new Date(cur.getTime());
+    next.setUTCDate(next.getUTCDate() + 6); // 7-day inclusive window
+    const sliceEnd = next.getTime() > end.getTime() ? end : next;
+    out.push([dateToYyyymmdd(cur), dateToYyyymmdd(sliceEnd)]);
+    const after = new Date(sliceEnd.getTime());
+    after.setUTCDate(after.getUTCDate() + 1);
+    cur = after;
+  }
+  return out;
+}
+
 // Pull NAME from either <NAME> child or NAME="..." attribute
 function extractNameAttr(block: string): string | null {
   const child = getTagText(block, 'NAME');
@@ -442,30 +478,51 @@ Deno.serve(async (req) => {
 
   await sleep(INTER_STEP_GAP_MS);
 
-  // Step 4 — Vouchers (Day Book)
+  // Step 4 — Vouchers (Day Book) — split into weekly chunks to avoid Tally
+  // gateway truncating large XML responses. Each weekly slice is fetched
+  // separately, parsed, then upserted (so overlapping ranges don't dupe).
   let voucherCount = 0;
   try {
-    const voucherXml = buildDayBookXml(company_name, from_date, to_date);
-    const res = await tallyRequestWithRetry(tallyUrl, voucherXml, 'vouchers');
-    if (!res.ok) {
-      errors.push(res.error);
-    } else {
-      const rows = parseVouchers(res.text, company_name, sync_type, syncedAtIso);
-      if (rows.length > 0) {
-        const up = await upsertInChunks(
-          supabase,
-          'tally_vouchers',
-          rows,
-          'company_name,voucher_number',
-        );
-        voucherCount = up.inserted;
-        totalRecords += up.inserted;
-        if (up.error) errors.push(`voucher upsert: ${up.error}`);
-        await supabase
-          .from('tally_sync_log')
-          .update({ records_fetched: totalRecords })
-          .eq('id', logId);
+    const weeklyRanges = buildWeeklyRanges(from_date, to_date);
+    console.log(`[vouchers] ${company_name}: ${weeklyRanges.length} weekly chunk(s) from ${from_date} to ${to_date}`);
+    const seenVoucherKeys = new Set<string>();
+    const combinedRows: VoucherRow[] = [];
+
+    for (let i = 0; i < weeklyRanges.length; i++) {
+      const [wf, wt] = weeklyRanges[i];
+      const label = `vouchers ${wf}-${wt} (${i + 1}/${weeklyRanges.length})`;
+      const voucherXml = buildDayBookXml(company_name, wf, wt);
+      const res = await tallyRequestWithRetry(tallyUrl, voucherXml, label);
+      if (!res.ok) {
+        errors.push(res.error);
+      } else {
+        const rows = parseVouchers(res.text, company_name, sync_type, syncedAtIso);
+        for (const r of rows) {
+          const key = `${r.company_name}::${r.voucher_number}`;
+          if (seenVoucherKeys.has(key)) continue;
+          seenVoucherKeys.add(key);
+          combinedRows.push(r);
+        }
+        console.log(`[${label}] parsed ${rows.length}, combined ${combinedRows.length}`);
       }
+      // 2-second gap between weekly requests (skip after final)
+      if (i < weeklyRanges.length - 1) await sleep(INTER_STEP_GAP_MS);
+    }
+
+    if (combinedRows.length > 0) {
+      const up = await upsertInChunks(
+        supabase,
+        'tally_vouchers',
+        combinedRows,
+        'company_name,voucher_number',
+      );
+      voucherCount = up.inserted;
+      totalRecords += up.inserted;
+      if (up.error) errors.push(`voucher upsert: ${up.error}`);
+      await supabase
+        .from('tally_sync_log')
+        .update({ records_fetched: totalRecords })
+        .eq('id', logId);
     }
   } catch (e: any) {
     errors.push(`vouchers: ${e?.message || String(e)}`);
