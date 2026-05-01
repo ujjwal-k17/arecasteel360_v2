@@ -401,6 +401,8 @@ Deno.serve(async (req) => {
         ? ['ledgers', 'sales', 'purchases', 'receipts', 'payments', 'contra', 'journal']
         : ['sales', 'purchases', 'receipts', 'payments', 'contra', 'journal'],
       companies: COMPANIES,
+      from_date: reqFrom,
+      to_date: reqTo,
     }).select('id').single();
     if (runErr || !runRow) {
       return new Response(JSON.stringify({ error: 'Failed to create sync run', detail: runErr?.message }), {
