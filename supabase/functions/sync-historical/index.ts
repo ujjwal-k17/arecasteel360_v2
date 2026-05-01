@@ -112,6 +112,11 @@ Deno.serve(async (req) => {
 
       for (let i = startIdx; i < endIdx; i++) {
         const ch = chunks[i];
+        // Fetch ledger masters only on the very first chunk of a company's
+        // historical run (i === 0 AND no prior successful chunk). For all
+        // subsequent chunks, skip — ledgers are a master snapshot, not
+        // weekly data, and re-fetching duplicates rows and inflates counts.
+        const fetch_ledgers = i === 0 && !lastChunk;
         try {
           const data = await callEngine(supabaseUrl, serviceKey, {
             company_name: c.company_name,
@@ -119,6 +124,7 @@ Deno.serve(async (req) => {
             to_date: ch.to,
             sync_type: "historical",
             chunk_label: ch.label,
+            fetch_ledgers,
           });
           companyResults.push({ chunk: ch.label, ok: true, data });
           totalProcessed++;
