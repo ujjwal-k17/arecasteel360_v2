@@ -34,7 +34,9 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { AlertTriangle, RefreshCcw, Pause, Play } from 'lucide-react';
+import { AlertTriangle, RefreshCcw, Pause, Play, Loader2 } from 'lucide-react';
+
+type SyncFn = 'sync-current-month' | 'sync-last-month' | 'sync-historical';
 
 const TALLY_URL = 'http://103.239.89.153:9000';
 
@@ -148,18 +150,38 @@ export default function TallySyncPage() {
   const lastSuccessHours = hoursAgo(lastSuccess?.completed_at);
 
   const triggerSync = useMutation({
-    mutationFn: async (fn: 'sync-current-month' | 'sync-last-month' | 'sync-historical') => {
+    mutationFn: async (fn: SyncFn) => {
       const { data, error } = await supabase.functions.invoke(fn, { body: {} });
       if (error) throw error;
-      return data;
+      return { fn, data } as { fn: SyncFn; data: any };
     },
-    onSuccess: (_d, fn) => {
-      toast.success(`${fn} started`);
+    onSuccess: ({ fn, data }) => {
+      const ok = data?.ok_count ?? 0;
+      const fail = data?.fail_count ?? 0;
+      const total = ok + fail;
+      const label =
+        fn === 'sync-current-month' ? 'Current month' :
+        fn === 'sync-last-month' ? 'Last month' : 'Historical';
+      if (fail === 0 && total > 0) {
+        toast.success(`${label} sync complete — ${ok} of ${total} companies OK`);
+      } else if (ok > 0 && fail > 0) {
+        const firstErr = (data?.results ?? []).find((r: any) => !r.ok)?.error;
+        toast.warning(`${label}: ${ok} ok, ${fail} failed${firstErr ? ` — ${firstErr}` : ''}`);
+      } else if (total === 0) {
+        toast.info(`${label}: no active companies to sync`);
+      } else {
+        const firstErr = (data?.results ?? []).find((r: any) => !r.ok)?.error;
+        toast.error(`${label} failed for all ${fail} companies${firstErr ? ` — ${firstErr}` : ''}`);
+      }
       qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
       qc.invalidateQueries({ queryKey: ['tally-counts'] });
     },
-    onError: (e: any) => toast.error(e.message ?? 'Sync failed to start'),
+    onError: (e: any) => toast.error(e?.message ?? 'Sync failed to start'),
   });
+
+  const runningFn: SyncFn | null = triggerSync.isPending
+    ? ((triggerSync.variables as SyncFn | undefined) ?? null)
+    : null;
 
   // Filtered logs
   const filteredLogs = useMemo(() => {
@@ -224,24 +246,27 @@ export default function TallySyncPage() {
             <div className="flex flex-wrap gap-3">
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
-                disabled={triggerSync.isPending}
+                disabled={runningFn === 'sync-current-month'}
                 onClick={() => triggerSync.mutate('sync-current-month')}
               >
+                {runningFn === 'sync-current-month' && <Loader2 className="h-4 w-4 animate-spin" />}
                 Sync Current Month
               </Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={triggerSync.isPending}
+                disabled={runningFn === 'sync-last-month'}
                 onClick={() => triggerSync.mutate('sync-last-month')}
               >
+                {runningFn === 'sync-last-month' && <Loader2 className="h-4 w-4 animate-spin" />}
                 Sync Last Month
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     className="bg-orange-500 hover:bg-orange-600 text-white"
-                    disabled={triggerSync.isPending}
+                    disabled={runningFn === 'sync-historical'}
                   >
+                    {runningFn === 'sync-historical' && <Loader2 className="h-4 w-4 animate-spin" />}
                     Sync Full Year History
                   </Button>
                 </AlertDialogTrigger>

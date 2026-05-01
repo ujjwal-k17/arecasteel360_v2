@@ -46,14 +46,30 @@ function buildChunks() {
   return chunks;
 }
 
+async function callEngine(supabaseUrl: string, serviceKey: string, body: any) {
+  const resp = await fetch(`${supabaseUrl}/functions/v1/tally-sync-engine`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await resp.text();
+  let data: any = null;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!resp.ok) throw new Error(data?.error || `HTTP ${resp.status}`);
+  return data;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
 
     const { data: companies, error } = await supabase
       .from("tally_companies")
@@ -87,22 +103,16 @@ Deno.serve(async (req) => {
       for (let i = startIdx; i < chunks.length; i++) {
         const ch = chunks[i];
         try {
-          const { data, error: invErr } = await supabase.functions.invoke(
-            "tally-sync-engine",
-            {
-              body: {
-                company_name: c.company_name,
-                from_date: ch.from,
-                to_date: ch.to,
-                sync_type: "historical",
-                chunk_label: ch.label,
-              },
-            }
-          );
-          if (invErr) throw invErr;
+          const data = await callEngine(supabaseUrl, serviceKey, {
+            company_name: c.company_name,
+            from_date: ch.from,
+            to_date: ch.to,
+            sync_type: "historical",
+            chunk_label: ch.label,
+          });
           companyResults.push({ chunk: ch.label, ok: true, data });
         } catch (e) {
-          companyResults.push({ chunk: ch.label, ok: false, error: String(e) });
+          companyResults.push({ chunk: ch.label, ok: false, error: String(e?.message || e) });
         }
         if (i < chunks.length - 1) await sleep(3000);
       }
