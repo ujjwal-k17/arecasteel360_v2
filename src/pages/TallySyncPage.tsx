@@ -38,7 +38,7 @@ import { AlertTriangle, RefreshCcw, Pause, Play, Loader2 } from 'lucide-react';
 
 type SyncFn = 'sync-current-month' | 'sync-last-month' | 'sync-historical' | 'sync-current-fy';
 
-const TALLY_URL = 'http://103.239.89.153:9000';
+
 
 // FY = India fiscal year, Apr 1 -> Mar 31
 function getFyWindows() {
@@ -103,10 +103,15 @@ export default function TallySyncPage() {
     queryKey: ['tally-ping'],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('tally-ping', {
-        body: { url: TALLY_URL },
+        body: {},
       });
       if (error) throw error;
-      return data as { reachable: boolean; url: string; error: string | null };
+      return data as {
+        reachable: boolean;
+        url: string;
+        via: 'tunnel' | 'direct' | null;
+        error: string | null;
+      };
     },
     refetchInterval: 60000,
     staleTime: 30000,
@@ -313,7 +318,13 @@ export default function TallySyncPage() {
               }`}
             />
             <span className="text-sm">
-              {ping.data?.reachable ? 'Tally Connected' : 'Tally Not Reachable'} — {TALLY_URL}
+              {ping.data?.reachable ? 'Tally Connected' : 'Tally Not Reachable'}
+              {ping.data?.url && <> — {ping.data.url}</>}
+              {ping.data?.via && (
+                <Badge variant="outline" className="ml-2 text-xs">
+                  via {ping.data.via}
+                </Badge>
+              )}
             </span>
             {ping.data?.error && (
               <span className="text-xs text-muted-foreground">({ping.data.error})</span>
@@ -325,8 +336,11 @@ export default function TallySyncPage() {
               disabled={ping.isFetching}
               onClick={async () => {
                 const res = await ping.refetch();
-                if (res.data?.reachable) toast.success('Tally is reachable');
-                else toast.error(`Tally not reachable${res.data?.error ? ` — ${res.data.error}` : ''}`);
+                if (res.data?.reachable) {
+                  toast.success(`Tally is reachable via ${res.data.via ?? 'unknown'}`);
+                } else {
+                  toast.error(`Tally not reachable${res.data?.error ? ` — ${res.data.error}` : ''}`);
+                }
               }}
             >
               {ping.isFetching ? (
