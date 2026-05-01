@@ -486,7 +486,7 @@ Deno.serve(async (req) => {
   if (companyRow?.tally_url) tallyUrl = companyRow.tally_url;
 
   const errors: string[] = [];
-  let totalRecords = 0;
+  let totalRecords = 0; // vouchers only — what's meaningful per chunk
   const syncedAtIso = new Date().toISOString();
   const asOfIso = tallyDateToIso(to_date)!;
 
