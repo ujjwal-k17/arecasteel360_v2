@@ -160,6 +160,21 @@ async function tallyRequestWithRetry(url: string, xml: string, label: string): P
 
 // ---------- XML builders ----------
 
+function buildSetCompanyXml(company: string): string {
+  return `<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Set Company</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
 function buildLedgerXml(company: string): string {
   return `<ENVELOPE>
   <HEADER>
@@ -168,7 +183,7 @@ function buildLedgerXml(company: string): string {
   <BODY>
     <EXPORTDATA>
       <REQUESTDESC>
-        <REPORTNAME>List of Ledgers</REPORTNAME>
+        <REPORTNAME>Ledger</REPORTNAME>
         <STATICVARIABLES>
           <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
           <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
