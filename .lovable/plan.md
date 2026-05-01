@@ -1,53 +1,70 @@
 ## Goal
 
-Restore Business Overview / Tally Sync responsiveness. The page got slow because (a) `useTallySnapshot` now fetches large datasets that the UI no longer needs after the move to "outstanding walk-back" logic, and (b) the Payment Summary table recomputes per-debtor invoice walks with O(debtors × sales) work + thousands of `Date` allocations on every dependency change.
+Replace timeout-prone "Sync All" with a manual, period-by-period sync model:
 
-Confirmed sizes in the DB today: 5,379 vouchers, 25,882 ledger entries, 7,878 bill refs, 2,960 ledgers. Cold loads currently do multiple chunked `.in()` round-trips then iterate 25k entries in JS — and re-do all of it after every sync or override save.
+- **Sync Current Month** — refreshes only the current month's vouchers + ledgers.
+- **Sync Historic Data** — opens a dialog where the user picks one quarter (Apr 1, 2025 onwards, plus older quarters back to Apr 2022) and syncs only that quarter.
 
-## Changes
+Each click syncs **only the chosen window** (no full-history loop), so each invocation stays well under the edge-function timeout.
 
-### 1. `src/hooks/useTallySnapshot.ts` — slim the payload
+## Important: Data-merging caveat (please read before approving)
 
-The Payment Summary table and debtor dialog now derive everything from `closing_balance` + `sales`. So:
+The current snapshot views (`v_tally_active_runs` → `v_tally_sales` etc.) pick **only the single most recent successful run per (company, dataset)**. That means today, if you "Sync Current Month", the resulting run becomes "the active run" and the views will show **only that month's vouchers** — earlier quarters silently disappear from the UI until you re-sync them.
 
-- **Drop the `debtorCredits` fetch entirely** (the two-pass entries → vouchers query is the heaviest single cost). Keep the type exported as `[]` for backward compatibility, or remove the field and update consumers.
-- **Drop the `billRefs` chunked fetch** — currently unused by the active UI paths. (If a future feature needs it, fetch on demand inside that component.)
-- **Drop receipts, bankTxns, purchases caps** from 50,000 to a more realistic ceiling, and only request the columns each view needs. Keep ascending order only where overdue calc requires it (sales).
-- Run the remaining `Promise.all` queries unchanged but without the dependent second-stage fetches.
+For per-period syncs to actually merge, we need to change how the views resolve "active data":
 
-Net effect: cold load goes from ~8–20 round-trips to ~6 single-shot queries, and the JS post-processing loop over 25k entries disappears.
+**Proposed fix:** switch the active-run logic from "latest run per company" to "latest run per (company, voucher_date window)". Concretely, for each voucher we keep the most recent run that covered its date — implemented by stamping each run with its `from_date` / `to_date` and resolving per-voucher via the run that has the latest `finished_at` among runs whose window contains that voucher's date.
 
-### 2. `src/pages/BusinessOverviewPage.tsx` — make the table cheap to render
+Without this change, partial-period syncs will not work as you expect — they'll wipe other periods from the views.
 
-In `DebtorPaymentSummaryTab` (`rows` memo around line 533):
+## Implementation Plan
 
-- **Pre-index sales by `(company, ledger_name lowercase)` once** with a `useMemo` over `sales`, then look up `salesByDebtor.get(key) || []` per debtor instead of `sales.filter(...)` in the inner loop. This collapses the dominant O(debtors × sales) factor.
-- Pre-sort each bucket descending by date once when building the index, so the per-row `[...].sort(...)` goes away.
-- Hoist `today` out of the loop; replace `new Date(...).setDate / toISOString()` with simple ISO string arithmetic by adding days numerically (we already store `voucher_date` as an ISO string — add days via a tiny helper that does it without allocating two `Date` objects per invoice).
-- Drop `creditIndex` from the deps of the `rows` memo (it's no longer read inside the loop after the walk-back rewrite — verified by reading the current code).
+### 1. Database migration (active-run resolution by date window)
 
-In `BusinessOverviewPage`:
+- Add `from_date date`, `to_date date` columns to `tally_sync_runs` (nullable; populated by edge function on insert).
+- Rewrite `v_tally_active_runs` and the dependent views (`v_tally_sales`, `v_tally_purchases`, `v_tally_receipts`, `v_tally_bank_txns`) so that for each voucher they pick the run with the latest `finished_at` among successful/partial runs whose `[from_date, to_date]` window contains `voucher_date`.
+- Ledgers stay "latest run per company" (closing balances are always whole-company, not date-scoped). So "Sync Current Month" will still update closing balances, while older quarters' vouchers remain visible from their own earlier runs.
 
-- Wrap `debtors / banks / sales / purchases / receipts / bankTxns / debtorCredits` filtering in a single `useMemo` keyed on `data` + `companyFilter` so we don't re-filter on every keystroke / dialog open.
+### 2. Edge function (`supabase/functions/tally-sync/index.ts`)
 
-In `DebtorInvoiceCycleCard` (dialog body):
+- On insert into `tally_sync_runs`, also write `from_date` and `to_date` from the request body.
+- No other behaviour change — it already accepts `fromDate`/`toDate`/`includeLedgers` and writes vouchers scoped to that window.
 
-- Same pre-index trick: derive `dInvoices` from a passed-in indexed map instead of re-filtering `sales` when the dialog opens.
+### 3. UI (`src/pages/BusinessOverviewPage.tsx`)
 
-### 3. Quick wins
+Replace the existing two buttons + Sync All dialog with:
 
-- Replace `localeCompare` on ISO date strings with `<` / `>` comparators (ISO dates sort lexicographically).
-- Memoize `repCounts`, `repFilteredRows`, `filtered`, `totals` are already memoized — leave as is.
+- **`Sync Current Month`** button
+  - Window: 1st of current month → today.
+  - `includeLedgers: true` (so closing balances refresh).
+  - Single edge-function call. No chunking.
+  - Toast with summary on completion.
 
-## Out of scope
+- **`Sync Historic Data`** button → opens a dialog
+  - Dialog shows a dropdown of quarters from **Apr 2022 → current quarter** (Indian FY quarters: Apr–Jun, Jul–Sep, Oct–Dec, Jan–Mar), labelled e.g. "Q1 FY26 (Apr–Jun 2025)".
+  - User picks one quarter, clicks **Sync Quarter**.
+  - Single edge-function call for that 90-ish-day window.
+  - `includeLedgers: false` (closing balances are not period-scoped; Sync Current Month handles those).
+  - Progress shown as a simple inline status row (Running → Done / Error with count).
 
-- No schema or edge-function changes. The sync function itself isn't the slow part the user is feeling on this page; the lag is on the read/render side after sync.
-- No removal of `debtorCredits` / `billRefs` from the codebase beyond the snapshot hook — components that currently import the types stay compiled; they'll just receive empty arrays.
+- Remove the old `buildChunks` loop, the multi-chunk progress panel, and the "Sync All" confirmation dialog. Keep the diagnostics ("Diagnose Tally") button untouched.
 
-## Verification
+### 4. Behaviour summary after the change
 
-1. Open Business Overview after the change → initial render visibly faster, fewer network requests in DevTools.
-2. Switch company filter → table updates without a perceptible pause.
-3. Open a debtor dialog → opens immediately; unpaid invoices and overdue figures match the table column.
-4. Run "Sync from Tally" → on completion, the snapshot refetch is a small handful of queries, not 15+.
-5. Numbers (Outstanding, Overdue, Overdue Invoices, Open Invoices) match the values shown before the change for a couple of spot-checked debtors.
+```text
+Sync Current Month  → updates Nov 2026 vouchers + all closing balances
+Sync Historic Data  → user picks Q2 FY26 → updates Jul–Sep 2025 vouchers only
+                       Earlier quarters' data remains intact in the views.
+```
+
+## Files touched
+
+- New SQL migration: alter `tally_sync_runs`, redefine 5 views.
+- `supabase/functions/tally-sync/index.ts` — write `from_date`/`to_date` on run insert.
+- `src/pages/BusinessOverviewPage.tsx` — replace sync UI + handlers, add quarter-picker dialog.
+
+## Decisions I need from you
+
+1. **Approve the view rewrite** (Section 1)? Without it, per-period syncs will overwrite other periods in the UI. This is the only safe way to make your proposal work.
+2. **Quarter range** — start the dropdown from **Apr 2022** (matching today's Sync All baseline) and go to current quarter? Or only from **Apr 2025** as your message implies, with older quarters hidden?
+3. **Should "Sync Current Month" also include the previous month's last few days** (e.g. current month – 7 days) to safely catch back-dated entries? Or strictly 1st of current month?
