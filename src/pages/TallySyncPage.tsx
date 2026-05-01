@@ -55,6 +55,8 @@ export default function TallySyncPage() {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCompany, setFilterCompany] = useState<string>('all');
   const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
   // Connection ping every 60s
   const ping = useQuery({
