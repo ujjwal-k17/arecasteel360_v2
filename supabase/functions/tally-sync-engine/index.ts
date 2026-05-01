@@ -169,6 +169,7 @@ function buildSetCompanyXml(company: string): string {
     <DESC>
       <STATICVARIABLES>
         <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+        <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
       </STATICVARIABLES>
     </DESC>
   </BODY>
@@ -187,6 +188,7 @@ function buildLedgerXml(company: string): string {
         <STATICVARIABLES>
           <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
           <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+          <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
         </STATICVARIABLES>
       </REQUESTDESC>
     </EXPORTDATA>
@@ -208,6 +210,7 @@ function buildDayBookXml(company: string, fromDate: string, toDate: string): str
           <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
           <SVFROMDATE>${escapeXml(fromDate)}</SVFROMDATE>
           <SVTODATE>${escapeXml(toDate)}</SVTODATE>
+          <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
         </STATICVARIABLES>
       </REQUESTDESC>
     </EXPORTDATA>
