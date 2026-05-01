@@ -29,8 +29,8 @@ function isoWeek(d: Date): { year: number; week: number } {
 }
 
 function buildChunks() {
-  const start = new Date(2024, 3, 1); // 01 Apr 2024
-  const end = new Date(2025, 2, 31); // 31 Mar 2025
+  const start = new Date(2025, 3, 1); // 01 Apr 2025
+  const end = new Date(2026, 2, 31); // 31 Mar 2026
   const chunks: { label: string; from: string; to: string }[] = [];
   let cursor = new Date(start);
   while (cursor <= end) {
