@@ -318,6 +318,24 @@ export default function TallySyncPage() {
             {ping.data?.error && (
               <span className="text-xs text-muted-foreground">({ping.data.error})</span>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto"
+              disabled={ping.isFetching}
+              onClick={async () => {
+                const res = await ping.refetch();
+                if (res.data?.reachable) toast.success('Tally is reachable');
+                else toast.error(`Tally not reachable${res.data?.error ? ` — ${res.data.error}` : ''}`);
+              }}
+            >
+              {ping.isFetching ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-3 w-3 mr-1" />
+              )}
+              Refresh
+            </Button>
           </CardContent>
         </Card>
 
