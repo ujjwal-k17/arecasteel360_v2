@@ -72,6 +72,15 @@ async function callEngine(supabaseUrl: string, serviceKey: string, body: any) {
   return data;
 }
 
+async function isHistoricalPaused(supabase: any) {
+  const { data } = await supabase
+    .from("tally_sync_control")
+    .select("is_paused")
+    .eq("sync_type", "historical")
+    .maybeSingle();
+  return data?.is_paused === true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -115,6 +124,28 @@ Deno.serve(async (req) => {
       const companyResults: any[] = [];
 
       for (let i = startIdx; i < endIdx; i++) {
+        if (await isHistoricalPaused(supabase)) {
+          anyRemaining = true;
+          summary.push({
+            company: c.company_name,
+            resumed_from: lastChunk,
+            paused: true,
+            chunks_processed: companyResults.length,
+            chunks_remaining: chunks.length - i,
+            results: companyResults,
+          });
+          return new Response(
+            JSON.stringify({
+              success: true,
+              paused: true,
+              done: false,
+              total_chunks: chunks.length,
+              processed_this_call: totalProcessed,
+              summary,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         const ch = chunks[i];
         // Fetch ledger masters only on the very first chunk of a company's
         // historical run (i === 0 AND no prior successful chunk). For all
