@@ -1220,6 +1220,24 @@ export type Database = {
         }
         Relationships: []
       }
+      tally_sync_control: {
+        Row: {
+          is_paused: boolean
+          sync_type: string
+          updated_at: string
+        }
+        Insert: {
+          is_paused?: boolean
+          sync_type: string
+          updated_at?: string
+        }
+        Update: {
+          is_paused?: boolean
+          sync_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tally_sync_log: {
         Row: {
           chunk_label: string | null
