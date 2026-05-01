@@ -10,7 +10,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const TALLY_URL_DEFAULT = 'http://103.239.89.153:9000';
+const TALLY_DIRECT_DEFAULT = 'http://103.239.89.153:9000';
 const TALLY_TIMEOUT_MS = 30_000;
 const FETCH_RETRIES = 3;
 const RETRY_GAP_MS = 5_000;
@@ -143,19 +143,28 @@ async function tallyRequestOnce(url: string, xml: string): Promise<string> {
   }
 }
 
-async function tallyRequestWithRetry(url: string, xml: string, label: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
-  let lastErr = '';
-  for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
-    try {
-      const text = await tallyRequestOnce(url, xml);
-      return { ok: true, text };
-    } catch (e: any) {
-      lastErr = e?.message || String(e);
-      console.log(`[${label}] attempt ${attempt}/${FETCH_RETRIES} failed: ${lastErr}`);
-      if (attempt < FETCH_RETRIES) await sleep(RETRY_GAP_MS);
+// urls is a prioritized list (e.g., [tunnel, directIP]). Each URL gets up to
+// FETCH_RETRIES attempts; if all retries fail, the next URL is tried.
+async function tallyRequestWithRetry(urls: string | string[], xml: string, label: string): Promise<{ ok: true; text: string; url: string } | { ok: false; error: string }> {
+  const urlList = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
+  if (urlList.length === 0) return { ok: false, error: `${label}: no Tally URL configured` };
+
+  const errorsByUrl: string[] = [];
+  for (const url of urlList) {
+    let lastErr = '';
+    for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
+      try {
+        const text = await tallyRequestOnce(url, xml);
+        return { ok: true, text, url };
+      } catch (e: any) {
+        lastErr = e?.message || String(e);
+        console.log(`[${label}] ${url} attempt ${attempt}/${FETCH_RETRIES} failed: ${lastErr}`);
+        if (attempt < FETCH_RETRIES) await sleep(RETRY_GAP_MS);
+      }
     }
+    errorsByUrl.push(`${url}: ${lastErr}`);
   }
-  return { ok: false, error: `${label} failed after ${FETCH_RETRIES} attempts: ${lastErr}` };
+  return { ok: false, error: `${label} failed on all URLs — ${errorsByUrl.join(' | ')}` };
 }
 
 // ---------- XML builders ----------
@@ -476,14 +485,20 @@ Deno.serve(async (req) => {
   }
   const logId = logRow.id as string;
 
-  // Resolve Tally URL for this company (fallback to default)
-  let tallyUrl = TALLY_URL_DEFAULT;
+  // Resolve Tally URLs (prioritized list: company override > tunnel > direct IP).
+  // Cloudflare Tunnel is preferred — direct IP kept as fallback in case the tunnel is down.
+  const tunnelUrl = Deno.env.get('TALLY_TUNNEL_URL') || '';
+  const directUrl = Deno.env.get('TALLY_DIRECT_URL') || TALLY_DIRECT_DEFAULT;
   const { data: companyRow } = await supabase
     .from('tally_companies')
     .select('tally_url, is_active')
     .eq('company_name', company_name)
     .maybeSingle();
-  if (companyRow?.tally_url) tallyUrl = companyRow.tally_url;
+  const tallyUrls: string[] = [];
+  if (companyRow?.tally_url) tallyUrls.push(companyRow.tally_url);
+  if (tunnelUrl && !tallyUrls.includes(tunnelUrl)) tallyUrls.push(tunnelUrl);
+  if (directUrl && !tallyUrls.includes(directUrl)) tallyUrls.push(directUrl);
+  const tallyUrl = tallyUrls; // helper now accepts string | string[]
 
   const errors: string[] = [];
   let totalRecords = 0; // vouchers only — what's meaningful per chunk
