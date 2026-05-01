@@ -6,6 +6,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Max chunks to process per invocation (per company). Keep low so we never
+// approach the 150s edge-function idle timeout. Each chunk = 1 tally-sync-engine
+// call (which itself can take 20-40s for heavy weeks).
+const CHUNKS_PER_CALL = 3;
+
 function fmt(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -79,6 +84,8 @@ Deno.serve(async (req) => {
 
     const chunks = buildChunks();
     const summary: any[] = [];
+    let totalProcessed = 0;
+    let anyRemaining = false;
 
     for (const c of companies ?? []) {
       // Find the last successful historical chunk for this company
@@ -99,8 +106,11 @@ Deno.serve(async (req) => {
         if (idx >= 0) startIdx = idx + 1;
       }
 
+      // Only process up to CHUNKS_PER_CALL chunks for this company per invocation
+      const endIdx = Math.min(startIdx + CHUNKS_PER_CALL, chunks.length);
       const companyResults: any[] = [];
-      for (let i = startIdx; i < chunks.length; i++) {
+
+      for (let i = startIdx; i < endIdx; i++) {
         const ch = chunks[i];
         try {
           const data = await callEngine(supabaseUrl, serviceKey, {
@@ -111,22 +121,33 @@ Deno.serve(async (req) => {
             chunk_label: ch.label,
           });
           companyResults.push({ chunk: ch.label, ok: true, data });
+          totalProcessed++;
         } catch (e) {
-          companyResults.push({ chunk: ch.label, ok: false, error: String(e?.message || e) });
+          companyResults.push({ chunk: ch.label, ok: false, error: String((e as any)?.message || e) });
         }
-        if (i < chunks.length - 1) await sleep(3000);
+        if (i < endIdx - 1) await sleep(1500);
       }
+
+      const remaining = chunks.length - endIdx;
+      if (remaining > 0) anyRemaining = true;
 
       summary.push({
         company: c.company_name,
         resumed_from: lastChunk,
         chunks_processed: companyResults.length,
+        chunks_remaining: remaining,
         results: companyResults,
       });
     }
 
     return new Response(
-      JSON.stringify({ success: true, total_chunks: chunks.length, summary }),
+      JSON.stringify({
+        success: true,
+        done: !anyRemaining,
+        total_chunks: chunks.length,
+        processed_this_call: totalProcessed,
+        summary,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
