@@ -1,0 +1,1 @@
+ALTER TABLE public.debtor_master ADD COLUMN IF NOT EXISTS is_intracompany boolean NOT NULL DEFAULT false;

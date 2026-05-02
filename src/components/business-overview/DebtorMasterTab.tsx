@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Search } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -11,14 +12,14 @@ import {
 import { toast } from 'sonner';
 import { ManageSalesRepsDialog, useSalesReps } from './ManageSalesRepsDialog';
 import { CompanyFilter } from './CompanyFilter';
-import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
+
 
 export default function DebtorMasterTab() {
   const qc = useQueryClient();
   const [company, setCompany] = useState('all');
   const [search, setSearch] = useState('');
   const [editingCP, setEditingCP] = useState<Record<string, string>>({});
-  const intra = useIntracompanyParties();
+  // intracompany flag is read directly from each row's is_intracompany column
   const reps = useSalesReps();
 
   const dm = useQuery({
@@ -34,14 +35,14 @@ export default function DebtorMasterTab() {
   });
 
   const rows = useMemo(() => {
-    let arr = (dm.data ?? []).filter((d: any) => !intra.data?.has(d.ledger_name));
+    let arr = (dm.data ?? []);
     if (company !== 'all') arr = arr.filter((d: any) => d.company_name === company);
     if (search.trim()) {
       const s = search.toLowerCase();
       arr = arr.filter((d: any) => d.ledger_name.toLowerCase().includes(s));
     }
     return arr;
-  }, [dm.data, intra.data, company, search]);
+  }, [dm.data, company, search]);
 
   const saveCP = async (id: string, raw: string) => {
     const days = parseInt(raw, 10);
@@ -61,6 +62,14 @@ export default function DebtorMasterTab() {
     const { error } = await supabase.from('debtor_master').update({ sales_rep: value }).eq('id', id);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ['debtor-master'] });
+  };
+
+  const toggleIntra = async (id: string, value: boolean) => {
+    const { error } = await supabase.from('debtor_master').update({ is_intracompany: value }).eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(value ? 'Marked as intracompany' : 'Removed intracompany flag');
+    qc.invalidateQueries({ queryKey: ['debtor-master'] });
+    qc.invalidateQueries({ queryKey: ['business-overview', 'intracompany-parties'] });
   };
 
   const activeReps = (reps.data ?? []).filter((r: any) => r.is_active);
@@ -101,6 +110,7 @@ export default function DebtorMasterTab() {
                     <th className="py-2">Company</th>
                     <th className="py-2 text-right">Credit Period (days)</th>
                     <th className="py-2">Sales Rep</th>
+                    <th className="py-2 text-center">Intracompany</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -137,6 +147,12 @@ export default function DebtorMasterTab() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </td>
+                        <td className="py-2 text-center">
+                          <Switch
+                            checked={!!d.is_intracompany}
+                            onCheckedChange={val => toggleIntra(d.id, val)}
+                          />
                         </td>
                       </tr>
                     );
