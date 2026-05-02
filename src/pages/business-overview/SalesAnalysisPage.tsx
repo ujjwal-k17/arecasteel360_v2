@@ -266,7 +266,7 @@ export default function SalesAnalysisPage() {
                               <tbody>
                                 {g.invoices.map((inv: any) => {
                                   const cpKey = `${inv.company_name}::${inv.voucher_number}`;
-                                  const stored = cps.data?.get(cpKey);
+                                  const stored = cps.data instanceof Map ? cps.data.get(cpKey) : undefined;
                                   const editing = editingCP[cpKey];
                                   const cp = editing != null ? editing : (stored != null ? String(stored) : '');
                                   const cpNum = parseInt(cp, 10);
