@@ -91,8 +91,22 @@ export default function SalesAnalysisPage() {
     },
   });
 
+  // Split sales into intra/non-intra. The "shown" view depends on the toggle.
+  const { mainSales, intraSales } = useMemo(() => {
+    const intraSet = intra.data ?? new Set<string>();
+    const main: any[] = [];
+    const ic: any[] = [];
+    (sales.data ?? []).forEach((v: any) => {
+      if (intraSet.has(v.party_name)) ic.push(v);
+      else main.push(v);
+    });
+    return { mainSales: main, intraSales: ic };
+  }, [sales.data, intra.data]);
+
+  const shown = mainSales;
+
   const summary = useMemo(() => {
-    const data = sales.data ?? [];
+    const data = shown;
     const partyByKey = new Set(data.map((d: any) => `${d.company_name}::${d.party_name ?? ''}`));
     return {
       value: data.reduce((s: number, d: any) => s + Number(d.amount || 0), 0),
@@ -100,11 +114,11 @@ export default function SalesAnalysisPage() {
       n: data.length,
       parties: partyByKey.size,
     };
-  }, [sales.data]);
+  }, [shown]);
 
-  const grouped = useMemo(() => {
+  const buildGrouped = (rows: any[]) => {
     const map = new Map<string, { party: string; company: string; invoices: any[]; mt: number; value: number }>();
-    (sales.data ?? []).forEach((v: any) => {
+    rows.forEach((v: any) => {
       const key = `${v.company_name}::${v.party_name ?? '(unknown)'}`;
       if (!map.has(key)) {
         map.set(key, { party: v.party_name ?? '(unknown)', company: v.company_name, invoices: [], mt: 0, value: 0 });
@@ -121,7 +135,16 @@ export default function SalesAnalysisPage() {
       arr = arr.filter(x => x.party.toLowerCase().includes(s));
     }
     return arr;
-  }, [sales.data, search]);
+  };
+
+  const grouped = useMemo(() => buildGrouped(shown), [shown, search]);
+  const groupedIntra = useMemo(() => buildGrouped(intraSales), [intraSales, search]);
+
+  const intraSummary = useMemo(() => ({
+    value: intraSales.reduce((s, d) => s + Number(d.amount || 0), 0),
+    mt: intraSales.reduce((s, d) => s + totalMTFromLineItems(d.line_items), 0),
+    n: intraSales.length,
+  }), [intraSales]);
 
   const toggle = (key: string) =>
     setExpanded(prev => {
