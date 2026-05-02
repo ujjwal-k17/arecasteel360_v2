@@ -66,7 +66,8 @@ export default function MISDashboardPage() {
   const { data: lastSync } = useLastSyncAt();
 
   const intra = useIntracompanyParties();
-  const intraSet = intra.data ?? new Set<string>();
+  const intraSet = intra.data ?? { has: (_: any) => false, companies: [] as string[], manualLedgers: new Set<string>() } as any;
+  const intraKey = (intra.data?.companies.length ?? 0) + (intra.data?.manualLedgers.size ?? 0);
 
   const { from, to } = useMemo(() => currentMonthRange(), []);
 
