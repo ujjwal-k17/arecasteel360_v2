@@ -93,41 +93,12 @@ Deno.serve(async (req) => {
     const summary: any[] = [];
 
     for (const c of companies ?? []) {
-      const { data: lastLogs } = await supabase
-        .from("tally_sync_log")
-        .select("last_successful_chunk, completed_at")
-        .eq("company_name", c.company_name)
-        .eq("sync_type", SYNC_TYPE)
-        .eq("status", "completed")
-        .not("last_successful_chunk", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(1);
-
-      const lastChunk = lastLogs?.[0]?.last_successful_chunk ?? null;
-      let startIdx = 0;
-      if (lastChunk) {
-        const idx = chunks.findIndex((ch) => ch.label === lastChunk);
-        if (idx >= 0) startIdx = idx + 1;
-      }
-
-      if (startIdx >= chunks.length) {
-        summary.push({
-          company: c.company_name,
-          resumed_from: lastChunk,
-          chunks_processed: 0,
-          chunks_remaining: 0,
-          results: [],
-        });
-        continue;
-      }
-
       if (await isPaused(supabase)) {
         summary.push({
           company: c.company_name,
-          resumed_from: lastChunk,
           paused: true,
           chunks_processed: 0,
-          chunks_remaining: chunks.length - startIdx,
+          chunks_remaining: chunks.length,
           results: [],
         });
         return new Response(
@@ -143,53 +114,44 @@ Deno.serve(async (req) => {
         );
       }
 
-      const ch = chunks[startIdx];
-      const fetch_ledgers = startIdx === 0 && !lastChunk;
+      // Always sync fresh: process all chunks regardless of previous sync history.
+      // The engine upserts data, so re-syncing is safe.
       const companyResults: any[] = [];
-      try {
-        const data = await callEngine(supabaseUrl, serviceKey, {
-          company_name: c.company_name,
-          from_date: ch.from,
-          to_date: ch.to,
-          sync_type: SYNC_TYPE,
-          chunk_label: ch.label,
-          fetch_ledgers,
-        });
-        companyResults.push({ chunk: ch.label, ok: true, data });
-      } catch (e) {
-        companyResults.push({ chunk: ch.label, ok: false, error: String((e as any)?.message || e) });
+      for (let i = 0; i < chunks.length; i++) {
+        const ch = chunks[i];
+        const fetch_ledgers = i === 0;
+        try {
+          const data = await callEngine(supabaseUrl, serviceKey, {
+            company_name: c.company_name,
+            from_date: ch.from,
+            to_date: ch.to,
+            sync_type: SYNC_TYPE,
+            chunk_label: ch.label,
+            fetch_ledgers,
+          });
+          companyResults.push({ chunk: ch.label, ok: true, data });
+        } catch (e) {
+          companyResults.push({ chunk: ch.label, ok: false, error: String((e as any)?.message || e) });
+        }
       }
-
-      const remaining = chunks.length - (startIdx + 1);
-      const chunkOk = companyResults.every((r) => r.ok);
 
       summary.push({
         company: c.company_name,
-        resumed_from: lastChunk,
         chunks_processed: companyResults.length,
-        chunks_remaining: remaining,
+        chunks_remaining: 0,
         results: companyResults,
       });
-
-      return new Response(
-        JSON.stringify({
-          success: chunkOk,
-          error: chunkOk ? null : companyResults.find((r) => !r.ok)?.error,
-          done: false,
-          total_chunks: chunks.length,
-          processed_this_call: companyResults.length,
-          summary,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
+    const totalProcessed = summary.reduce((acc: number, s: any) => acc + (s.chunks_processed || 0), 0);
+    const anyError = summary.some((s: any) => (s.results || []).some((r: any) => !r.ok));
     return new Response(
       JSON.stringify({
-        success: true,
+        success: !anyError,
+        error: anyError ? "One or more chunks failed" : null,
         done: true,
         total_chunks: chunks.length,
-        processed_this_call: 0,
+        processed_this_call: totalProcessed,
         summary,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
