@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, TrendingUp, Search, Save } from 'lucide-react';
+import { ChevronDown, ChevronRight, TrendingUp, Search, Save, RefreshCw } from 'lucide-react';
 import { CompanyFilter } from '@/components/business-overview/CompanyFilter';
 import { LastSyncedFooter } from '@/components/business-overview/LastSyncedFooter';
 import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
