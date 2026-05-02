@@ -332,9 +332,15 @@ export default function TallySyncPage() {
       }
 
       // --- Chunked orchestrators: each edge call processes one small safe slice ---
-      if (fn === 'sync-current-fy' || fn === 'sync-last-month') {
-        const syncType = fn === 'sync-last-month' ? 'last_month' : CHUNKED_SYNCS[fn].syncType;
-        const label = fn === 'sync-last-month' ? 'Last month' : CHUNKED_SYNCS[fn].label;
+      if (fn === 'sync-current-fy' || fn === 'sync-last-month' || fn === 'sync-current-month') {
+        const syncType =
+          fn === 'sync-last-month' ? 'last_month' :
+          fn === 'sync-current-month' ? 'current_month' :
+          CHUNKED_SYNCS['sync-current-fy'].syncType;
+        const label =
+          fn === 'sync-last-month' ? 'Last month' :
+          fn === 'sync-current-month' ? 'Current month' :
+          CHUNKED_SYNCS['sync-current-fy'].label;
         const pauseRef = fn === 'sync-current-fy' ? pausedCurrFyRef : { current: false };
 
         await supabase
@@ -390,7 +396,7 @@ export default function TallySyncPage() {
         fn === 'sync-current-month' ? 'Current month' :
         fn === 'sync-last-month' ? 'Last month' :
         fn === 'sync-historical' ? 'Previous FY' : 'Current FY (YTD)';
-      if (fn === 'sync-historical' || fn === 'sync-last-month' || fn === 'sync-current-fy') {
+      if (fn === 'sync-historical' || fn === 'sync-last-month' || fn === 'sync-current-fy' || fn === 'sync-current-month') {
         if (data?.paused) {
           // toast already shown
         } else if (fail === 0 && ok > 0) {
