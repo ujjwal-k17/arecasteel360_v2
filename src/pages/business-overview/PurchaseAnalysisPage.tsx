@@ -1,12 +1,14 @@
 import { Fragment, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, ShoppingCart, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, ShoppingCart, Search, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { CompanyFilter } from '@/components/business-overview/CompanyFilter';
 import { LastSyncedFooter } from '@/components/business-overview/LastSyncedFooter';
 import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
@@ -30,6 +32,7 @@ function StatCard({ title, value, loading }: any) {
 }
 
 export default function PurchaseAnalysisPage() {
+  const qc = useQueryClient();
   const [company, setCompany] = useState<string>('all');
   const [monthSel, setMonthSel] = useState<string>('current');
   const [from, setFrom] = useState<string>(toISODate(currentMonthRange().from));
