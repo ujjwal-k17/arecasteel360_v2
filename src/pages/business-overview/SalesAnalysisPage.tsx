@@ -221,7 +221,11 @@ export default function SalesAnalysisPage() {
             <label className="text-xs text-muted-foreground">Company</label>
             <CompanyFilter value={company} onChange={setCompany} />
           </div>
-          <div className="space-y-1 ml-auto">
+          <div className="flex items-center gap-2 ml-auto">
+            <label className="text-xs text-muted-foreground">Show Intracompany</label>
+            <Switch checked={showIntracompany} onCheckedChange={setShowIntracompany} />
+          </div>
+          <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Search Debtor</label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
