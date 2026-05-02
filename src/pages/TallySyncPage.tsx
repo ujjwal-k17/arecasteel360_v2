@@ -423,13 +423,91 @@ export default function TallySyncPage() {
     ? ((triggerSync.variables as SyncFn | undefined) ?? null)
     : null;
 
+  // Aggregate chunked logs into one row per (sync_type, company_name) so users
+  // see whole-period status (with date range) instead of week-by-week chunks.
+  const aggregatedLogs = useMemo(() => {
+    type AggRow = {
+      id: string;
+      sync_type: string | null;
+      company_name: string | null;
+      started_at: string;
+      completed_at: string | null;
+      records_fetched: number;
+      statuses: Set<string>;
+      error_message: string | null;
+      chunks_total: number;
+      chunks_done: number;
+      chunks_failed: number;
+      chunks_running: number;
+    };
+    const map = new Map<string, AggRow>();
+    for (const r of logs) {
+      const key = `${r.sync_type}::${r.company_name ?? ''}`;
+      const cur = map.get(key);
+      if (!cur) {
+        map.set(key, {
+          id: r.id,
+          sync_type: r.sync_type,
+          company_name: r.company_name,
+          started_at: r.started_at,
+          completed_at: r.completed_at,
+          records_fetched: r.records_fetched ?? 0,
+          statuses: new Set([r.status]),
+          error_message: r.status === 'failed' ? r.error_message : null,
+          chunks_total: 1,
+          chunks_done: r.status === 'completed' ? 1 : 0,
+          chunks_failed: r.status === 'failed' ? 1 : 0,
+          chunks_running: r.status === 'running' ? 1 : 0,
+        });
+      } else {
+        cur.chunks_total += 1;
+        if (r.status === 'completed') cur.chunks_done += 1;
+        else if (r.status === 'failed') cur.chunks_failed += 1;
+        else if (r.status === 'running') cur.chunks_running += 1;
+        cur.statuses.add(r.status);
+        cur.records_fetched += r.records_fetched ?? 0;
+        if (new Date(r.started_at) < new Date(cur.started_at)) cur.started_at = r.started_at;
+        if (r.completed_at && (!cur.completed_at || new Date(r.completed_at) > new Date(cur.completed_at))) {
+          cur.completed_at = r.completed_at;
+        }
+        if (r.status === 'failed' && !cur.error_message) cur.error_message = r.error_message;
+      }
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
+    );
+  }, [logs]);
+
+  // Date range label per sync_type (whole period being synced)
+  const dateRangeForType = (syncType: string | null): string => {
+    if (!syncType) return '—';
+    const now = new Date();
+    if (syncType === 'current_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return `${fmtDate(start)} – ${fmtDate(now)}`;
+    }
+    if (syncType === 'last_month') {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      return `${fmtDate(start)} – ${fmtDate(end)}`;
+    }
+    if (syncType === 'historical') {
+      return `${fmtDate(fyWindows.prevFyStart)} – ${fmtDate(fyWindows.prevFyEnd)}`;
+    }
+    if (syncType === 'current_fy') {
+      return `${fmtDate(fyWindows.currFyStart)} – ${fmtDate(fyWindows.currFyEnd)}`;
+    }
+    return '—';
+  };
+
   const filteredLogs = useMemo(() => {
-    return logs.filter((r) => {
+    return aggregatedLogs.filter((r) => {
       if (filterType !== 'all' && r.sync_type !== filterType) return false;
       if (filterCompany !== 'all' && r.company_name !== filterCompany) return false;
       return true;
     });
-  }, [logs, filterType, filterCompany]);
+  }, [aggregatedLogs, filterType, filterCompany]);
+
 
   const lastAutoSync = lastByType['current_month']?.completed_at;
 
@@ -781,7 +859,8 @@ export default function TallySyncPage() {
                   <TableHead>Time</TableHead>
                   <TableHead>Sync Type</TableHead>
                   <TableHead>Company</TableHead>
-                  <TableHead>Chunk</TableHead>
+                  <TableHead>Date Range</TableHead>
+                  <TableHead className="text-right">Chunks</TableHead>
                   <TableHead className="text-right">Records</TableHead>
                   <TableHead className="text-right">Duration</TableHead>
                   <TableHead>Status</TableHead>
@@ -790,7 +869,7 @@ export default function TallySyncPage() {
               <TableBody>
                 {filteredLogs.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
                       No sync runs yet
                     </TableCell>
                   </TableRow>
@@ -803,11 +882,19 @@ export default function TallySyncPage() {
                             1000
                         )}s`
                       : '—';
+                  // Aggregated status: running > failed > completed
+                  const aggStatus =
+                    r.chunks_running > 0 ? 'running' :
+                    r.chunks_failed > 0 && r.chunks_done === 0 ? 'failed' :
+                    r.chunks_failed > 0 ? 'partial' :
+                    r.chunks_done > 0 ? 'completed' : 'pending';
                   const statusColor =
-                    r.status === 'completed'
+                    aggStatus === 'completed'
                       ? 'bg-green-500/15 text-green-700 dark:text-green-400'
-                      : r.status === 'failed'
+                      : aggStatus === 'failed'
                       ? 'bg-red-500/15 text-red-700 dark:text-red-400'
+                      : aggStatus === 'partial'
+                      ? 'bg-orange-500/15 text-orange-700 dark:text-orange-400'
                       : 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400';
                   const typeLabel =
                     r.sync_type === 'historical' ? 'previous_fy' :
@@ -817,19 +904,23 @@ export default function TallySyncPage() {
                       <TableCell className="text-xs">{formatDateTime(r.started_at)}</TableCell>
                       <TableCell className="text-xs">{typeLabel}</TableCell>
                       <TableCell className="text-xs">{r.company_name ?? '—'}</TableCell>
-                      <TableCell className="text-xs">{r.chunk_label ?? '—'}</TableCell>
+                      <TableCell className="text-xs">{dateRangeForType(r.sync_type)}</TableCell>
+                      <TableCell className="text-right text-xs">
+                        {r.chunks_done}/{r.chunks_total}
+                        {r.chunks_failed > 0 ? ` (${r.chunks_failed} failed)` : ''}
+                      </TableCell>
                       <TableCell className="text-right text-xs">
                         {(r.records_fetched ?? 0).toLocaleString('en-IN')}
                       </TableCell>
                       <TableCell className="text-right text-xs">{dur}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={statusColor}>
-                          {r.status}
+                          {aggStatus}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   );
-                  if (r.status === 'failed' && r.error_message) {
+                  if ((aggStatus === 'failed' || aggStatus === 'partial') && r.error_message) {
                     return (
                       <Tooltip key={r.id}>
                         <TooltipTrigger asChild>{row}</TooltipTrigger>
