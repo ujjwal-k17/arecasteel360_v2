@@ -39,25 +39,29 @@ export function formatDate(d: string | Date | null | undefined): string {
 }
 
 // Parse a quantity string from line_items into MT.
-// Examples: "11.6050 MT", "1200 KG", "1.5 ton", "750 Kgs"
+// Only weight units are counted. Anything else (PCS, NOS, no-unit, etc.) → 0.
+// Examples: "11.6050 MT" → 11.605, "1200 Kgs" → 1.2, "3.00 PCS" → 0.
 export function parseQtyToMT(qty: unknown): number {
   if (qty == null) return 0;
-  if (typeof qty === 'number') return qty;
+  if (typeof qty === 'number') return qty; // legacy numeric callers — already MT
   const s = String(qty).trim();
   if (!s) return 0;
   const match = s.match(/([\d,]*\.?\d+)\s*([a-zA-Z]+)?/);
   if (!match) return 0;
   const num = parseFloat(match[1].replace(/,/g, ''));
   if (isNaN(num)) return 0;
-  const unit = (match[2] || 'mt').toLowerCase();
+  const unit = (match[2] || '').toLowerCase();
+
+  // MT / tonne — keep as-is
   if (unit.startsWith('mt') || unit === 'ton' || unit === 'tons' || unit === 'tonne' || unit === 'tonnes') {
     return num;
   }
-  if (unit.startsWith('kg')) return num / 1000;
-  if (unit.startsWith('g') && !unit.startsWith('gm')) return num / 1_000_000;
-  if (unit.startsWith('gm')) return num / 1_000_000;
-  // Fallback: assume MT
-  return num;
+  // KG / KGS — 1 MT = 1000 KG
+  if (unit === 'kg' || unit === 'kgs') {
+    return num / 1000;
+  }
+  // PCS, NOS, BOX, missing unit, anything else → ignore
+  return 0;
 }
 
 export function totalMTFromLineItems(lineItems: unknown): number {
