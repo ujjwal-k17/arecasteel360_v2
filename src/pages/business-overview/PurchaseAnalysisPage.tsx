@@ -4,9 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronRight, ShoppingCart, Search } from 'lucide-react';
 import { CompanyFilter } from '@/components/business-overview/CompanyFilter';
 import { LastSyncedFooter } from '@/components/business-overview/LastSyncedFooter';
+import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
 import {
   formatINR, formatINRCompact, formatMT, formatDate, totalMTFromLineItems, currentMonthRange, toISODate,
 } from '@/lib/business-overview-utils';
@@ -33,6 +36,8 @@ export default function PurchaseAnalysisPage() {
   const [to, setTo] = useState<string>(toISODate(currentMonthRange().to));
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showIntracompany, setShowIntracompany] = useState(false);
+  const intra = useIntracompanyParties();
 
   const range = useMemo(() => {
     if (monthSel === 'current') return currentMonthRange();
@@ -63,19 +68,30 @@ export default function PurchaseAnalysisPage() {
     },
   });
 
+  const { mainPurch, intraPurch } = useMemo(() => {
+    const intraSet = intra.data ?? new Set<string>();
+    const main: any[] = [];
+    const ic: any[] = [];
+    (purchases.data ?? []).forEach((v: any) => {
+      if (intraSet.has(v.party_name)) ic.push(v);
+      else main.push(v);
+    });
+    return { mainPurch: main, intraPurch: ic };
+  }, [purchases.data, intra.data]);
+
   const summary = useMemo(() => {
-    const data = purchases.data ?? [];
+    const data = mainPurch;
     return {
       value: data.reduce((s: number, d: any) => s + Number(d.amount || 0), 0),
       mt: data.reduce((s: number, d: any) => s + totalMTFromLineItems(d.line_items), 0),
       n: data.length,
       parties: new Set(data.map((d: any) => `${d.company_name}::${d.party_name ?? ''}`)).size,
     };
-  }, [purchases.data]);
+  }, [mainPurch]);
 
-  const grouped = useMemo(() => {
+  const buildGrouped = (rows: any[]) => {
     const map = new Map<string, { party: string; company: string; invoices: any[]; mt: number; value: number }>();
-    (purchases.data ?? []).forEach((v: any) => {
+    rows.forEach((v: any) => {
       const key = `${v.company_name}::${v.party_name ?? '(unknown)'}`;
       if (!map.has(key)) {
         map.set(key, { party: v.party_name ?? '(unknown)', company: v.company_name, invoices: [], mt: 0, value: 0 });
@@ -92,7 +108,15 @@ export default function PurchaseAnalysisPage() {
       arr = arr.filter(x => x.party.toLowerCase().includes(s));
     }
     return arr;
-  }, [purchases.data, search]);
+  };
+
+  const grouped = useMemo(() => buildGrouped(mainPurch), [mainPurch, search]);
+  const groupedIntra = useMemo(() => buildGrouped(intraPurch), [intraPurch, search]);
+  const intraSummary = useMemo(() => ({
+    value: intraPurch.reduce((s, d) => s + Number(d.amount || 0), 0),
+    mt: intraPurch.reduce((s, d) => s + totalMTFromLineItems(d.line_items), 0),
+    n: intraPurch.length,
+  }), [intraPurch]);
 
   const toggle = (key: string) =>
     setExpanded(prev => {
@@ -138,7 +162,11 @@ export default function PurchaseAnalysisPage() {
             <label className="text-xs text-muted-foreground">Company</label>
             <CompanyFilter value={company} onChange={setCompany} />
           </div>
-          <div className="space-y-1 ml-auto">
+          <div className="flex items-center gap-2 ml-auto">
+            <label className="text-xs text-muted-foreground">Show Intracompany</label>
+            <Switch checked={showIntracompany} onCheckedChange={setShowIntracompany} />
+          </div>
+          <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Search Supplier</label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -224,6 +252,55 @@ export default function PurchaseAnalysisPage() {
           )}
         </CardContent>
       </Card>
+
+      {showIntracompany && (
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              Intracompany Transactions
+              <Badge variant="secondary">Excluded from totals above</Badge>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Purchases where the supplier is one of your own Tally companies. Shown separately for transparency.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {groupedIntra.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No intracompany purchases in this period.</p>
+            ) : (
+              <>
+                <div className="text-xs text-muted-foreground mb-2">
+                  {intraSummary.n} invoices • {formatMT(intraSummary.mt)} MT • {formatINR(intraSummary.value)}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b text-left text-xs text-muted-foreground">
+                      <tr>
+                        <th className="py-2">Supplier (Intracompany)</th>
+                        <th className="py-2">Company</th>
+                        <th className="py-2 text-right">Invoices</th>
+                        <th className="py-2 text-right">Total MT</th>
+                        <th className="py-2 text-right">Total Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedIntra.map(g => (
+                        <tr key={g.key} className="border-b">
+                          <td className="py-2 font-medium">{g.party}</td>
+                          <td className="py-2 text-muted-foreground">{g.company}</td>
+                          <td className="py-2 text-right">{g.invoices.length}</td>
+                          <td className="py-2 text-right">{formatMT(g.mt)}</td>
+                          <td className="py-2 text-right font-medium">{formatINR(g.value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <LastSyncedFooter />
     </div>
