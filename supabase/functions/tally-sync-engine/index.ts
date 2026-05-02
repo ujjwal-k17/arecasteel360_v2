@@ -11,9 +11,9 @@ const corsHeaders = {
 };
 
 const TALLY_DIRECT_DEFAULT = 'http://103.239.89.153:9000';
-const TALLY_TIMEOUT_MS = 30_000;
-const FETCH_RETRIES = 3;
-const RETRY_GAP_MS = 5_000;
+const TALLY_TIMEOUT_MS = 12_000;
+const FETCH_RETRIES = 2;
+const RETRY_GAP_MS = 2_000;
 const INTER_STEP_GAP_MS = 2_000;
 const LOCK_WINDOW_MIN = 10;
 
@@ -146,7 +146,11 @@ async function tallyRequestOnce(url: string, xml: string): Promise<string> {
 // urls is a prioritized list (e.g., [tunnel, directIP]). Each URL gets up to
 // FETCH_RETRIES attempts; if all retries fail, the next URL is tried.
 async function tallyRequestWithRetry(urls: string | string[], xml: string, label: string): Promise<{ ok: true; text: string; url: string } | { ok: false; error: string }> {
-  const urlList = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
+  const urlList = [...new Map(
+    (Array.isArray(urls) ? urls : [urls])
+      .filter(Boolean)
+      .map((url) => [url.replace(/\/+$/, ''), url.replace(/\/+$/, '')]),
+  ).values()];
   if (urlList.length === 0) return { ok: false, error: `${label}: no Tally URL configured` };
 
   const errorsByUrl: string[] = [];
