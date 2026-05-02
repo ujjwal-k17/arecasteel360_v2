@@ -859,7 +859,8 @@ export default function TallySyncPage() {
                   <TableHead>Time</TableHead>
                   <TableHead>Sync Type</TableHead>
                   <TableHead>Company</TableHead>
-                  <TableHead>Chunk</TableHead>
+                  <TableHead>Date Range</TableHead>
+                  <TableHead className="text-right">Chunks</TableHead>
                   <TableHead className="text-right">Records</TableHead>
                   <TableHead className="text-right">Duration</TableHead>
                   <TableHead>Status</TableHead>
@@ -881,11 +882,19 @@ export default function TallySyncPage() {
                             1000
                         )}s`
                       : '—';
+                  // Aggregated status: running > failed > completed
+                  const aggStatus =
+                    r.chunks_running > 0 ? 'running' :
+                    r.chunks_failed > 0 && r.chunks_done === 0 ? 'failed' :
+                    r.chunks_failed > 0 ? 'partial' :
+                    r.chunks_done > 0 ? 'completed' : 'pending';
                   const statusColor =
-                    r.status === 'completed'
+                    aggStatus === 'completed'
                       ? 'bg-green-500/15 text-green-700 dark:text-green-400'
-                      : r.status === 'failed'
+                      : aggStatus === 'failed'
                       ? 'bg-red-500/15 text-red-700 dark:text-red-400'
+                      : aggStatus === 'partial'
+                      ? 'bg-orange-500/15 text-orange-700 dark:text-orange-400'
                       : 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400';
                   const typeLabel =
                     r.sync_type === 'historical' ? 'previous_fy' :
@@ -895,19 +904,23 @@ export default function TallySyncPage() {
                       <TableCell className="text-xs">{formatDateTime(r.started_at)}</TableCell>
                       <TableCell className="text-xs">{typeLabel}</TableCell>
                       <TableCell className="text-xs">{r.company_name ?? '—'}</TableCell>
-                      <TableCell className="text-xs">{r.chunk_label ?? '—'}</TableCell>
+                      <TableCell className="text-xs">{dateRangeForType(r.sync_type)}</TableCell>
+                      <TableCell className="text-right text-xs">
+                        {r.chunks_done}/{r.chunks_total}
+                        {r.chunks_failed > 0 ? ` (${r.chunks_failed} failed)` : ''}
+                      </TableCell>
                       <TableCell className="text-right text-xs">
                         {(r.records_fetched ?? 0).toLocaleString('en-IN')}
                       </TableCell>
                       <TableCell className="text-right text-xs">{dur}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={statusColor}>
-                          {r.status}
+                          {aggStatus}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   );
-                  if (r.status === 'failed' && r.error_message) {
+                  if ((aggStatus === 'failed' || aggStatus === 'partial') && r.error_message) {
                     return (
                       <Tooltip key={r.id}>
                         <TooltipTrigger asChild>{row}</TooltipTrigger>
