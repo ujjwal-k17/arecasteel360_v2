@@ -7,12 +7,33 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Eraser } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+
+// Tables that hold company-scoped synced data
+const SYNCED_TABLES = [
+  'tally_vouchers',
+  'tally_groups',
+  'tally_ledger_balances',
+  'tally_stock_items',
+  'tally_sync_log',
+] as const;
+
+async function purgeCompanyData(companyName: string) {
+  const results = await Promise.all(
+    SYNCED_TABLES.map((t) =>
+      supabase.from(t as any).delete().eq('company_name', companyName).select('id'),
+    ),
+  );
+  const errors = results.map((r, i) => (r.error ? `${SYNCED_TABLES[i]}: ${r.error.message}` : null)).filter(Boolean);
+  const totalDeleted = results.reduce((s, r) => s + (Array.isArray(r.data) ? r.data.length : 0), 0);
+  if (errors.length) throw new Error(errors.join('; '));
+  return totalDeleted;
+}
 
 export default function TallyCompaniesTab() {
   const qc = useQueryClient();
@@ -34,6 +55,8 @@ export default function TallyCompaniesTab() {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['admin-tally-companies'] });
     qc.invalidateQueries({ queryKey: ['business-overview', 'companies'] });
+    qc.invalidateQueries({ queryKey: ['sales-analysis'] });
+    qc.invalidateQueries({ queryKey: ['purchase-analysis'] });
   };
 
   const addCompany = async () => {
@@ -71,14 +94,32 @@ export default function TallyCompaniesTab() {
     refresh();
   };
 
-  const remove = async (id: string, label: string) => {
-    const { error } = await supabase.from('tally_companies').delete().eq('id', id);
-    if (error) {
-      toast.error(error.message);
-      return;
+  const purge = async (label: string) => {
+    setBusy(true);
+    try {
+      const n = await purgeCompanyData(label);
+      toast.success(`Purged ${n} synced rows for ${label}`);
+      refresh();
+    } catch (e: any) {
+      toast.error(e.message || 'Purge failed');
+    } finally {
+      setBusy(false);
     }
-    toast.success(`Deleted ${label}`);
-    refresh();
+  };
+
+  const removeWithPurge = async (id: string, label: string) => {
+    setBusy(true);
+    try {
+      await purgeCompanyData(label);
+      const { error } = await supabase.from('tally_companies').delete().eq('id', id);
+      if (error) throw error;
+      toast.success(`Deleted ${label} and purged synced data`);
+      refresh();
+    } catch (e: any) {
+      toast.error(e.message || 'Delete failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -110,8 +151,9 @@ export default function TallyCompaniesTab() {
         <CardHeader>
           <CardTitle>Companies ({companies.length})</CardTitle>
           <CardDescription>
-            Toggle a company off to skip it in future syncs without deleting historical data.
-            Deleting a company only removes the entry from this list — synced vouchers remain.
+            Toggle a company off to skip it in future syncs (historical data is preserved).
+            Use <b>Purge</b> to wipe already-synced vouchers, ledgers, groups and stock for a company.
+            <b> Delete</b> removes the company from this list <i>and</i> purges its synced data.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -123,7 +165,7 @@ export default function TallyCompaniesTab() {
                 <TableRow>
                   <TableHead>Company Name</TableHead>
                   <TableHead className="w-[140px]">Active</TableHead>
-                  <TableHead className="w-[100px] text-right">Actions</TableHead>
+                  <TableHead className="w-[180px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -134,12 +176,35 @@ export default function TallyCompaniesTab() {
                       <Switch
                         checked={!!c.is_active}
                         onCheckedChange={(v) => toggleActive(c.id, v)}
+                        disabled={busy}
                       />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-1">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" disabled={busy} title="Purge synced data">
+                            <Eraser className="h-4 w-4 text-amber-600" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Purge synced data for {c.company_name}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This permanently deletes all vouchers, ledger balances, groups, stock items and sync logs for <b>{c.company_name}</b> from the database. The company entry stays in this list. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => purge(c.company_name)}>
+                              Purge
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" disabled={busy} title="Delete company & purge data">
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </AlertDialogTrigger>
@@ -147,13 +212,13 @@ export default function TallyCompaniesTab() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete {c.company_name}?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This removes the company from the sync list. Already-synced vouchers and ledgers will remain in the database but new syncs will not pull data for this company. Consider toggling Active off instead if you want to preserve the entry.
+                              This removes <b>{c.company_name}</b> from the sync list and permanently deletes all of its synced vouchers, ledgers, groups, stock items and sync logs. This cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => remove(c.id, c.company_name)}>
-                              Delete
+                            <AlertDialogAction onClick={() => removeWithPurge(c.id, c.company_name)}>
+                              Delete & Purge
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
