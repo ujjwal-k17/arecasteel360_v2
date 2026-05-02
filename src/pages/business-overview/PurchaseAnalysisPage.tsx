@@ -134,9 +134,23 @@ export default function PurchaseAnalysisPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold">Purchase Analysis</h1>
-        <p className="text-sm text-muted-foreground">Procurement performance — supplier wise</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Purchase Analysis</h1>
+          <p className="text-sm text-muted-foreground">Procurement performance — supplier wise</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ['purchase-analysis'] });
+            toast.success('Refreshing purchase data…');
+          }}
+          disabled={purchases.isFetching}
+        >
+          <RefreshCw className={`h-4 w-4 ${purchases.isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       <Card>
