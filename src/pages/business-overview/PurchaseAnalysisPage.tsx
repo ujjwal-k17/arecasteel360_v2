@@ -56,8 +56,10 @@ export default function PurchaseAnalysisPage() {
     queryFn: async () => {
       let q = supabase
         .from('tally_vouchers')
-        .select('voucher_number, party_name, amount, date, line_items, narration, company_name')
-        .eq('voucher_type', 'Purchase')
+        .select('voucher_number, party_name, amount, date, line_items, narration, company_name, voucher_type')
+        // Match all purchase variants: "Purchase", "Purchase Goods", "Purchase Gst", "Purchase Order", etc.
+        // Exclude Debit/Credit Note Purchase (those are adjustments, not purchases).
+        .ilike('voucher_type', 'Purchase%')
         .gte('date', toISODate(range.from))
         .lte('date', toISODate(range.to))
         .order('date', { ascending: false })
@@ -70,11 +72,11 @@ export default function PurchaseAnalysisPage() {
   });
 
   const { mainPurch, intraPurch } = useMemo(() => {
-    const intraSet = intra.data ?? new Set<string>();
+    const matcher = intra.data;
     const main: any[] = [];
     const ic: any[] = [];
     (purchases.data ?? []).forEach((v: any) => {
-      if (intraSet.has(v.party_name)) ic.push(v);
+      if (matcher?.isIntracompany(v.party_name)) ic.push(v);
       else main.push(v);
     });
     return { mainPurch: main, intraPurch: ic };
