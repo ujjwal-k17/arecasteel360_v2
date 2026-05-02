@@ -228,99 +228,122 @@ function AnalysisView({ side }: Mode) {
 
   const buckets: AgeingBucket[] = ['not_yet_due', '1_30', '31_60', '61_90', '90_plus'];
 
-  // Build party rows.
-  // For debtors: only Sundry Debtors with debit balance (positive after sign flip).
-  //   credit balances on Sundry Debtors are advances → moved to creditor view as "Advance from Customers".
-  // For creditors: Sundry Creditors normal (positive closing) + advance customers section.
+  // Build party rows using the new ledger-anchored balance calculator.
+  // Outstanding always == ledger closing balance (sign-corrected). FIFO is used only
+  // for invoice-wise paid/outstanding/overdue distribution in the drill-down.
   const { mainRows, advanceRows } = useMemo(() => {
     if (!vchr.data || !ledg.data) return { mainRows: [], advanceRows: [] };
 
     const intraSet = intra.data ?? new Set<string>();
 
-    // Group vouchers by company::party for FIFO calc later
-    const grouper = (invType: string, recType: string) => {
-      const g = new Map<string, { invoices: any[]; receipts: any[] }>();
-      vchr.data.forEach((v: any) => {
-        if (intraSet.has(v.party_name)) return;
-        const key = `${v.company_name}::${v.party_name ?? ''}`;
-        if (!g.has(key)) g.set(key, { invoices: [], receipts: [] });
-        const rec = g.get(key)!;
-        if (v.voucher_type === invType) rec.invoices.push(v);
-        else if (v.voucher_type === recType) rec.receipts.push(v);
-      });
-      return g;
-    };
+    // Group vouchers by company::party
+    const vchrByParty = new Map<string, any[]>();
+    vchr.data.forEach((v: any) => {
+      if (intraSet.has(v.party_name)) return;
+      const key = `${v.company_name}::${v.party_name ?? ''}`;
+      if (!vchrByParty.has(key)) vchrByParty.set(key, []);
+      vchrByParty.get(key)!.push(v);
+    });
 
-    const debtorGroups = grouper('Sales', 'Receipt');
-    const creditorGroups = grouper('Purchase', 'Payment');
+    // Group ledger snapshots by company::ledger
+    type Snap = { as_of_date: string; closing_balance: number; ultimate_group?: string; ledger_group?: string };
+    const snapsByLedger = new Map<string, Snap[]>();
+    const groupByLedger = new Map<string, string>();
+    ledg.data.forEach((l: any) => {
+      const key = `${l.company_name}::${l.ledger_name}`;
+      if (!snapsByLedger.has(key)) snapsByLedger.set(key, []);
+      snapsByLedger.get(key)!.push(l);
+      const grp = l.ultimate_group ?? l.ledger_group ?? '';
+      if (!groupByLedger.has(key)) groupByLedger.set(key, grp);
+    });
 
     const buildRow = (
       key: string,
       partyName: string,
       companyKey: string,
-      groups: Map<string, { invoices: any[]; receipts: any[] }>,
-      ledgerOutstanding: number,
       isAdvance: boolean,
+      side_: 'debtors' | 'creditors',
     ) => {
-      const g = groups.get(key) ?? { invoices: [], receipts: [] };
-      const invs = g.invoices.map((s: any) => ({
-        voucher_number: s.voucher_number,
-        date: s.date,
-        amount: Number(s.amount || 0),
-        narration: s.narration,
-        credit_period_days: resolveCreditPeriod(companyKey, s.voucher_number, partyName, cpMap, dmMap),
-      }));
-      const recs = g.receipts.map((r: any) => ({ date: r.date, amount: Number(r.amount || 0) }));
-      const fifo = applyFIFO(invs, recs);
-      const totalOverdue = fifo
-        .filter(r => r.outstanding > 0 && r.days_overdue > 0)
-        .reduce((s, r) => s + r.outstanding, 0);
-      const maxOverdueDays = Math.max(0, ...fifo.filter(r => r.outstanding > 0).map(r => r.days_overdue));
-      const ageBucket = ageingBucketFor(maxOverdueDays);
+      const partyVchrs = (vchrByParty.get(key) ?? []) as any[];
+      const snaps = snapsByLedger.get(key) ?? [];
       const partyDM = dmRecordMap.get(key);
+
+      const balance = calculatePartyBalance({
+        side: side_,
+        vouchers: partyVchrs.map((v: any) => ({
+          voucher_number: v.voucher_number,
+          voucher_type: v.voucher_type,
+          date: v.date,
+          amount: Number(v.amount || 0),
+          narration: v.narration,
+        })),
+        ledgerSnaps: snaps.map((s: any) => ({
+          as_of_date: s.as_of_date,
+          closing_balance: Number(s.closing_balance || 0),
+        })),
+        creditPeriodResolver: (vno, _date) =>
+          resolveCreditPeriod(companyKey, vno, partyName, cpMap, dmMap),
+      });
+
+      // For "Advance from Customers" rows on the creditor side, ledgerOutstanding (debtor-side
+      // computation) is negative; flip to a positive payable.
+      const totalOutstanding = isAdvance
+        ? Math.max(0, -balance.ledgerOutstanding)
+        : Math.max(0, balance.ledgerOutstanding);
+
+      const ageBucket = balance.maxOverdueDays > 0
+        ? ageingBucketFor(balance.maxOverdueDays)
+        : 'not_yet_due' as AgeingBucket;
+
       return {
         key,
         company: companyKey,
         party: partyName,
         creditPeriod: partyDM?.credit_period_days ?? null,
         salesRep: partyDM?.sales_rep ?? null,
-        totalOutstanding: ledgerOutstanding,
-        totalOverdue,
-        maxOverdueDays,
+        totalOutstanding,
+        totalOverdue: balance.totalOverdue,
+        maxOverdueDays: balance.maxOverdueDays,
         ageBucket,
         isAdvance,
-        fifo: fifo.filter(r => r.outstanding > 0).sort((a, b) => b.days_overdue - a.days_overdue),
+        balance,
+        invoices: balance.invoices,
       };
     };
 
     const main: any[] = [];
     const advances: any[] = [];
 
-    ledg.data.forEach((l: any) => {
-      const partyName = l.ledger_name;
+    // Iterate the union of ledger-keys and voucher-keys so that parties with vouchers
+    // but no ledger row (rare) still surface, but only debtors/creditors are kept.
+    const allKeys = new Set<string>([...snapsByLedger.keys(), ...vchrByParty.keys()]);
+
+    allKeys.forEach((key) => {
+      const [companyKey, partyName] = key.split('::');
+      if (!partyName) return;
       if (intraSet.has(partyName)) return;
-      const grp = l.ultimate_group ?? l.ledger_group;
-      const key = `${l.company_name}::${partyName}`;
-      const closing = Number(l.closing_balance || 0);
+
+      const grp = groupByLedger.get(key);
+      // If we have no ledger at all for this party, default-classify by side
+      // (cannot determine group; skip — outstanding wouldn't be reliable anyway).
+      if (!grp) return;
 
       if (grp === 'Sundry Debtors') {
-        const out = debtorOutstandingFromClosing(closing); // flipped
         if (side === 'debtors') {
-          // Show ALL debtors with any debit balance, no minimum threshold.
-          if (out > 0) {
-            main.push(buildRow(key, partyName, l.company_name, debtorGroups, out, false));
-          }
+          // Compute side='debtors' to get debit-positive ledgerOutstanding
+          const row = buildRow(key, partyName, companyKey, false, 'debtors');
+          if (row.totalOutstanding > 0) main.push(row);
         } else {
-          // creditor view: pick up advances (credit balance on debtor ledger)
-          if (out < 0) {
-            advances.push(buildRow(key, partyName, l.company_name, debtorGroups, Math.abs(out), true));
+          // creditor view → advances (credit balance on debtor ledger).
+          // Use side='debtors' to compute ledgerOutstanding, then check it's negative.
+          const probe = buildRow(key, partyName, companyKey, true, 'debtors');
+          if (probe.balance.ledgerOutstanding < 0) {
+            advances.push(probe);
           }
         }
       } else if (grp === 'Sundry Creditors' && side === 'creditors') {
-        const out = creditorOutstandingFromClosing(closing);
-        if (out > 0) {
-          main.push(buildRow(key, partyName, l.company_name, creditorGroups, out, false));
-        }
+        const row = buildRow(key, partyName, companyKey, false, 'creditors');
+        if (row.totalOutstanding > 0) main.push(row);
       }
     });
 
