@@ -403,7 +403,7 @@ function PurchasesSection() {
       if (!map.has(d)) map.set(d, { invKg: 0, tallyKg: 0 });
       map.get(d)![key] += kg;
     };
-    (batches.data || []).forEach((r: any) => add(r.updated_at, Number(r.net_weight || 0), 'invKg'));
+    (batches.data || []).forEach((r: any) => add(r.purchase_date, Number(r.net_weight || 0), 'invKg'));
     (tallyPurch.data || []).forEach((r: any) => {
       if (intra.data?.isIntracompany(r.party_name)) return;
       add(r.date, totalMTFromLineItems(r.line_items) * 1000, 'tallyKg');
@@ -416,7 +416,7 @@ function PurchasesSection() {
   const showInvDrill = (date?: string) => {
     const map = new Map<string, number>();
     (batches.data || []).forEach((r: any) => {
-      const matchDate = date ? (r.updated_at && isoDate(new Date(r.updated_at)) === date) : inRange(r.updated_at, range);
+      const matchDate = date ? (r.purchase_date && isoDate(new Date(r.purchase_date)) === date) : inRange(r.purchase_date, range);
       if (!matchDate) return;
       const name = r.purchase_from || '(no supplier)';
       map.set(name, (map.get(name) || 0) + Number(r.net_weight || 0));
