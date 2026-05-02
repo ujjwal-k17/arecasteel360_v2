@@ -157,7 +157,7 @@ export default function MISDashboardPage() {
 
   // Need voucher_type for overdue grouping — refetch with type
   const overdueDetail = useQuery({
-    queryKey: ['mis', 'overdueDetail', company],
+    queryKey: ['mis', 'overdueDetail', company, intraSet.size],
     queryFn: async () => {
       let q = supabase
         .from('tally_vouchers')
@@ -178,6 +178,8 @@ export default function MISDashboardPage() {
       type Rec = { sales: any[]; purchases: any[]; receipts: any[]; payments: any[] };
       const groups = new Map<string, Rec>();
       (data ?? []).forEach((v: any) => {
+        // Exclude intracompany parties from overdue calculations
+        if (intraSet.has(v.party_name)) return;
         const key = `${v.company_name}::${v.party_name ?? ''}`;
         if (!groups.has(key)) groups.set(key, { sales: [], purchases: [], receipts: [], payments: [] });
         const g = groups.get(key)!;
@@ -194,15 +196,11 @@ export default function MISDashboardPage() {
 
       groups.forEach((g, key) => {
         const [companyKey, partyName] = key.split('::');
-        // Debtor side
         const salesInv = g.sales.map((s: any) => ({
           voucher_number: s.voucher_number,
           date: s.date,
           amount: Number(s.amount || 0),
-          credit_period_days:
-            cpMap.get(`${companyKey}::${s.voucher_number}`) ??
-            dmMap.get(`${companyKey}::${partyName}`) ??
-            0,
+          credit_period_days: resolveCreditPeriod(companyKey, s.voucher_number, partyName, cpMap, dmMap),
         }));
         const recVchr = g.receipts.map((r: any) => ({ date: r.date, amount: Number(r.amount || 0) }));
         const fifoDeb = applyFIFO(salesInv, recVchr);
@@ -214,12 +212,11 @@ export default function MISDashboardPage() {
           overdueDebtors.push({ party: partyName, amount: debOverSum, days: maxDays });
         }
 
-        // Creditor side
         const purInv = g.purchases.map((s: any) => ({
           voucher_number: s.voucher_number,
           date: s.date,
           amount: Number(s.amount || 0),
-          credit_period_days: cpMap.get(`${companyKey}::${s.voucher_number}`) ?? 0,
+          credit_period_days: resolveCreditPeriod(companyKey, s.voucher_number, partyName, cpMap, dmMap),
         }));
         const payVchr = g.payments.map((r: any) => ({ date: r.date, amount: Number(r.amount || 0) }));
         const fifoCre = applyFIFO(purInv, payVchr);
@@ -238,14 +235,24 @@ export default function MISDashboardPage() {
     },
   });
 
+  // Sign-flip + intracompany exclusion for outstanding totals.
   const debtorOutstanding = (ledgers.data ?? [])
     .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Debtors')
-    .reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
+    .filter((l: any) => !intraSet.has(l.ledger_name))
+    .reduce((s: number, l: any) => {
+      const flipped = debtorOutstandingFromClosing(l.closing_balance);
+      return s + (flipped > 0 ? flipped : 0); // only debit balances count as debtor outstanding
+    }, 0);
   const creditorOutstanding = (ledgers.data ?? [])
     .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Creditors')
-    .reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
+    .filter((l: any) => !intraSet.has(l.ledger_name))
+    .reduce((s: number, l: any) => {
+      const out = creditorOutstandingFromClosing(l.closing_balance);
+      return s + (out > 0 ? out : 0);
+    }, 0);
   const banks = (ledgers.data ?? []).filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Bank Accounts');
   const bankTotal = banks.reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
+
 
   const m = monthly.data;
   const isLoading = monthly.isLoading || ledgers.isLoading;
