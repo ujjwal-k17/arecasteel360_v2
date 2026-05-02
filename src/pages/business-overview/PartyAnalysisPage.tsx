@@ -105,17 +105,27 @@ function AnalysisView({ side }: Mode) {
     },
   });
 
-  // Ledger balances — pull both Sundry Debtors and Sundry Creditors so we can re-classify by sign
+  // Ledger balances — always use the latest snapshot per (company, ledger).
+  // Tally writes one row per as_of_date; we keep only the most recent.
   const ledg = useQuery({
     queryKey: ['party-analysis', 'ledgers', company],
     queryFn: async () => {
       let q = supabase
         .from('tally_ledger_balances')
-        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name');
+        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
+        .order('as_of_date', { ascending: false });
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      // Dedupe — first occurrence wins (already sorted desc by as_of_date)
+      const seen = new Set<string>();
+      const latest = (data ?? []).filter((r: any) => {
+        const k = `${r.company_name}::${r.ledger_name}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      return latest;
     },
   });
 
@@ -269,18 +279,19 @@ function AnalysisView({ side }: Mode) {
       if (grp === 'Sundry Debtors') {
         const out = debtorOutstandingFromClosing(closing); // flipped
         if (side === 'debtors') {
-          if (out > 0.01) {
+          // Show ALL debtors with any debit balance, no minimum threshold.
+          if (out > 0) {
             main.push(buildRow(key, partyName, l.company_name, debtorGroups, out, false));
           }
         } else {
           // creditor view: pick up advances (credit balance on debtor ledger)
-          if (out < -0.01) {
+          if (out < 0) {
             advances.push(buildRow(key, partyName, l.company_name, debtorGroups, Math.abs(out), true));
           }
         }
       } else if (grp === 'Sundry Creditors' && side === 'creditors') {
         const out = creditorOutstandingFromClosing(closing);
-        if (out > 0.01) {
+        if (out > 0) {
           main.push(buildRow(key, partyName, l.company_name, creditorGroups, out, false));
         }
       }
