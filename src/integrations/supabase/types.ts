@@ -250,6 +250,7 @@ export type Database = {
           id: string
           is_active: boolean
           ledger_name: string
+          sales_rep: string | null
           updated_at: string
         }
         Insert: {
@@ -262,6 +263,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           ledger_name: string
+          sales_rep?: string | null
           updated_at?: string
         }
         Update: {
@@ -274,6 +276,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           ledger_name?: string
+          sales_rep?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1021,6 +1024,27 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+        }
+        Relationships: []
+      }
+      sales_reps: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
         }
         Relationships: []
       }
