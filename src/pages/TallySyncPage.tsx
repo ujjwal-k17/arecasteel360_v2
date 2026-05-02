@@ -342,6 +342,9 @@ export default function TallySyncPage() {
           .upsert({ sync_type: syncType, is_paused: false }, { onConflict: 'sync_type' });
 
         let lastData: any = null;
+        let okCount = 0;
+        let failCount = 0;
+        let firstErr: string | null = null;
         let safety = 200;
         while (safety-- > 0) {
           if (pauseRef.current) {
@@ -352,8 +355,11 @@ export default function TallySyncPage() {
           if (error) throw error;
           lastData = data;
           if (data?.success === false) {
-            const firstErr = data?.error || data?.summary?.flatMap((s: any) => s.results ?? []).find((r: any) => !r.ok)?.error;
-            throw new Error(firstErr || `${label} sync failed`);
+            const e = data?.error || data?.summary?.flatMap((s: any) => s.results ?? []).find((r: any) => !r.ok)?.error;
+            failCount++;
+            if (!firstErr) firstErr = e || `${label} chunk failed`;
+          } else if ((data?.processed_this_call ?? 0) > 0) {
+            okCount++;
           }
           qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
           qc.invalidateQueries({ queryKey: ['tally-counts'] });
@@ -367,7 +373,10 @@ export default function TallySyncPage() {
             break;
           }
         }
-        return { fn, data: lastData } as { fn: SyncFn; data: any };
+        return {
+          fn,
+          data: { ...(lastData || {}), ok_count: okCount, fail_count: failCount, first_error: firstErr },
+        } as { fn: SyncFn; data: any };
       }
       const { data, error } = await supabase.functions.invoke(fn, { body: {} });
       if (error) throw error;
@@ -381,7 +390,7 @@ export default function TallySyncPage() {
         fn === 'sync-current-month' ? 'Current month' :
         fn === 'sync-last-month' ? 'Last month' :
         fn === 'sync-historical' ? 'Previous FY' : 'Current FY (YTD)';
-      if (fn === 'sync-historical') {
+      if (fn === 'sync-historical' || fn === 'sync-last-month' || fn === 'sync-current-fy') {
         if (data?.paused) {
           // toast already shown
         } else if (fail === 0 && ok > 0) {
@@ -393,8 +402,6 @@ export default function TallySyncPage() {
         } else {
           toast.error(`${label} failed${data?.first_error ? ` — ${data.first_error}` : ''}`);
         }
-      } else if (fn === 'sync-current-fy') {
-        toast.success(`${label} sync complete`);
       } else if (fail === 0 && total > 0) {
         toast.success(`${label} sync complete — ${ok} of ${total} companies OK`);
       } else if (ok > 0 && fail > 0) {
