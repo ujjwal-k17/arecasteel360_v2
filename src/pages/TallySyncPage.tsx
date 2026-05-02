@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { upsertDebtorsFromSales } from '@/lib/business-overview-sync';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -421,6 +422,8 @@ export default function TallySyncPage() {
       }
       qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
       qc.invalidateQueries({ queryKey: ['tally-counts'] });
+      // Auto-populate Business Overview debtor master from Sales vouchers (never overwrites credit period)
+      upsertDebtorsFromSales();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Sync failed to start'),
   });

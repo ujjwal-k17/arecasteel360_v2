@@ -19,6 +19,11 @@ import NotFound from "./pages/NotFound";
 
 import SetupPage from "./pages/SetupPage";
 import TallySyncPage from "./pages/TallySyncPage";
+import MISDashboardPage from "./pages/business-overview/MISDashboardPage";
+import SalesAnalysisPage from "./pages/business-overview/SalesAnalysisPage";
+import PartyAnalysisPage from "./pages/business-overview/PartyAnalysisPage";
+import PurchaseAnalysisPage from "./pages/business-overview/PurchaseAnalysisPage";
+import PartyLedgerPage from "./pages/business-overview/PartyLedgerPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +55,12 @@ const App = () => (
               <Route path="/freight" element={<ProtectedRoute page="freight"><FreightPage /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute page="admin"><AdminPage /></ProtectedRoute>} />
               <Route path="/tally-sync" element={<ProtectedRoute page="tally-sync"><TallySyncPage /></ProtectedRoute>} />
+              <Route path="/business-overview" element={<ProtectedRoute page="business-overview"><MISDashboardPage /></ProtectedRoute>} />
+              <Route path="/business-overview/sales" element={<ProtectedRoute page="business-overview"><SalesAnalysisPage /></ProtectedRoute>} />
+              <Route path="/business-overview/debtors" element={<ProtectedRoute page="business-overview"><PartyAnalysisPage side="debtors" /></ProtectedRoute>} />
+              <Route path="/business-overview/purchase" element={<ProtectedRoute page="business-overview"><PurchaseAnalysisPage /></ProtectedRoute>} />
+              <Route path="/business-overview/creditors" element={<ProtectedRoute page="business-overview"><PartyAnalysisPage side="creditors" /></ProtectedRoute>} />
+              <Route path="/business-overview/party-ledger" element={<ProtectedRoute page="business-overview"><PartyLedgerPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

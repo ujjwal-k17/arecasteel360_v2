@@ -1,4 +1,4 @@
-import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard, Settings, LogOut, RefreshCcw } from 'lucide-react';
+import { Package, Wrench, ClipboardList, Wallet, Truck, LayoutDashboard, Settings, LogOut, RefreshCcw, BarChart3, TrendingUp, Users, ShoppingCart, Building2, BookOpen } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -22,9 +23,20 @@ const modules = [
   { title: 'Inventory', url: '/inventory', icon: Package, page: 'inventory' },
   { title: 'Consumables', url: '/consumables', icon: Wrench, page: 'consumables' },
   { title: 'Order Book', url: '/order-book', icon: ClipboardList, page: 'order-book' },
-  
   { title: 'Petty Cash', url: '/petty-cash', icon: Wallet, page: 'petty-cash' },
   { title: 'Transportation', url: '/freight', icon: Truck, page: 'freight' },
+];
+
+const businessOverviewModules = [
+  { title: 'MIS Dashboard', url: '/business-overview', icon: BarChart3, end: true },
+  { title: 'Sales Analysis', url: '/business-overview/sales', icon: TrendingUp },
+  { title: 'Debtor Analysis', url: '/business-overview/debtors', icon: Users },
+  { title: 'Purchase Analysis', url: '/business-overview/purchase', icon: ShoppingCart },
+  { title: 'Creditor Analysis', url: '/business-overview/creditors', icon: Building2 },
+  { title: 'Party Ledger', url: '/business-overview/party-ledger', icon: BookOpen },
+];
+
+const tallyModules = [
   { title: 'Tally Sync', url: '/tally-sync', icon: RefreshCcw, page: 'tally-sync' },
 ];
 
@@ -35,8 +47,6 @@ export function AppSidebar() {
   const { isAdmin, canView, signOut, user } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
-
-  const visibleModules = modules.filter(m => isAdmin || canView(m.page));
 
   return (
     <Sidebar collapsible="icon">
@@ -54,7 +64,63 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleModules.map((item) => (
+              {modules.filter(m => isAdmin || canView(m.page)).map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                  >
+                    <NavLink
+                      to={item.url}
+                      end
+                      className="hover:bg-sidebar-accent/50"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {(isAdmin || canView('business-overview')) && (
+          <SidebarGroup>
+            {!collapsed && <SidebarGroupLabel>Business Overview</SidebarGroupLabel>}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {businessOverviewModules.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location.pathname === item.url}
+                      tooltip={item.title}
+                    >
+                      <NavLink
+                        to={item.url}
+                        end={item.end ?? false}
+                        className="hover:bg-sidebar-accent/50"
+                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        <SidebarGroup>
+          {!collapsed && <SidebarGroupLabel>Tally Sync</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {tallyModules.filter(m => isAdmin || canView(m.page)).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
