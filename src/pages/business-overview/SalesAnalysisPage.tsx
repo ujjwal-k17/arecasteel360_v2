@@ -190,6 +190,18 @@ export default function SalesAnalysisPage() {
           <h1 className="text-2xl font-bold">Sales Analysis</h1>
           <p className="text-sm text-muted-foreground">Dispatch performance — debtor & invoice wise</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ['sales-analysis'] });
+            toast.success('Refreshing sales data…');
+          }}
+          disabled={sales.isFetching}
+        >
+          <RefreshCw className={`h-4 w-4 ${sales.isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Filters */}
