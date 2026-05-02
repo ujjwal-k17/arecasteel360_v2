@@ -351,6 +351,10 @@ export default function TallySyncPage() {
           const { data, error } = await supabase.functions.invoke(fn, { body: {} });
           if (error) throw error;
           lastData = data;
+          if (data?.success === false) {
+            const firstErr = data?.error || data?.summary?.flatMap((s: any) => s.results ?? []).find((r: any) => !r.ok)?.error;
+            throw new Error(firstErr || `${label} sync failed`);
+          }
           qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
           qc.invalidateQueries({ queryKey: ['tally-counts'] });
           if (data?.paused) {

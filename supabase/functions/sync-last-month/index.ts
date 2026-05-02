@@ -161,6 +161,7 @@ Deno.serve(async (req) => {
       }
 
       const remaining = chunks.length - (startIdx + 1);
+      const chunkOk = companyResults.every((r) => r.ok);
 
       summary.push({
         company: c.company_name,
@@ -172,7 +173,8 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({
-          success: true,
+          success: chunkOk,
+          error: chunkOk ? null : companyResults.find((r) => !r.ok)?.error,
           done: false,
           total_chunks: chunks.length,
           processed_this_call: companyResults.length,
