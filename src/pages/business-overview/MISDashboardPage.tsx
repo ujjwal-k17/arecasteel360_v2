@@ -100,7 +100,7 @@ export default function MISDashboardPage() {
     queryFn: async () => {
       let q = supabase
         .from('tally_ledger_balances')
-        .select('ledger_name, ledger_group, closing_balance, company_name');
+        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name');
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
