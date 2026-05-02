@@ -266,7 +266,7 @@ export default function PartyLedgerPage() {
             <CardContent>
               {txns.isLoading ? (
                 <Skeleton className="h-40 w-full" />
-              ) : rowsWithBalance.length === 0 ? (
+              ) : rowsWithBalance.length === 0 && Math.abs(opening) <= 0.01 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">No data found. Run Tally Sync to import data.</p>
               ) : (
                 <div className="overflow-x-auto">
