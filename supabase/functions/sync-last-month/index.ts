@@ -143,12 +143,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    const totalProcessed = summary.reduce((acc: number, s: any) => acc + (s.chunks_processed || 0), 0);
+    const anyError = summary.some((s: any) => (s.results || []).some((r: any) => !r.ok));
     return new Response(
       JSON.stringify({
-        success: true,
+        success: !anyError,
+        error: anyError ? "One or more chunks failed" : null,
         done: true,
         total_chunks: chunks.length,
-        processed_this_call: 0,
+        processed_this_call: totalProcessed,
         summary,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
