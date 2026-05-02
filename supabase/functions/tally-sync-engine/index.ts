@@ -111,12 +111,23 @@ function buildWeeklyRanges(from: string, to: string): Array<[string, string]> {
   return out;
 }
 
+// Strip stray <NAME>... wrapper that Tally sometimes double-encodes inside attribute values.
+function cleanTallyName(s: string | null): string | null {
+  if (!s) return s;
+  let out = s.trim();
+  // Repeatedly strip a leading literal "<NAME>" (case-insensitive)
+  while (/^<NAME>/i.test(out)) out = out.replace(/^<NAME>/i, '').trim();
+  // Strip a trailing literal "</NAME>" if present
+  out = out.replace(/<\/NAME>\s*$/i, '').trim();
+  return out;
+}
+
 // Pull NAME from either <NAME> child or NAME="..." attribute
 function extractNameAttr(block: string): string | null {
   const child = getTagText(block, 'NAME');
-  if (child) return child;
+  if (child) return cleanTallyName(child);
   const attr = block.match(/\sNAME="([^"]+)"/i);
-  return attr ? decodeXmlEntities(attr[1]) : null;
+  return attr ? cleanTallyName(decodeXmlEntities(attr[1])) : null;
 }
 
 // ---------- Tally request with retry ----------
