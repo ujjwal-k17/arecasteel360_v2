@@ -627,7 +627,52 @@ Deno.serve(async (req) => {
   }
   await sleep(INTER_STEP_GAP_MS);
 
-  // Step 3 — Ledger balances (skipped when fetch_ledgers=false, e.g. for
+  // Step 3a — Groups (always fetched when ledgers are fetched, so the
+  // group→ultimate_parent map is fresh before ledgers are processed).
+  let groupCount = 0;
+  const ultimateByGroup = new Map<string, string>();
+  if (fetch_ledgers) {
+    try {
+      const groupXml = buildGroupsXml(company_name);
+      const res = await tallyRequestWithRetry(tallyUrl, groupXml, 'groups');
+      if (!res.ok) {
+        errors.push(res.error);
+      } else {
+        const groupRows = computeUltimateParents(parseGroups(res.text, company_name, syncedAtIso));
+        for (const g of groupRows) {
+          if (g.ultimate_parent) ultimateByGroup.set(g.group_name, g.ultimate_parent);
+        }
+        if (groupRows.length > 0) {
+          const up = await upsertInChunks(
+            supabase,
+            'tally_groups',
+            groupRows,
+            'company_name,group_name',
+          );
+          groupCount = up.inserted;
+          if (up.error) errors.push(`group upsert: ${up.error}`);
+        }
+        console.log(`[groups] ${company_name}: ${groupRows.length} groups, map size ${ultimateByGroup.size}`);
+      }
+    } catch (e: any) {
+      errors.push(`groups: ${e?.message || String(e)}`);
+    }
+    await sleep(INTER_STEP_GAP_MS);
+  }
+
+  // If we skipped the group fetch (e.g. historical chunks after the first),
+  // hydrate the map from whatever we already stored in tally_groups.
+  if (ultimateByGroup.size === 0) {
+    const { data: existingGroups } = await supabase
+      .from('tally_groups')
+      .select('group_name, ultimate_parent')
+      .eq('company_name', company_name);
+    for (const g of existingGroups ?? []) {
+      if (g.ultimate_parent) ultimateByGroup.set(g.group_name, g.ultimate_parent);
+    }
+  }
+
+  // Step 3b — Ledger balances (skipped when fetch_ledgers=false, e.g. for
   // historical chunks after the first one — ledgers are a master snapshot,
   // not weekly data, and re-fetching duplicates rows and inflates counts).
   let ledgerCount = 0;
@@ -638,7 +683,7 @@ Deno.serve(async (req) => {
       if (!res.ok) {
         errors.push(res.error);
       } else {
-        const rows = parseLedgers(res.text, company_name, asOfIso, syncedAtIso);
+        const rows = parseLedgers(res.text, company_name, asOfIso, syncedAtIso, ultimateByGroup);
         if (rows.length > 0) {
           const up = await upsertInChunks(
             supabase,
