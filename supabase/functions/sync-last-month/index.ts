@@ -49,16 +49,27 @@ function buildChunks() {
   return chunks;
 }
 
-async function callEngine(supabaseUrl: string, serviceKey: string, body: any) {
-  const resp = await fetch(`${supabaseUrl}/functions/v1/tally-sync-engine`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
-    },
-    body: JSON.stringify(body),
-  });
+async function callEngine(supabaseUrl: string, serviceKey: string, body: any, timeoutMs = 120000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let resp: Response;
+  try {
+    resp = await fetch(`${supabaseUrl}/functions/v1/tally-sync-engine`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch (e: any) {
+    clearTimeout(t);
+    if (e?.name === "AbortError") throw new Error(`engine call timed out after ${timeoutMs}ms`);
+    throw e;
+  }
+  clearTimeout(t);
   const text = await resp.text();
   let data: any = null;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
