@@ -186,7 +186,7 @@ function DispatchesSection() {
     const addRec = (name: string, kg: number) => {
       partyMap.set(name, (partyMap.get(name) || 0) + kg);
     };
-    const filterDate = (d: string | null | undefined) => date ? (d && isoDate(new Date(d)) === date) : inRange(d, range);
+    const filterDate = (d: string | null | undefined) => date ? isoDate(d) === date : inRange(d, range);
 
     (coilSales.data || []).forEach((r: any) => {
       if (!filterDate(r.sales_date)) return;
@@ -207,7 +207,7 @@ function DispatchesSection() {
     const rows = Array.from(partyMap.entries())
       .map(([name, qtyKg]) => ({ name, qtyKg }))
       .sort((a, b) => b.qtyKg - a.qtyKg);
-    setDrill({ open: true, title: `Inventory Dispatches — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+    setDrill({ open: true, title: `Inventory Dispatches — ${date ? displayDate(date) : 'All'}`, rows });
   };
 
   const showTallyDrill = (date?: string) => {
@@ -585,7 +585,7 @@ function ProductionDrillDialog({ state, onClose }: { state: { open: boolean; tit
                   : '-';
                 return (
                   <TableRow key={r.id}>
-                    <TableCell className="text-xs">{format(new Date(r.created_at), 'dd/MM/yy')}</TableCell>
+                    <TableCell className="text-xs">{displayDate(r.created_at, 'dd/MM/yy')}</TableCell>
                     <TableCell className="text-xs">{r.process_type}</TableCell>
                     <TableCell className="text-xs font-mono">{b?.batch_number || '-'}</TableCell>
                     <TableCell className="text-xs">{b?.material || '-'}</TableCell>
