@@ -42,6 +42,21 @@ const SIDE_CONFIG = {
   },
 } as const;
 
+const FETCH_PAGE_SIZE = 1000;
+
+async function fetchAllRows(buildQuery: (from: number, to: number) => any) {
+  const rows: any[] = [];
+  for (let from = 0; ; from += FETCH_PAGE_SIZE) {
+    const to = from + FETCH_PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+    if (error) throw error;
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < FETCH_PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 export default function PartyAnalysisPage({ side }: Mode) {
   const cfg = SIDE_CONFIG[side];
 
@@ -92,36 +107,46 @@ function AnalysisView({ side }: Mode) {
 
   // Vouchers — pull both this side AND the opposite (for "Advance from Customers" on creditor view)
   const vchr = useQuery({
-    queryKey: ['party-analysis', 'vouchers', company],
+    queryKey: ['party-analysis', 'vouchers', company, side],
     queryFn: async () => {
-      let q = supabase
-        .from('tally_vouchers')
-        .select('voucher_number, voucher_type, party_name, amount, date, narration, company_name')
-        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
-        .limit(10000);
-      if (company !== 'all') q = q.eq('company_name', company);
-      const { data, error } = await q;
-      if (error) throw error;
-      return data ?? [];
+      return fetchAllRows((from, to) => {
+        let q = supabase
+          .from('tally_vouchers')
+          .select('voucher_number, voucher_type, party_name, amount, date, narration, company_name')
+          .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
+          .range(from, to);
+        if (company !== 'all') q = q.eq('company_name', company);
+        return q;
+      });
     },
   });
 
   // Ledger balances — always use the latest snapshot per (company, ledger).
   // Tally writes one row per as_of_date; we keep only the most recent.
   const ledg = useQuery({
-    queryKey: ['party-analysis', 'ledgers', company],
+    queryKey: ['party-analysis', 'ledgers', company, side],
     queryFn: async () => {
-      let q = supabase
-        .from('tally_ledger_balances')
-        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
-        .order('as_of_date', { ascending: false })
-        .limit(10000);
-      if (company !== 'all') q = q.eq('company_name', company);
-      const { data, error } = await q;
-      if (error) throw error;
+      const ledgerGroups = side === 'debtors'
+        ? ['Sundry Debtors']
+        : ['Sundry Creditors', 'Sundry Debtors'];
+      const fetchByGroupField = (field: 'ultimate_group' | 'ledger_group') => fetchAllRows((from, to) => {
+        let q = supabase
+          .from('tally_ledger_balances')
+          .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
+          .in(field, ledgerGroups)
+          .order('as_of_date', { ascending: false })
+          .range(from, to);
+        if (company !== 'all') q = q.eq('company_name', company);
+        return q;
+      });
+      const [byUltimateGroup, byLedgerGroup] = await Promise.all([
+        fetchByGroupField('ultimate_group'),
+        fetchByGroupField('ledger_group'),
+      ]);
+      const data = [...byUltimateGroup, ...byLedgerGroup];
       // Dedupe — first occurrence wins (already sorted desc by as_of_date)
       const seen = new Set<string>();
-      const latest = (data ?? []).filter((r: any) => {
+      const latest = data.filter((r: any) => {
         const k = `${r.company_name}::${r.ledger_name}`;
         if (seen.has(k)) return false;
         seen.add(k);
