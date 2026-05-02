@@ -68,12 +68,32 @@ function DateRangeFilter({ dateRange, setDateRange, label }: { dateRange: DateRa
 }
 
 const fmtKg = (kg: number) => `${(kg || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Kgs`;
-const isoDate = (d: Date) => format(d, 'yyyy-MM-dd');
+const parseAppDate = (value: string | Date | null | undefined): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const dateOnly = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const [, y, m, d] = dateOnly;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+const isoDate = (value: string | Date | null | undefined) => {
+  const d = parseAppDate(value);
+  return d ? format(d, 'yyyy-MM-dd') : '';
+};
+const displayDate = (value: string | Date | null | undefined, pattern = 'dd MMM yyyy') => {
+  const d = parseAppDate(value);
+  return d ? format(d, pattern) : '-';
+};
 const inRange = (dateStr: string | null | undefined, range: DateRange) => {
   if (!range.from) return true;
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  return d >= range.from && (!range.to || d <= range.to);
+  const key = isoDate(dateStr);
+  if (!key) return false;
+  const fromKey = isoDate(range.from);
+  const toKey = range.to ? isoDate(range.to) : '';
+  return key >= fromKey && (!toKey || key <= toKey);
 };
 
 interface DrillRow { name: string; qtyKg: number }
@@ -88,18 +108,20 @@ function DispatchesSection() {
 
   // Inventory dispatches: coil sales + FG sales + defective sales (all in Kgs)
   const coilSales = useQuery({
-    queryKey: ['sum-coil-sales'],
+    queryKey: ['sum-coil-sales', 'v2'],
     queryFn: async () => (await supabase.from('inventory_actions')
       .select('net_weight, sales_date, order_id')
-      .in('action_type', ['pack_coil_sale', 'loose_coil_sale'])).data || [],
+      .in('action_type', ['pack_coil_sale', 'loose_coil_sale'])
+      .order('sales_date', { ascending: false })
+      .limit(50000)).data || [],
   });
   const fgSales = useQuery({
-    queryKey: ['sum-fg-sales'],
-    queryFn: async () => (await supabase.from('fg_sales').select('quantity, sales_date, order_id')).data || [],
+    queryKey: ['sum-fg-sales', 'v2'],
+    queryFn: async () => (await supabase.from('fg_sales').select('quantity, sales_date, order_id').order('sales_date', { ascending: false }).limit(50000)).data || [],
   });
   const defSales = useQuery({
-    queryKey: ['sum-def-sales'],
-    queryFn: async () => (await supabase.from('defective_sales').select('quantity, sales_date, order_id')).data || [],
+    queryKey: ['sum-def-sales', 'v2'],
+    queryFn: async () => (await supabase.from('defective_sales').select('quantity, sales_date, order_id').order('sales_date', { ascending: false }).limit(50000)).data || [],
   });
   const orders = useQuery({
     queryKey: ['sum-orders'],
@@ -107,12 +129,17 @@ function DispatchesSection() {
   });
   // Tally sales
   const tallySales = useQuery({
-    queryKey: ['sum-tally-sales'],
-    queryFn: async () => (await supabase.from('tally_vouchers')
-      .select('party_name, line_items, date, voucher_type')
-      .eq('voucher_type', 'Sales')
-      .order('date', { ascending: false })
-      .limit(50000)).data || [],
+    queryKey: ['sum-tally-sales', 'v2', isoDate(range.from), isoDate(range.to)],
+    queryFn: async () => {
+      let q = supabase.from('tally_vouchers')
+        .select('party_name, line_items, date, voucher_type')
+        .eq('voucher_type', 'Sales')
+        .order('date', { ascending: false })
+        .limit(50000);
+      if (range.from) q = q.gte('date', isoDate(range.from));
+      if (range.to) q = q.lte('date', isoDate(range.to));
+      return (await q).data || [];
+    },
   });
 
   const orderMap = useMemo(() => {
@@ -131,7 +158,7 @@ function DispatchesSection() {
 
     const add = (date: string | null | undefined, kg: number, key: 'invKg' | 'tallyKg') => {
       if (!date || !inRange(date, range)) return;
-      const d = isoDate(new Date(date));
+      const d = isoDate(date);
       if (!map.has(d)) map.set(d, { invKg: 0, tallyKg: 0 });
       map.get(d)![key] += kg;
     };
@@ -159,7 +186,7 @@ function DispatchesSection() {
     const addRec = (name: string, kg: number) => {
       partyMap.set(name, (partyMap.get(name) || 0) + kg);
     };
-    const filterDate = (d: string | null | undefined) => date ? (d && isoDate(new Date(d)) === date) : inRange(d, range);
+    const filterDate = (d: string | null | undefined) => date ? isoDate(d) === date : inRange(d, range);
 
     (coilSales.data || []).forEach((r: any) => {
       if (!filterDate(r.sales_date)) return;
@@ -180,14 +207,14 @@ function DispatchesSection() {
     const rows = Array.from(partyMap.entries())
       .map(([name, qtyKg]) => ({ name, qtyKg }))
       .sort((a, b) => b.qtyKg - a.qtyKg);
-    setDrill({ open: true, title: `Inventory Dispatches — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+    setDrill({ open: true, title: `Inventory Dispatches — ${date ? displayDate(date) : 'All'}`, rows });
   };
 
   const showTallyDrill = (date?: string) => {
     const partyMap = new Map<string, number>();
     (tallySales.data || []).forEach((r: any) => {
       if (intra.data?.isIntracompany(r.party_name)) return;
-      const matchDate = date ? (r.date && isoDate(new Date(r.date)) === date) : inRange(r.date, range);
+      const matchDate = date ? isoDate(r.date) === date : inRange(r.date, range);
       if (!matchDate) return;
       const kg = totalMTFromLineItems(r.line_items) * 1000;
       const name = r.party_name || '(unknown)';
@@ -196,7 +223,7 @@ function DispatchesSection() {
     const rows = Array.from(partyMap.entries())
       .map(([name, qtyKg]) => ({ name, qtyKg }))
       .sort((a, b) => b.qtyKg - a.qtyKg);
-    setDrill({ open: true, title: `Tally Sales (Debtors) — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+    setDrill({ open: true, title: `Tally Sales (Debtors) — ${date ? displayDate(date) : 'All'}`, rows });
   };
 
   return (
@@ -225,7 +252,7 @@ function DispatchesSection() {
                 <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No data for selected period</TableCell></TableRow>
               ) : dateRows.map((r) => (
                 <TableRow key={r.date}>
-                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs">{displayDate(r.date)}</TableCell>
                   <TableCell className="text-xs text-right">
                     <button
                       className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
@@ -289,7 +316,7 @@ function ProductionSection() {
     const map = new Map<string, { c2w: number; w2f: number; c2f: number }>();
     (proc.data || []).forEach((r: any) => {
       if (!inRange(r.created_at, range)) return;
-      const d = isoDate(new Date(r.created_at));
+      const d = isoDate(r.created_at);
       if (!map.has(d)) map.set(d, { c2w: 0, w2f: 0, c2f: 0 });
       const kg = Number(r.input_qty || 0);
       const cls = classify(r);
@@ -305,14 +332,14 @@ function ProductionSection() {
   const showDrill = (kind: 'coil_to_wip' | 'wip_to_fg' | 'coil_to_fg', date?: string) => {
     const records = (proc.data || []).filter((r: any) => {
       if (classify(r) !== kind) return false;
-      return date ? (r.created_at && isoDate(new Date(r.created_at)) === date) : inRange(r.created_at, range);
+      return date ? isoDate(r.created_at) === date : inRange(r.created_at, range);
     });
     const labels: Record<typeof kind, string> = {
       coil_to_wip: 'Coils → WIP',
       wip_to_fg: 'WIP → FG',
       coil_to_fg: 'Coils → FG',
     } as any;
-    setDrill({ open: true, title: `${labels[kind]} — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, records });
+    setDrill({ open: true, title: `${labels[kind]} — ${date ? displayDate(date) : 'All'}`, records });
   };
 
   return (
@@ -342,7 +369,7 @@ function ProductionSection() {
                 <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">No production for selected period</TableCell></TableRow>
               ) : dateRows.map((r) => (
                 <TableRow key={r.date}>
-                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs">{displayDate(r.date)}</TableCell>
                   <TableCell className="text-xs text-right">
                     <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showDrill('coil_to_wip', r.date)} disabled={r.c2w <= 0}>{fmtKg(r.c2w)}</button>
                   </TableCell>
@@ -399,7 +426,7 @@ function PurchasesSection() {
     const map = new Map<string, { invKg: number; tallyKg: number }>();
     const add = (date: string | null | undefined, kg: number, key: 'invKg' | 'tallyKg') => {
       if (!date || !inRange(date, range)) return;
-      const d = isoDate(new Date(date));
+      const d = isoDate(date);
       if (!map.has(d)) map.set(d, { invKg: 0, tallyKg: 0 });
       map.get(d)![key] += kg;
     };
@@ -416,27 +443,27 @@ function PurchasesSection() {
   const showInvDrill = (date?: string) => {
     const map = new Map<string, number>();
     (batches.data || []).forEach((r: any) => {
-      const matchDate = date ? (r.purchase_date && isoDate(new Date(r.purchase_date)) === date) : inRange(r.purchase_date, range);
+      const matchDate = date ? isoDate(r.purchase_date) === date : inRange(r.purchase_date, range);
       if (!matchDate) return;
       const name = r.purchase_from || '(no supplier)';
       map.set(name, (map.get(name) || 0) + Number(r.net_weight || 0));
     });
     const rows = Array.from(map.entries()).map(([name, qtyKg]) => ({ name, qtyKg })).sort((a, b) => b.qtyKg - a.qtyKg);
-    setDrill({ open: true, title: `Inventory Inwards — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+    setDrill({ open: true, title: `Inventory Inwards — ${date ? displayDate(date) : 'All'}`, rows });
   };
 
   const showTallyDrill = (date?: string) => {
     const map = new Map<string, number>();
     (tallyPurch.data || []).forEach((r: any) => {
       if (intra.data?.isIntracompany(r.party_name)) return;
-      const matchDate = date ? (r.date && isoDate(new Date(r.date)) === date) : inRange(r.date, range);
+      const matchDate = date ? isoDate(r.date) === date : inRange(r.date, range);
       if (!matchDate) return;
       const kg = totalMTFromLineItems(r.line_items) * 1000;
       const name = r.party_name || '(unknown)';
       map.set(name, (map.get(name) || 0) + kg);
     });
     const rows = Array.from(map.entries()).map(([name, qtyKg]) => ({ name, qtyKg })).sort((a, b) => b.qtyKg - a.qtyKg);
-    setDrill({ open: true, title: `Tally Purchases (Creditors) — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+    setDrill({ open: true, title: `Tally Purchases (Creditors) — ${date ? displayDate(date) : 'All'}`, rows });
   };
 
   return (
@@ -465,7 +492,7 @@ function PurchasesSection() {
                 <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No data for selected period</TableCell></TableRow>
               ) : dateRows.map((r) => (
                 <TableRow key={r.date}>
-                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs">{displayDate(r.date)}</TableCell>
                   <TableCell className="text-xs text-right">
                     <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showInvDrill(r.date)} disabled={r.invKg <= 0}>{fmtKg(r.invKg)}</button>
                   </TableCell>
@@ -558,7 +585,7 @@ function ProductionDrillDialog({ state, onClose }: { state: { open: boolean; tit
                   : '-';
                 return (
                   <TableRow key={r.id}>
-                    <TableCell className="text-xs">{format(new Date(r.created_at), 'dd/MM/yy')}</TableCell>
+                    <TableCell className="text-xs">{displayDate(r.created_at, 'dd/MM/yy')}</TableCell>
                     <TableCell className="text-xs">{r.process_type}</TableCell>
                     <TableCell className="text-xs font-mono">{b?.batch_number || '-'}</TableCell>
                     <TableCell className="text-xs">{b?.material || '-'}</TableCell>
