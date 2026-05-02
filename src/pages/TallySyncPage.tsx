@@ -541,6 +541,14 @@ export default function TallySyncPage() {
   const prevFyLabel = `${fmtDate(fyWindows.prevFyStart)} – ${fmtDate(fyWindows.prevFyEnd)}`;
   const currFyLabel = `${fmtDate(fyWindows.currFyStart)} – ${fmtDate(fyWindows.currFyEnd)}`;
 
+  // All running rows in the log — surface any sync happening in the background,
+  // even ones not started by this browser session (e.g. cron, another tab).
+  const activeSyncs = useMemo(() => {
+    return logs
+      .filter((r) => r.status === 'running')
+      .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+  }, [logs]);
+
   return (
     <TooltipProvider>
       <div className="p-6 space-y-4">
