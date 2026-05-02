@@ -445,6 +445,16 @@ function PartyTable({
   creditLabel: string;
   showSalesRep: boolean;
 }) {
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(1);
+  const totalOutstanding = useMemo(() => rows.reduce((s, r) => s + (r.totalOutstanding || 0), 0), [rows]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  // Reset to page 1 if filter shrinks results below current page
+  useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const startIdx = rows.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endIdx = Math.min(page * PAGE_SIZE, rows.length);
+
   return (
     <Card>
       <CardHeader>
@@ -457,7 +467,20 @@ function PartyTable({
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No data found.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 text-sm">
+              <div>
+                <span className="font-medium">Showing {rows.length} {title.toLowerCase()}</span>
+                <span className="text-muted-foreground"> — Total Outstanding: </span>
+                <span className="font-semibold">{formatINR(totalOutstanding)}</span>
+              </div>
+              {rows.length > PAGE_SIZE && (
+                <div className="text-xs text-muted-foreground">
+                  Rows {startIdx}–{endIdx} of {rows.length}
+                </div>
+              )}
+            </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b text-left text-xs text-muted-foreground">
                 <tr>
