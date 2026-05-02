@@ -78,7 +78,8 @@ export default function MISDashboardPage() {
         .from('tally_vouchers')
         .select('voucher_type, amount, line_items, company_name, party_name')
         .gte('date', toISODate(from))
-        .lte('date', toISODate(to));
+        .lte('date', toISODate(to))
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -136,16 +137,17 @@ export default function MISDashboardPage() {
         .from('tally_vouchers')
         .select('voucher_number, party_name, amount, date, company_name')
         .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
-        .order('date', { ascending: true });
+        .order('date', { ascending: true })
+        .limit(10000);
       if (company !== 'all') qSales = qSales.eq('company_name', company);
       const { data, error } = await qSales;
       if (error) throw error;
 
       // Credit period overrides
-      const { data: cps } = await supabase.from('invoice_credit_periods').select('*');
+      const { data: cps } = await supabase.from('invoice_credit_periods').select('*').limit(10000);
       const cpMap = new Map<string, number>();
       (cps ?? []).forEach((c: any) => cpMap.set(`${c.company_name}::${c.voucher_number}`, c.credit_period_days));
-      const { data: dms } = await supabase.from('debtor_master').select('company_name, ledger_name, credit_period_days');
+      const { data: dms } = await supabase.from('debtor_master').select('company_name, ledger_name, credit_period_days').limit(10000);
       const dmMap = new Map<string, number>();
       (dms ?? []).forEach((d: any) => {
         if (d.credit_period_days != null) dmMap.set(`${d.company_name}::${d.ledger_name}`, d.credit_period_days);
@@ -172,12 +174,13 @@ export default function MISDashboardPage() {
       let q = supabase
         .from('tally_vouchers')
         .select('voucher_number, voucher_type, party_name, amount, date, company_name')
-        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment']);
+        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
-      const { data: cps } = await supabase.from('invoice_credit_periods').select('company_name, voucher_number, credit_period_days');
-      const { data: dms } = await supabase.from('debtor_master').select('company_name, ledger_name, credit_period_days');
+      const { data: cps } = await supabase.from('invoice_credit_periods').select('company_name, voucher_number, credit_period_days').limit(10000);
+      const { data: dms } = await supabase.from('debtor_master').select('company_name, ledger_name, credit_period_days').limit(10000);
       const cpMap = new Map<string, number>();
       (cps ?? []).forEach((c: any) => cpMap.set(`${c.company_name}::${c.voucher_number}`, c.credit_period_days));
       const dmMap = new Map<string, number>();

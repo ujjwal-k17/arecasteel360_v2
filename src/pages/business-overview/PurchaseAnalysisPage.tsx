@@ -60,7 +60,8 @@ export default function PurchaseAnalysisPage() {
         .eq('voucher_type', 'Purchase')
         .gte('date', toISODate(range.from))
         .lte('date', toISODate(range.to))
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;

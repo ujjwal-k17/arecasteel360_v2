@@ -28,7 +28,8 @@ export default function DebtorMasterTab() {
       const { data, error } = await supabase
         .from('debtor_master')
         .select('*')
-        .order('ledger_name');
+        .order('ledger_name')
+        .limit(10000);
       if (error) throw error;
       return data ?? [];
     },

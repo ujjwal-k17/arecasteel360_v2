@@ -25,8 +25,8 @@ export function useIntracompanyParties() {
     queryKey: ['business-overview', 'intracompany-parties', 'v2'],
     queryFn: async () => {
       const [{ data: cos, error: e1 }, { data: dm, error: e2 }] = await Promise.all([
-        supabase.from('tally_companies').select('company_name'),
-        supabase.from('debtor_master').select('ledger_name').eq('is_intracompany', true),
+        supabase.from('tally_companies').select('company_name').limit(10000),
+        supabase.from('debtor_master').select('ledger_name').eq('is_intracompany', true).limit(10000),
       ]);
       if (e1) throw e1;
       if (e2) throw e2;

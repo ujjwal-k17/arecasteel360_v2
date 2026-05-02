@@ -45,7 +45,7 @@ export default function PartyLedgerPage() {
   const parties = useQuery({
     queryKey: ['party-list', company],
     queryFn: async () => {
-      let q = supabase.from('tally_vouchers').select('party_name, company_name').not('party_name', 'is', null);
+      let q = supabase.from('tally_vouchers').select('party_name, company_name').not('party_name', 'is', null).limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -72,7 +72,8 @@ export default function PartyLedgerPage() {
         .gte('date', from)
         .lte('date', to)
         .not('voucher_type', 'in', `(${EXCLUDED_VOUCHER_TYPES.map(t => `"${t}"`).join(',')})`)
-        .order('date', { ascending: true });
+        .order('date', { ascending: true })
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -88,7 +89,8 @@ export default function PartyLedgerPage() {
       let q = supabase
         .from('tally_ledger_balances')
         .select('closing_balance, company_name, ledger_group')
-        .eq('ledger_name', selectedParty as string);
+        .eq('ledger_name', selectedParty as string)
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
