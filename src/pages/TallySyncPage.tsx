@@ -444,7 +444,11 @@ export default function TallySyncPage() {
   });
 
   const runningFn: SyncFn | null = triggerSync.isPending
-    ? ((triggerSync.variables as SyncFn | undefined) ?? null)
+    ? (() => {
+        const v = triggerSync.variables as SyncFn | { fn: SyncFn } | undefined;
+        if (!v) return null;
+        return typeof v === 'string' ? v : v.fn;
+      })()
     : null;
 
   // Aggregate chunked logs into one row per (sync_type, company_name) so users
