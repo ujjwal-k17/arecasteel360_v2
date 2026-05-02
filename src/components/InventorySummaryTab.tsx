@@ -111,7 +111,8 @@ function DispatchesSection() {
     queryFn: async () => (await supabase.from('tally_vouchers')
       .select('party_name, line_items, date, voucher_type')
       .eq('voucher_type', 'Sales')
-      .limit(20000)).data || [],
+      .order('date', { ascending: false })
+      .limit(50000)).data || [],
   });
 
   const orderMap = useMemo(() => {
@@ -377,19 +378,21 @@ function PurchasesSection() {
   const [drill, setDrill] = useState<DrillState>({ open: false, title: '', rows: [] });
   const intra = useIntracompanyParties();
 
-  // Inventory inwards: batches received (use updated_at as the received date, matching prior tab)
+  // Inventory inwards: batches received (use purchase_date as the received date)
   const batches = useQuery({
     queryKey: ['sum-batches-received'],
     queryFn: async () => (await supabase.from('batches')
-      .select('id, net_weight, purchase_from, updated_at, status')
-      .eq('status', 'received')).data || [],
+      .select('id, net_weight, purchase_from, purchase_date, status')
+      .eq('status', 'received')
+      .limit(50000)).data || [],
   });
   const tallyPurch = useQuery({
     queryKey: ['sum-tally-purchases'],
     queryFn: async () => (await supabase.from('tally_vouchers')
       .select('party_name, line_items, date, voucher_type')
       .ilike('voucher_type', 'Purchase%')
-      .limit(20000)).data || [],
+      .order('date', { ascending: false })
+      .limit(50000)).data || [],
   });
 
   const { dateRows, totals } = useMemo(() => {
