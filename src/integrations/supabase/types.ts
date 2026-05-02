@@ -239,6 +239,45 @@ export type Database = {
         }
         Relationships: []
       }
+      debtor_master: {
+        Row: {
+          address: string | null
+          company_name: string
+          contact: string | null
+          created_at: string
+          credit_period_days: number | null
+          gstin: string | null
+          id: string
+          is_active: boolean
+          ledger_name: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company_name: string
+          contact?: string | null
+          created_at?: string
+          credit_period_days?: number | null
+          gstin?: string | null
+          id?: string
+          is_active?: boolean
+          ledger_name: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company_name?: string
+          contact?: string | null
+          created_at?: string
+          credit_period_days?: number | null
+          gstin?: string | null
+          id?: string
+          is_active?: boolean
+          ledger_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       defective_sales: {
         Row: {
           batch_id: string | null
@@ -501,6 +540,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invoice_credit_periods: {
+        Row: {
+          company_name: string
+          credit_period_days: number
+          id: string
+          updated_at: string
+          voucher_number: string
+        }
+        Insert: {
+          company_name: string
+          credit_period_days: number
+          id?: string
+          updated_at?: string
+          voucher_number: string
+        }
+        Update: {
+          company_name?: string
+          credit_period_days?: number
+          id?: string
+          updated_at?: string
+          voucher_number?: string
+        }
+        Relationships: []
       }
       invoice_details: {
         Row: {
