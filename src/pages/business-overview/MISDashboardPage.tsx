@@ -109,11 +109,19 @@ export default function MISDashboardPage() {
     queryFn: async () => {
       let q = supabase
         .from('tally_ledger_balances')
-        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name');
+        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
+        .order('as_of_date', { ascending: false });
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      // Always use latest snapshot per (company, ledger).
+      const seen = new Set<string>();
+      return (data ?? []).filter((r: any) => {
+        const k = `${r.company_name}::${r.ledger_name}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
     },
   });
 
