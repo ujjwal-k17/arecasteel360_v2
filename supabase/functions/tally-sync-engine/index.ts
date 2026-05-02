@@ -327,7 +327,7 @@ function parseVouchers(xml: string, companyName: string, syncType: string | null
     if (seen.has(voucherKey)) continue;
     seen.add(voucherKey);
 
-    const partyName = getTagText(b, 'PARTYLEDGERNAME') || getTagText(b, 'PARTYNAME');
+    const partyName = cleanTallyName(getTagText(b, 'PARTYLEDGERNAME') || getTagText(b, 'PARTYNAME'));
     const narration = getTagText(b, 'NARRATION');
     const amount = Math.abs(parseTallyAmount(getTagText(b, 'AMOUNT')));
 
