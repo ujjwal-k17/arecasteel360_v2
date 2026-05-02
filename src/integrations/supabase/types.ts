@@ -249,6 +249,7 @@ export type Database = {
           gstin: string | null
           id: string
           is_active: boolean
+          is_intracompany: boolean
           ledger_name: string
           sales_rep: string | null
           updated_at: string
@@ -262,6 +263,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           is_active?: boolean
+          is_intracompany?: boolean
           ledger_name: string
           sales_rep?: string | null
           updated_at?: string
@@ -275,6 +277,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           is_active?: boolean
+          is_intracompany?: boolean
           ledger_name?: string
           sales_rep?: string | null
           updated_at?: string
