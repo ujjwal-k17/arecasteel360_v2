@@ -65,10 +65,13 @@ export default function MISDashboardPage() {
   const [company, setCompany] = useState<string>('all');
   const { data: lastSync } = useLastSyncAt();
 
+  const intra = useIntracompanyParties();
+  const intraSet = intra.data ?? new Set<string>();
+
   const { from, to } = useMemo(() => currentMonthRange(), []);
 
   const monthly = useQuery({
-    queryKey: ['mis', 'monthly', company, toISODate(from), toISODate(to)],
+    queryKey: ['mis', 'monthly', company, toISODate(from), toISODate(to), intraSet.size],
     queryFn: async () => {
       let q = supabase
         .from('tally_vouchers')
