@@ -598,6 +598,44 @@ export default function TallySyncPage() {
           </CardContent>
         </Card>
 
+        {/* Active background syncs — anything currently running, even from other sessions/cron */}
+        {activeSyncs.length > 0 && (
+          <Card className="border-blue-500/40 bg-blue-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                Active background sync{activeSyncs.length > 1 ? 's' : ''} ({activeSyncs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {activeSyncs.map((s) => {
+                const typeLabel =
+                  s.sync_type === 'historical' ? 'Previous FY' :
+                  s.sync_type === 'current_fy' ? 'Current FY' :
+                  s.sync_type === 'last_month' ? 'Last month' :
+                  s.sync_type === 'current_month' ? 'Current month' :
+                  s.sync_type ?? '—';
+                const elapsed = Math.round((Date.now() - new Date(s.started_at).getTime()) / 1000);
+                return (
+                  <div key={s.id} className="text-xs flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <Badge variant="outline" className="bg-blue-500/15 text-blue-700 dark:text-blue-400">
+                      {typeLabel}
+                    </Badge>
+                    <span className="font-medium">{s.company_name ?? '—'}</span>
+                    <span className="text-muted-foreground">{dateRangeForType(s.sync_type)}</span>
+                    {s.chunk_label && (
+                      <span className="text-muted-foreground">chunk {s.chunk_label}</span>
+                    )}
+                    <span className="text-muted-foreground ml-auto">
+                      started {formatDateTime(s.started_at)} · {elapsed}s ago
+                    </span>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Sync buttons */}
         <Card>
           <CardContent className="py-4 space-y-3">
