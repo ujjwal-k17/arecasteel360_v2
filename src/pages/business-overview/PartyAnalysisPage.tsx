@@ -71,8 +71,8 @@ export default function PartyAnalysisPage({ side }: Mode) {
     queryFn: async () => {
       let q = supabase
         .from('tally_ledger_balances')
-        .select('ledger_name, ledger_group, closing_balance, company_name')
-        .eq('ledger_group', cfg.ledgerGroup);
+        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name')
+        .or(`ultimate_group.eq.${cfg.ledgerGroup},and(ultimate_group.is.null,ledger_group.eq.${cfg.ledgerGroup})`);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;

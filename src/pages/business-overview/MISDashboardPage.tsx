@@ -230,12 +230,12 @@ export default function MISDashboardPage() {
   });
 
   const debtorOutstanding = (ledgers.data ?? [])
-    .filter((l: any) => l.ledger_group === 'Sundry Debtors')
+    .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Debtors')
     .reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
   const creditorOutstanding = (ledgers.data ?? [])
-    .filter((l: any) => l.ledger_group === 'Sundry Creditors')
+    .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Creditors')
     .reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
-  const banks = (ledgers.data ?? []).filter((l: any) => l.ledger_group === 'Bank Accounts');
+  const banks = (ledgers.data ?? []).filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Bank Accounts');
   const bankTotal = banks.reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
 
   const m = monthly.data;
