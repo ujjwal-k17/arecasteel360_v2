@@ -15,8 +15,12 @@ import {
   currentMonthRange,
   toISODate,
   applyFIFO,
+  debtorOutstandingFromClosing,
+  creditorOutstandingFromClosing,
+  resolveCreditPeriod,
 } from '@/lib/business-overview-utils';
 import { useLastSyncAt } from '@/hooks/useTallyCompanies';
+import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
 
 function StatCard({
   title,
