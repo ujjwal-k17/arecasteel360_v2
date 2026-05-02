@@ -231,6 +231,36 @@ function buildLedgerXml(company: string): string {
 </ENVELOPE>`;
 }
 
+function buildGroupsXml(company: string): string {
+  // Returns master Group rows with NAME and PARENT — needed to compute the
+  // ultimate (top-level) parent of every group dynamically.
+  return `<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>GroupCollection</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+        <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="GroupCollection" ISMODIFY="No">
+            <TYPE>Group</TYPE>
+            <FETCH>NAME,PARENT</FETCH>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
 function buildDayBookXml(company: string, fromDate: string, toDate: string): string {
   return `<ENVELOPE>
   <HEADER>
