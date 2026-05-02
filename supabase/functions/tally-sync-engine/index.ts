@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 
 const TALLY_DIRECT_DEFAULT = 'http://103.239.89.153:9000';
-const TALLY_TIMEOUT_MS = 12_000;
+const TALLY_TIMEOUT_MS = 45_000;
 const FETCH_RETRIES = 2;
 const RETRY_GAP_MS = 2_000;
 const INTER_STEP_GAP_MS = 2_000;
