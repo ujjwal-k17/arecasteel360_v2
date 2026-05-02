@@ -110,6 +110,7 @@ export default function DebtorMasterTab() {
                     <th className="py-2">Company</th>
                     <th className="py-2 text-right">Credit Period (days)</th>
                     <th className="py-2">Sales Rep</th>
+                    <th className="py-2 text-center">Intracompany</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -146,6 +147,12 @@ export default function DebtorMasterTab() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </td>
+                        <td className="py-2 text-center">
+                          <Switch
+                            checked={!!d.is_intracompany}
+                            onCheckedChange={val => toggleIntra(d.id, val)}
+                          />
                         </td>
                       </tr>
                     );
