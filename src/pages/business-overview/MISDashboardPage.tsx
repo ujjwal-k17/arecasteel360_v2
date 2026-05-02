@@ -72,7 +72,7 @@ export default function MISDashboardPage() {
   const { from, to } = useMemo(() => currentMonthRange(), []);
 
   const monthly = useQuery({
-    queryKey: ['mis', 'monthly', company, toISODate(from), toISODate(to), intraSet.size],
+    queryKey: ['mis', 'monthly', company, toISODate(from), toISODate(to), intraKey],
     queryFn: async () => {
       let q = supabase
         .from('tally_vouchers')
@@ -166,7 +166,7 @@ export default function MISDashboardPage() {
 
   // Need voucher_type for overdue grouping — refetch with type
   const overdueDetail = useQuery({
-    queryKey: ['mis', 'overdueDetail', company, intraSet.size],
+    queryKey: ['mis', 'overdueDetail', company, intraKey],
     queryFn: async () => {
       let q = supabase
         .from('tally_vouchers')
