@@ -607,3 +607,147 @@ function PartyTable({
     </Card>
   );
 }
+
+// ─── Drill-down with editable credit periods + summary + mismatch warning ───
+function DrillDown({ row, creditLabel }: { row: any; creditLabel: string }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const invoices = (row.invoices ?? []) as InvoiceRow[];
+  const balance = row.balance;
+
+  const totals = useMemo(() => {
+    let inv = 0, paid = 0, out = 0, over = 0;
+    invoices.forEach(i => {
+      inv += i.original_amount;
+      paid += i.paid_amount;
+      out += i.outstanding;
+      if (i.days_overdue > 0 && i.outstanding > 0) over += i.outstanding;
+    });
+    return { inv, paid, out, over };
+  }, [invoices]);
+
+  const saveCreditPeriod = async (voucher: string, value: number) => {
+    if (voucher === 'Opening Balance') return;
+    setSavingKey(voucher);
+    try {
+      const { error } = await supabase
+        .from('invoice_credit_periods')
+        .upsert({
+          company_name: row.company,
+          voucher_number: voucher,
+          credit_period_days: value,
+        }, { onConflict: 'company_name,voucher_number' });
+      if (error) throw error;
+      toast.success('Credit period updated');
+      qc.invalidateQueries({ queryKey: ['invoice-credit-periods'] });
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to save');
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  if (invoices.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No outstanding invoices found in synced data.
+        {row.totalOutstanding > 0 && ' Closing balance from Tally suggests outstanding exists — historical vouchers may not be synced.'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <table className="w-full text-xs">
+        <thead className="text-muted-foreground">
+          <tr>
+            <th className="text-left py-1">Invoice #</th>
+            <th className="text-left py-1">Invoice Date</th>
+            <th className="text-right py-1">Invoice Amount</th>
+            <th className="text-right py-1">Paid</th>
+            <th className="text-right py-1">Outstanding</th>
+            <th className="text-right py-1">{creditLabel} (days)</th>
+            <th className="text-left py-1">Due Date</th>
+            <th className="text-right py-1">Overdue Days</th>
+            <th className="text-left py-1">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoices.map((f) => {
+            const isOpening = f.is_opening || f.voucher_number === 'Opening Balance';
+            const draftVal = draft[f.voucher_number];
+            return (
+              <tr key={f.voucher_number} className={`border-t ${f.days_overdue > 0 ? 'bg-destructive/5' : ''} ${isOpening ? 'italic' : ''}`}>
+                <td className="py-1">{isOpening ? 'Opening Balance' : f.voucher_number}</td>
+                <td className="py-1">{formatDate(f.invoice_date)}</td>
+                <td className="py-1 text-right">{formatINR(f.original_amount)}</td>
+                <td className="py-1 text-right">{formatINR(f.paid_amount)}</td>
+                <td className="py-1 text-right font-medium">{formatINR(f.outstanding)}</td>
+                <td className="py-1 text-right">
+                  {isOpening ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : (
+                    <Input
+                      type="number"
+                      className="h-7 w-20 text-right text-xs ml-auto"
+                      value={draftVal ?? String(f.credit_period_days || 0)}
+                      disabled={savingKey === f.voucher_number}
+                      onChange={(e) => setDraft(prev => ({ ...prev, [f.voucher_number]: e.target.value }))}
+                      onBlur={() => {
+                        const raw = draft[f.voucher_number];
+                        if (raw == null) return;
+                        const n = parseInt(raw, 10);
+                        if (isNaN(n) || n < 0) return;
+                        if (n === (f.credit_period_days || 0)) return;
+                        saveCreditPeriod(f.voucher_number, n);
+                      }}
+                    />
+                  )}
+                </td>
+                <td className="py-1">{formatDate(f.due_date)}</td>
+                <td className={`py-1 text-right font-medium ${f.days_overdue > 0 ? 'text-destructive' : ''}`}>
+                  {f.days_overdue > 0 ? f.days_overdue : '—'}
+                </td>
+                <td className="py-1">
+                  <Badge variant={
+                    f.status === 'Overdue' ? 'destructive' :
+                    f.status === 'Paid' ? 'secondary' : 'default'
+                  }>{f.status}</Badge>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot className="border-t-2 font-semibold">
+          <tr>
+            <td className="py-2" colSpan={2}>Totals</td>
+            <td className="py-2 text-right">{formatINR(totals.inv)}</td>
+            <td className="py-2 text-right">{formatINR(totals.paid)}</td>
+            <td className="py-2 text-right">{formatINR(totals.out)}</td>
+            <td className="py-2"></td>
+            <td className="py-2"></td>
+            <td className="py-2 text-right text-destructive">{totals.over > 0 ? formatINR(totals.over) : '—'}</td>
+            <td className="py-2"></td>
+          </tr>
+          <tr className="text-xs text-muted-foreground">
+            <td colSpan={4} className="py-1">Ledger closing balance (Tally)</td>
+            <td className="py-1 text-right">{formatINR(row.totalOutstanding)}</td>
+            <td colSpan={4}></td>
+          </tr>
+        </tfoot>
+      </table>
+      {balance?.hasMismatch && (
+        <div className="text-xs text-destructive flex items-start gap-1.5 pt-1">
+          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            Balance mismatch of {formatINR(Math.abs(balance.mismatch))} — historical sync may be incomplete.
+            Run Full Year History sync for accurate data.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
