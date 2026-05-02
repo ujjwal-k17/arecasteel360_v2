@@ -35,14 +35,14 @@ export default function DebtorMasterTab() {
   });
 
   const rows = useMemo(() => {
-    let arr = (dm.data ?? []).filter((d: any) => !intra.data?.has(d.ledger_name));
+    let arr = (dm.data ?? []);
     if (company !== 'all') arr = arr.filter((d: any) => d.company_name === company);
     if (search.trim()) {
       const s = search.toLowerCase();
       arr = arr.filter((d: any) => d.ledger_name.toLowerCase().includes(s));
     }
     return arr;
-  }, [dm.data, intra.data, company, search]);
+  }, [dm.data, company, search]);
 
   const saveCP = async (id: string, raw: string) => {
     const days = parseInt(raw, 10);
@@ -62,6 +62,14 @@ export default function DebtorMasterTab() {
     const { error } = await supabase.from('debtor_master').update({ sales_rep: value }).eq('id', id);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ['debtor-master'] });
+  };
+
+  const toggleIntra = async (id: string, value: boolean) => {
+    const { error } = await supabase.from('debtor_master').update({ is_intracompany: value }).eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(value ? 'Marked as intracompany' : 'Removed intracompany flag');
+    qc.invalidateQueries({ queryKey: ['debtor-master'] });
+    qc.invalidateQueries({ queryKey: ['business-overview', 'intracompany-parties'] });
   };
 
   const activeReps = (reps.data ?? []).filter((r: any) => r.is_active);
