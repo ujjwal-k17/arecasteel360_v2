@@ -83,76 +83,100 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    if (await isPaused(supabase)) {
+      return new Response(
+        JSON.stringify({ success: true, paused: true, done: false, processed_this_call: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { data: companies, error } = await supabase
       .from("tally_companies")
       .select("company_name")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .order("company_name", { ascending: true });
     if (error) throw error;
 
     const chunks = buildChunks();
-    const summary: any[] = [];
+    const totalChunks = (companies?.length ?? 0) * chunks.length;
 
-    for (const c of companies ?? []) {
-      if (await isPaused(supabase)) {
-        summary.push({
-          company: c.company_name,
-          paused: true,
-          chunks_processed: 0,
-          chunks_remaining: chunks.length,
-          results: [],
-        });
-        return new Response(
-          JSON.stringify({
-            success: true,
-            paused: true,
-            done: false,
-            total_chunks: chunks.length,
-            processed_this_call: 0,
-            summary,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Always sync fresh: process all chunks regardless of previous sync history.
-      // The engine upserts data, so re-syncing is safe.
-      const companyResults: any[] = [];
-      for (let i = 0; i < chunks.length; i++) {
-        const ch = chunks[i];
-        const fetch_ledgers = i === 0;
-        try {
-          const data = await callEngine(supabaseUrl, serviceKey, {
-            company_name: c.company_name,
-            from_date: ch.from,
-            to_date: ch.to,
-            sync_type: SYNC_TYPE,
-            chunk_label: ch.label,
-            fetch_ledgers,
-          });
-          companyResults.push({ chunk: ch.label, ok: true, data });
-        } catch (e) {
-          companyResults.push({ chunk: ch.label, ok: false, error: String((e as any)?.message || e) });
-        }
-      }
-
-      summary.push({
-        company: c.company_name,
-        chunks_processed: companyResults.length,
-        chunks_remaining: 0,
-        results: companyResults,
-      });
+    if (!companies || companies.length === 0 || chunks.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, done: true, total_chunks: 0, processed_this_call: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const totalProcessed = summary.reduce((acc: number, s: any) => acc + (s.chunks_processed || 0), 0);
-    const anyError = summary.some((s: any) => (s.results || []).some((r: any) => !r.ok));
+    // Fetch already-completed chunk labels for this sync_type per company
+    const { data: doneRows } = await supabase
+      .from("tally_sync_log")
+      .select("company_name, chunk_label, status")
+      .eq("sync_type", SYNC_TYPE)
+      .eq("status", "completed");
+
+    const doneSet = new Set<string>(
+      (doneRows ?? []).map((r: any) => `${r.company_name}::${r.chunk_label}`)
+    );
+
+    // Find the next pending (company, chunk) pair
+    let target: { company: string; chunk: typeof chunks[number]; firstForCompany: boolean } | null = null;
+    for (const c of companies) {
+      let firstForCompany = true;
+      for (const ch of chunks) {
+        const key = `${c.company_name}::${ch.label}`;
+        if (!doneSet.has(key)) {
+          target = { company: c.company_name, chunk: ch, firstForCompany };
+          break;
+        }
+        firstForCompany = false;
+      }
+      if (target) break;
+    }
+
+    if (!target) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          done: true,
+          total_chunks: totalChunks,
+          processed_this_call: 0,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    let result: any;
+    let ok = true;
+    let errMsg: string | null = null;
+    try {
+      result = await callEngine(supabaseUrl, serviceKey, {
+        company_name: target.company,
+        from_date: target.chunk.from,
+        to_date: target.chunk.to,
+        sync_type: SYNC_TYPE,
+        chunk_label: target.chunk.label,
+        fetch_ledgers: target.firstForCompany,
+      });
+    } catch (e: any) {
+      ok = false;
+      errMsg = String(e?.message || e);
+    }
+
+    const completedAfter = doneSet.size + (ok ? 1 : 0);
+    const done = completedAfter >= totalChunks;
+
     return new Response(
       JSON.stringify({
-        success: !anyError,
-        error: anyError ? "One or more chunks failed" : null,
-        done: true,
-        total_chunks: chunks.length,
-        processed_this_call: totalProcessed,
-        summary,
+        success: ok,
+        error: errMsg,
+        done,
+        total_chunks: totalChunks,
+        processed_this_call: ok ? 1 : 0,
+        summary: [{
+          company: target.company,
+          chunks_processed: ok ? 1 : 0,
+          results: [{ chunk: target.chunk.label, ok, error: errMsg, data: result }],
+        }],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
