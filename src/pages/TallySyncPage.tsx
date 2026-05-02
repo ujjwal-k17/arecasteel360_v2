@@ -421,6 +421,8 @@ export default function TallySyncPage() {
       }
       qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
       qc.invalidateQueries({ queryKey: ['tally-counts'] });
+      // Auto-populate Business Overview debtor master from Sales vouchers (never overwrites credit period)
+      upsertDebtorsFromSales();
     },
     onError: (e: any) => toast.error(e?.message ?? 'Sync failed to start'),
   });
