@@ -549,7 +549,16 @@ function PartyTable({
                       <td className="py-2">
                         {expanded.has(r.key) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </td>
-                      <td className="py-2 font-medium">{r.party}</td>
+                      <td className="py-2 font-medium">
+                        <span className="inline-flex items-center gap-1.5">
+                          {r.party}
+                          {r.balance?.hasMismatch && (
+                            <span title={`Balance mismatch of ${formatINR(Math.abs(r.balance.mismatch))} — sync may be incomplete`}>
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="py-2 text-muted-foreground">{r.company}</td>
                       {showSalesRep && <td className="py-2 text-muted-foreground">{r.salesRep ?? '—'}</td>}
                       <td className="py-2 text-right">{r.creditPeriod ?? '—'}</td>
@@ -564,50 +573,7 @@ function PartyTable({
                     {expanded.has(r.key) && (
                       <tr className="bg-muted/20">
                         <td colSpan={showSalesRep ? 8 : 7} className="p-3">
-                          {r.fifo.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                              No outstanding invoices found in synced data.
-                              {r.totalOutstanding > 0 && ' Closing balance from Tally suggests outstanding exists — historical vouchers may not be synced.'}
-                            </p>
-                          ) : (
-                            <table className="w-full text-xs">
-                              <thead className="text-muted-foreground">
-                                <tr>
-                                  <th className="text-left py-1">Invoice #</th>
-                                  <th className="text-left py-1">Invoice Date</th>
-                                  <th className="text-right py-1">Original</th>
-                                  <th className="text-right py-1">Paid</th>
-                                  <th className="text-right py-1">Outstanding</th>
-                                  <th className="text-right py-1">{creditLabel}</th>
-                                  <th className="text-left py-1">Due Date</th>
-                                  <th className="text-right py-1">Overdue Days</th>
-                                  <th className="text-left py-1">Status</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {r.fifo.map((f: any) => (
-                                  <tr key={f.voucher_number} className={`border-t ${f.days_overdue > 0 ? 'bg-destructive/5' : ''}`}>
-                                    <td className="py-1">{f.voucher_number}</td>
-                                    <td className="py-1">{formatDate(f.invoice_date)}</td>
-                                    <td className="py-1 text-right">{formatINR(f.original_amount)}</td>
-                                    <td className="py-1 text-right">{formatINR(f.paid_amount)}</td>
-                                    <td className="py-1 text-right font-medium">{formatINR(f.outstanding)}</td>
-                                    <td className="py-1 text-right">{f.credit_period_days || 0}</td>
-                                    <td className="py-1">{formatDate(f.due_date)}</td>
-                                    <td className={`py-1 text-right font-medium ${f.days_overdue > 0 ? 'text-destructive' : ''}`}>
-                                      {f.days_overdue > 0 ? f.days_overdue : '—'}
-                                    </td>
-                                    <td className="py-1">
-                                      <Badge variant={
-                                        f.status === 'Overdue' ? 'destructive' :
-                                        f.status === 'Paid' ? 'secondary' : 'default'
-                                      }>{f.status}</Badge>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
+                          <DrillDown row={r} creditLabel={creditLabel} />
                         </td>
                       </tr>
                     )}
