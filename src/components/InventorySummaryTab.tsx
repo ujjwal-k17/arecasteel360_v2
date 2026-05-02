@@ -111,7 +111,8 @@ function DispatchesSection() {
     queryFn: async () => (await supabase.from('tally_vouchers')
       .select('party_name, line_items, date, voucher_type')
       .eq('voucher_type', 'Sales')
-      .limit(20000)).data || [],
+      .order('date', { ascending: false })
+      .limit(50000)).data || [],
   });
 
   const orderMap = useMemo(() => {
@@ -377,19 +378,21 @@ function PurchasesSection() {
   const [drill, setDrill] = useState<DrillState>({ open: false, title: '', rows: [] });
   const intra = useIntracompanyParties();
 
-  // Inventory inwards: batches received (use updated_at as the received date, matching prior tab)
+  // Inventory inwards: batches received (use purchase_date as the received date)
   const batches = useQuery({
     queryKey: ['sum-batches-received'],
     queryFn: async () => (await supabase.from('batches')
-      .select('id, net_weight, purchase_from, updated_at, status')
-      .eq('status', 'received')).data || [],
+      .select('id, net_weight, purchase_from, purchase_date, status')
+      .eq('status', 'received')
+      .limit(50000)).data || [],
   });
   const tallyPurch = useQuery({
     queryKey: ['sum-tally-purchases'],
     queryFn: async () => (await supabase.from('tally_vouchers')
       .select('party_name, line_items, date, voucher_type')
       .ilike('voucher_type', 'Purchase%')
-      .limit(20000)).data || [],
+      .order('date', { ascending: false })
+      .limit(50000)).data || [],
   });
 
   const { dateRows, totals } = useMemo(() => {
@@ -400,7 +403,7 @@ function PurchasesSection() {
       if (!map.has(d)) map.set(d, { invKg: 0, tallyKg: 0 });
       map.get(d)![key] += kg;
     };
-    (batches.data || []).forEach((r: any) => add(r.updated_at, Number(r.net_weight || 0), 'invKg'));
+    (batches.data || []).forEach((r: any) => add(r.purchase_date, Number(r.net_weight || 0), 'invKg'));
     (tallyPurch.data || []).forEach((r: any) => {
       if (intra.data?.isIntracompany(r.party_name)) return;
       add(r.date, totalMTFromLineItems(r.line_items) * 1000, 'tallyKg');
@@ -413,7 +416,7 @@ function PurchasesSection() {
   const showInvDrill = (date?: string) => {
     const map = new Map<string, number>();
     (batches.data || []).forEach((r: any) => {
-      const matchDate = date ? (r.updated_at && isoDate(new Date(r.updated_at)) === date) : inRange(r.updated_at, range);
+      const matchDate = date ? (r.purchase_date && isoDate(new Date(r.purchase_date)) === date) : inRange(r.purchase_date, range);
       if (!matchDate) return;
       const name = r.purchase_from || '(no supplier)';
       map.set(name, (map.get(name) || 0) + Number(r.net_weight || 0));
