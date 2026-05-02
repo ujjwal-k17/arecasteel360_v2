@@ -283,6 +283,19 @@ export default function PartyLedgerPage() {
                       </tr>
                     </thead>
                     <tbody>
+                      {Math.abs(opening) > 0.01 && (
+                        <tr className="border-b bg-muted/30 font-medium">
+                          <td className="py-1.5">{formatDate(from)}</td>
+                          <td className="py-1.5 italic">Opening Balance</td>
+                          <td className="py-1.5">—</td>
+                          <td className="py-1.5 text-right">{opening > 0 ? formatINR(opening) : '—'}</td>
+                          <td className="py-1.5 text-right">{opening < 0 ? formatINR(-opening) : '—'}</td>
+                          <td className="py-1.5 text-right">{formatINR(opening)}</td>
+                          <td className="py-1.5 text-muted-foreground italic">
+                            Carried forward{openingQ.data?.snapDate ? ` since ${formatDate(openingQ.data.snapDate)}` : ''}
+                          </td>
+                        </tr>
+                      )}
                       {rowsWithBalance.map((r: any, i: number) => (
                         <tr key={`${r.voucher_number}-${i}`} className="border-b hover:bg-muted/40">
                           <td className="py-1.5">{formatDate(r.date)}</td>
