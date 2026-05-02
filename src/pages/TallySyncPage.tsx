@@ -348,6 +348,13 @@ export default function TallySyncPage() {
           .from('tally_sync_control')
           .upsert({ sync_type: syncType, is_paused: false }, { onConflict: 'sync_type' });
 
+        // Always re-sync fresh: wipe previous log rows for this sync_type so
+        // every chunk is reprocessed. Engine upserts data, so this is safe.
+        if (fn === 'sync-last-month') {
+          await supabase.from('tally_sync_log').delete().eq('sync_type', syncType);
+          qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
+        }
+
         let lastData: any = null;
         let okCount = 0;
         let failCount = 0;
@@ -405,7 +412,7 @@ export default function TallySyncPage() {
         } else if (ok > 0 && fail > 0) {
           toast.warning(`${label}: ${ok} ok, ${fail} failed${data?.first_error ? ` — ${data.first_error}` : ''}`);
         } else if (ok === 0 && fail === 0) {
-          toast.info(`${label}: nothing to sync (already complete)`);
+          toast.info(`${label}: sync complete`);
         } else {
           toast.error(`${label} failed${data?.first_error ? ` — ${data.first_error}` : ''}`);
         }
