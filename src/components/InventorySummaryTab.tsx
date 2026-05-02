@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, startOfMonth } from 'date-fns';
-import { CalendarIcon, Package, Layers, CheckCircle, Warehouse, TruckIcon, ArrowDownUp, ChevronDown, AlertTriangle, Trash2, ArrowDownToLine } from 'lucide-react';
+import { CalendarIcon, TruckIcon, Factory, ShoppingCart } from 'lucide-react';
+import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
+import { totalMTFromLineItems } from '@/lib/business-overview-utils';
 
 type DateRange = { from: Date | undefined; to: Date | undefined };
 
@@ -19,11 +21,10 @@ function DateRangeFilter({ dateRange, setDateRange, label }: { dateRange: DateRa
     { label: 'Today', from: startOfDay(today), to: endOfDay(today) },
     { label: 'Yesterday', from: startOfDay(subDays(today, 1)), to: endOfDay(subDays(today, 1)) },
     { label: 'This Week', from: startOfWeek(today, { weekStartsOn: 1 }), to: endOfDay(today) },
-    { label: `${today.toLocaleString('en-US', { month: 'long' })} '${String(today.getFullYear()).slice(-2)}`, from: startOfMonth(today), to: endOfDay(today) },
+    { label: `${today.toLocaleString('en-US', { month: 'short' })} '${String(today.getFullYear()).slice(-2)}`, from: startOfMonth(today), to: endOfDay(today) },
     { label: 'Last 7 Days', from: startOfDay(subDays(today, 6)), to: endOfDay(today) },
     { label: 'Last 30 Days', from: startOfDay(subDays(today, 29)), to: endOfDay(today) },
   ];
-
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-xs font-medium text-muted-foreground">{label}:</span>
@@ -34,28 +35,26 @@ function DateRangeFilter({ dateRange, setDateRange, label }: { dateRange: DateRa
           size="sm"
           className="text-xs h-7 px-2"
           onClick={() => setDateRange({ from: p.from, to: p.to })}
-        >
-          {p.label}
-        </Button>
+        >{p.label}</Button>
       ))}
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="text-xs h-7 gap-1">
             <CalendarIcon className="h-3 w-3" />
-            {dateRange.from ? (
-              dateRange.to ? (
-                `${format(dateRange.from, 'dd/MM')} - ${format(dateRange.to, 'dd/MM')}`
-              ) : format(dateRange.from, 'dd/MM/yy')
-            ) : 'Custom'}
+            {dateRange.from
+              ? dateRange.to
+                ? `${format(dateRange.from, 'dd/MM')} - ${format(dateRange.to, 'dd/MM')}`
+                : format(dateRange.from, 'dd/MM/yy')
+              : 'Custom'}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="range"
-            selected={dateRange}
-            onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+            selected={dateRange as any}
+            onSelect={(range: any) => setDateRange({ from: range?.from, to: range?.to })}
             numberOfMonths={2}
-            className={cn("p-3 pointer-events-auto")}
+            className={cn('p-3 pointer-events-auto')}
           />
         </PopoverContent>
       </Popover>
@@ -68,562 +67,524 @@ function DateRangeFilter({ dateRange, setDateRange, label }: { dateRange: DateRa
   );
 }
 
-export default function InventorySummaryTab() {
+const fmtKg = (kg: number) => `${(kg || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Kgs`;
+const isoDate = (d: Date) => format(d, 'yyyy-MM-dd');
+const inRange = (dateStr: string | null | undefined, range: DateRange) => {
+  if (!range.from) return true;
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  return d >= range.from && (!range.to || d <= range.to);
+};
+
+interface DrillRow { name: string; qtyKg: number }
+interface DrillState { open: boolean; title: string; rows: DrillRow[] }
+
+// ─── Section 1: Dispatches ─────────────────────────────────────────────────
+function DispatchesSection() {
   const today = new Date();
-  const [prodRange, setProdRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
-  const [dispatchRange, setDispatchRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
-  const [inwardRange, setInwardRange] = useState<DateRange>({ from: startOfDay(today), to: endOfDay(today) });
-  const [prodOpen, setProdOpen] = useState(false);
-  const [dispatchOpen, setDispatchOpen] = useState(false);
-  const [inwardOpen, setInwardOpen] = useState(false);
+  const [range, setRange] = useState<DateRange>({ from: startOfMonth(today), to: endOfDay(today) });
+  const [drill, setDrill] = useState<DrillState>({ open: false, title: '', rows: [] });
+  const intra = useIntracompanyParties();
 
-  // In-transit total
-  const { data: inTransitData } = useQuery({
-    queryKey: ['summary-in-transit'],
-    queryFn: async () => {
-      const { data } = await supabase.from('batches').select('net_weight').eq('status', 'in-transit');
-      return data || [];
-    },
+  // Inventory dispatches: coil sales + FG sales + defective sales (all in Kgs)
+  const coilSales = useQuery({
+    queryKey: ['sum-coil-sales'],
+    queryFn: async () => (await supabase.from('inventory_actions')
+      .select('net_weight, sales_date, order_id')
+      .in('action_type', ['pack_coil_sale', 'loose_coil_sale'])).data || [],
+  });
+  const fgSales = useQuery({
+    queryKey: ['sum-fg-sales'],
+    queryFn: async () => (await supabase.from('fg_sales').select('quantity, sales_date, order_id')).data || [],
+  });
+  const defSales = useQuery({
+    queryKey: ['sum-def-sales'],
+    queryFn: async () => (await supabase.from('defective_sales').select('quantity, sales_date, order_id')).data || [],
+  });
+  const orders = useQuery({
+    queryKey: ['sum-orders'],
+    queryFn: async () => (await supabase.from('orders').select('id, order_number, customers(customer_name)')).data || [],
+  });
+  // Tally sales
+  const tallySales = useQuery({
+    queryKey: ['sum-tally-sales'],
+    queryFn: async () => (await supabase.from('tally_vouchers')
+      .select('party_name, line_items, date, voucher_type')
+      .eq('voucher_type', 'Sales')
+      .limit(20000)).data || [],
   });
 
-  // Coils inventory total
-  const { data: coilsData } = useQuery({
-    queryKey: ['summary-coils'],
-    queryFn: async () => {
-      const { data } = await supabase.from('batches').select('net_weight').eq('status', 'received');
-      return data || [];
-    },
-  });
+  const orderMap = useMemo(() => {
+    const m = new Map<string, string>();
+    (orders.data || []).forEach((o: any) => {
+      const name = o.customers?.customer_name || '-';
+      m.set(o.id, name);
+      if (o.order_number) m.set(o.order_number, name);
+    });
+    return m;
+  }, [orders.data]);
 
-  // WIP inventory total
-  const { data: wipData } = useQuery({
-    queryKey: ['summary-wip'],
-    queryFn: async () => {
-      const { data } = await supabase.from('wip_items').select('qty').eq('status', 'active');
-      return data || [];
-    },
-  });
+  // Build per-day rows
+  const { dateRows, totals } = useMemo(() => {
+    const map = new Map<string, { invKg: number; tallyKg: number }>();
 
-  // FG inventory total
-  const { data: fgData } = useQuery({
-    queryKey: ['summary-fg'],
-    queryFn: async () => {
-      const { data } = await supabase.from('fg_items').select('qty');
-      return data || [];
-    },
-  });
+    const add = (date: string | null | undefined, kg: number, key: 'invKg' | 'tallyKg') => {
+      if (!date || !inRange(date, range)) return;
+      const d = isoDate(new Date(date));
+      if (!map.has(d)) map.set(d, { invKg: 0, tallyKg: 0 });
+      map.get(d)![key] += kg;
+    };
 
-  // FG sales for total FG sold
-  const { data: fgSalesData } = useQuery({
-    queryKey: ['summary-fg-sales'],
-    queryFn: async () => {
-      const { data } = await supabase.from('fg_sales').select('quantity');
-      return data || [];
-    },
-  });
+    (coilSales.data || []).forEach((r: any) => add(r.sales_date, Number(r.net_weight || 0), 'invKg'));
+    (fgSales.data || []).forEach((r: any) => add(r.sales_date, Number(r.quantity || 0), 'invKg'));
+    (defSales.data || []).forEach((r: any) => add(r.sales_date, Number(r.quantity || 0), 'invKg'));
 
-  // Scrap inventory total (from inventory_actions with scrap_type)
-  const { data: scrapData } = useQuery({
-    queryKey: ['summary-scrap'],
-    queryFn: async () => {
-      const { data } = await supabase.from('inventory_actions').select('net_weight').not('scrap_type', 'is', null);
-      return data || [];
-    },
-  });
+    (tallySales.data || []).forEach((r: any) => {
+      if (intra.data?.isIntracompany(r.party_name)) return;
+      const kg = totalMTFromLineItems(r.line_items) * 1000;
+      add(r.date, kg, 'tallyKg');
+    });
 
-  // Scrap sold total
-  const { data: scrapSoldData } = useQuery({
-    queryKey: ['summary-scrap-sold'],
-    queryFn: async () => {
-      const { data } = await supabase.from('scrap_sales').select('qty_sold');
-      return data || [];
-    },
-  });
+    const rows = Array.from(map.entries())
+      .map(([date, v]) => ({ date, ...v }))
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    const totals = rows.reduce((s, r) => ({ invKg: s.invKg + r.invKg, tallyKg: s.tallyKg + r.tallyKg }), { invKg: 0, tallyKg: 0 });
+    return { dateRows: rows, totals };
+  }, [coilSales.data, fgSales.data, defSales.data, tallySales.data, range, intra.data]);
 
-  // Defective inventory total (from inventory_actions with defect_type)
-  const { data: defectiveActionData } = useQuery({
-    queryKey: ['summary-defective-actions'],
-    queryFn: async () => {
-      const { data } = await supabase.from('inventory_actions').select('net_weight').not('defect_type', 'is', null);
-      return data || [];
-    },
-  });
+  // Drill-down builders
+  const showInvDrill = (date?: string) => {
+    const partyMap = new Map<string, number>();
+    const addRec = (name: string, kg: number) => {
+      partyMap.set(name, (partyMap.get(name) || 0) + kg);
+    };
+    const filterDate = (d: string | null | undefined) => date ? (d && isoDate(new Date(d)) === date) : inRange(d, range);
 
-  // Defective sold
-  const { data: defectiveSoldData } = useQuery({
-    queryKey: ['summary-defective-sold'],
-    queryFn: async () => {
-      const { data } = await supabase.from('defective_sales').select('quantity');
-      return data || [];
-    },
-  });
+    (coilSales.data || []).forEach((r: any) => {
+      if (!filterDate(r.sales_date)) return;
+      const name = (r.order_id && orderMap.get(r.order_id)) || '(no customer)';
+      addRec(name, Number(r.net_weight || 0));
+    });
+    (fgSales.data || []).forEach((r: any) => {
+      if (!filterDate(r.sales_date)) return;
+      const name = (r.order_id && orderMap.get(r.order_id)) || '(no customer)';
+      addRec(name, Number(r.quantity || 0));
+    });
+    (defSales.data || []).forEach((r: any) => {
+      if (!filterDate(r.sales_date)) return;
+      const name = (r.order_id && orderMap.get(r.order_id)) || '(no customer)';
+      addRec(name, Number(r.quantity || 0));
+    });
 
-  // FG defectives total
-  const { data: fgDefectivesData } = useQuery({
-    queryKey: ['summary-fg-defectives'],
-    queryFn: async () => {
-      const { data } = await supabase.from('fg_defectives').select('quantity');
-      return data || [];
-    },
-  });
-
-  // Processing records with details for production breakdown
-  const { data: processingDetailData } = useQuery({
-    queryKey: ['summary-processing-detail'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('processing_records')
-        .select('id, input_qty, created_at, process_type, source_type, output_type, order_id, batch_id, batches(batch_number, material, thickness, width, make, coating, grade), processing_output_items(width, length)')
-        .order('created_at', { ascending: false });
-      return data || [];
-    },
-  });
-
-  // Dispatch details: coil sales with batch info
-  const { data: coilSalesDetailData } = useQuery({
-    queryKey: ['summary-coil-sales-detail'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('inventory_actions')
-        .select('net_weight, sales_date, order_id, invoice_number, batch_id, batches(batch_number, material, thickness, width, length, make, coating, grade)')
-        .in('action_type', ['pack_coil_sale', 'loose_coil_sale', 'sell', 'sales'])
-        .order('sales_date', { ascending: false });
-      return data || [];
-    },
-  });
-
-  // FG sales with fg_item + sku info
-  const { data: fgSalesDetailData } = useQuery({
-    queryKey: ['summary-fg-sales-detail'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('fg_sales')
-        .select('quantity, sales_date, order_id, invoice_number, fg_item_id, fg_items(material, thickness, width, length, process, make, coating, grade)')
-        .order('sales_date', { ascending: false });
-      return data || [];
-    },
-  });
-
-  // Defective sales with batch info
-  const { data: defSalesDetailData } = useQuery({
-    queryKey: ['summary-def-sales-detail'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('defective_sales')
-        .select('quantity, sales_date, order_id, invoice_number, batch_id, batches(batch_number, material, thickness, width, make, coating, grade)')
-        .order('sales_date', { ascending: false });
-      return data || [];
-    },
-  });
-
-  // Fetch orders with customers for dispatch details
-  const { data: ordersData } = useQuery({
-    queryKey: ['summary-orders'],
-    queryFn: async () => {
-      const { data } = await supabase.from('orders').select('id, order_number, customers(customer_name)');
-      return data || [];
-    },
-  });
-
-  // Inward details: batches with status='received', using updated_at as received date
-  const { data: inwardDetailData } = useQuery({
-    queryKey: ['summary-inward-detail'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('batches')
-        .select('id, batch_number, material, thickness, width, length, make, coating, grade, net_weight, gross_weight, purchase_from, updated_at, created_at, status')
-        .eq('status', 'received')
-        .order('updated_at', { ascending: false });
-      return data || [];
-    },
-  });
-
-  // Computed values
-  const inTransitTotal = useMemo(() => (inTransitData || []).reduce((s, r) => s + (r.net_weight || 0), 0), [inTransitData]);
-  const coilsTotal = useMemo(() => (coilsData || []).reduce((s, r) => s + (r.net_weight || 0), 0), [coilsData]);
-  const wipTotal = useMemo(() => (wipData || []).reduce((s, r) => s + (r.qty || 0), 0), [wipData]);
-
-  const fgTotal = useMemo(() => {
-    const totalProduced = (fgData || []).reduce((s, r) => s + (r.qty || 0), 0);
-    const totalSold = (fgSalesData || []).reduce((s, r) => s + (r.quantity || 0), 0);
-    return totalProduced - totalSold;
-  }, [fgData, fgSalesData]);
-
-  const scrapTotal = useMemo(() => {
-    const totalScrap = (scrapData || []).reduce((s, r) => s + (r.net_weight || 0), 0);
-    const totalSold = (scrapSoldData || []).reduce((s, r) => s + (r.qty_sold || 0), 0);
-    return totalScrap - totalSold;
-  }, [scrapData, scrapSoldData]);
-
-  const defectiveTotal = useMemo(() => {
-    const fromActions = (defectiveActionData || []).reduce((s, r) => s + (r.net_weight || 0), 0);
-    const fromFG = (fgDefectivesData || []).reduce((s, r) => s + (r.quantity || 0), 0);
-    const sold = (defectiveSoldData || []).reduce((s, r) => s + (r.quantity || 0), 0);
-    return fromActions + fromFG - sold;
-  }, [defectiveActionData, fgDefectivesData, defectiveSoldData]);
-
-  const inDateRange = (dateStr: string | null | undefined, range: DateRange) => {
-    if (!range.from) return true;
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    return d >= range.from && (!range.to || d <= range.to);
+    const rows = Array.from(partyMap.entries())
+      .map(([name, qtyKg]) => ({ name, qtyKg }))
+      .sort((a, b) => b.qtyKg - a.qtyKg);
+    setDrill({ open: true, title: `Inventory Dispatches — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
   };
 
-  // Also fetch WIP items for input dimensions when source is WIP
-  const { data: wipLookupData } = useQuery({
-    queryKey: ['summary-wip-lookup'],
-    queryFn: async () => {
-      const { data } = await supabase.from('wip_items').select('id, source_batch_id, thickness, width, length');
-      return data || [];
-    },
-  });
-
-  // Processing filtered details
-  const filteredProduction = useMemo(() => {
-    return (processingDetailData || []).filter(r => inDateRange(r.created_at, prodRange));
-  }, [processingDetailData, prodRange]);
-
-  const productionTotal = useMemo(() => filteredProduction.reduce((s, r) => s + (r.input_qty || 0), 0), [filteredProduction]);
-
-  // Dispatch filtered details
-  const filteredDispatch = useMemo(() => {
-    const orderMap = new Map<string, { order_number: string; customer_name: string }>();
-    (ordersData || []).forEach((o: any) => {
-      const entry = { order_number: o.order_number, customer_name: o.customers?.customer_name || '-' };
-      orderMap.set(o.id, entry);
-      // Also key by order_number since order_id in sales tables stores order_number text
-      if (o.order_number) orderMap.set(o.order_number, entry);
+  const showTallyDrill = (date?: string) => {
+    const partyMap = new Map<string, number>();
+    (tallySales.data || []).forEach((r: any) => {
+      if (intra.data?.isIntracompany(r.party_name)) return;
+      const matchDate = date ? (r.date && isoDate(new Date(r.date)) === date) : inRange(r.date, range);
+      if (!matchDate) return;
+      const kg = totalMTFromLineItems(r.line_items) * 1000;
+      const name = r.party_name || '(unknown)';
+      partyMap.set(name, (partyMap.get(name) || 0) + kg);
     });
-
-    const records: Array<{
-      date: string;
-      type: string;
-      order_id: string;
-      order_number: string;
-      customer_name: string;
-      sku: string;
-      qty: number;
-      invoice: string;
-    }> = [];
-
-    (coilSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
-      const batch = r.batches;
-      const order = r.order_id ? orderMap.get(r.order_id) : null;
-      records.push({
-        date: r.sales_date || '-',
-        type: 'Coil',
-        order_id: r.order_id || '-',
-        order_number: order?.order_number || r.order_id || '-',
-        customer_name: order?.customer_name || '-',
-        sku: batch ? `${batch.material || ''} ${batch.thickness || ''}x${batch.width || ''}${batch.coating ? ' ' + batch.coating : ''}${batch.grade ? ' ' + batch.grade : ''}` : '-',
-        qty: r.net_weight || 0,
-        invoice: r.invoice_number || '-',
-      });
-    });
-
-    (fgSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
-      const fg = r.fg_items;
-      const order = r.order_id ? orderMap.get(r.order_id) : null;
-      records.push({
-        date: r.sales_date || '-',
-        type: 'FG',
-        order_id: r.order_id || '-',
-        order_number: order?.order_number || r.order_id || '-',
-        customer_name: order?.customer_name || '-',
-        sku: fg ? `${fg.material || ''} ${fg.thickness || ''}x${fg.width || ''}x${fg.length || ''}${fg.coating ? ' ' + fg.coating : ''}${fg.grade ? ' ' + fg.grade : ''}` : '-',
-        qty: r.quantity || 0,
-        invoice: r.invoice_number || '-',
-      });
-    });
-
-    (defSalesDetailData || []).filter(r => inDateRange(r.sales_date, dispatchRange)).forEach((r: any) => {
-      const batch = r.batches;
-      const order = r.order_id ? orderMap.get(r.order_id) : null;
-      records.push({
-        date: r.sales_date || '-',
-        type: 'Defective',
-        order_id: r.order_id || '-',
-        order_number: order?.order_number || r.order_id || '-',
-        customer_name: order?.customer_name || '-',
-        sku: batch ? `${batch.material || ''} ${batch.thickness || ''}x${batch.width || ''}${batch.coating ? ' ' + batch.coating : ''}` : '-',
-        qty: r.quantity || 0,
-        invoice: r.invoice_number || '-',
-      });
-    });
-
-    return records.sort((a, b) => (b.date > a.date ? 1 : -1));
-  }, [coilSalesDetailData, fgSalesDetailData, defSalesDetailData, ordersData, dispatchRange]);
-
-  const dispatchTotal = useMemo(() => filteredDispatch.reduce((s, r) => s + r.qty, 0), [filteredDispatch]);
-
-  // Inward filtered details
-  const filteredInward = useMemo(() => {
-    return (inwardDetailData || []).filter(r => inDateRange(r.updated_at, inwardRange));
-  }, [inwardDetailData, inwardRange]);
-
-  const inwardTotal = useMemo(() => filteredInward.reduce((s, r) => s + (r.net_weight || 0), 0), [filteredInward]);
-
-  const formatWeight = (val: number) => `${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg`;
-
-  const summaryCards = [
-    { label: 'In-Transit', value: inTransitTotal, icon: TruckIcon, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-200 dark:border-amber-800' },
-    { label: 'Coils Inventory', value: coilsTotal, icon: Warehouse, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-200 dark:border-blue-800' },
-    { label: 'WIP Inventory', value: wipTotal, icon: Layers, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-200 dark:border-purple-800' },
-    { label: 'FG Inventory', value: fgTotal, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-200 dark:border-green-800' },
-  ];
-
-  const smallCards = [
-    { label: 'Scrap', value: scrapTotal, icon: Trash2, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-200 dark:border-orange-800' },
-    { label: 'Defective', value: defectiveTotal, icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-200 dark:border-red-800' },
-  ];
+    const rows = Array.from(partyMap.entries())
+      .map(([name, qtyKg]) => ({ name, qtyKg }))
+      .sort((a, b) => b.qtyKg - a.qtyKg);
+    setDrill({ open: true, title: `Tally Sales (Debtors) — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+  };
 
   return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <TruckIcon className="h-5 w-5 text-rose-600" />
+            <CardTitle className="text-base">Total Dispatches</CardTitle>
+          </div>
+          <DateRangeFilter dateRange={range} setDateRange={setRange} label="Period" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs font-semibold">Date</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Inventory Dispatch (Kgs)</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Tally Sales (Kgs)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dateRows.length === 0 ? (
+                <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No data for selected period</TableCell></TableRow>
+              ) : dateRows.map((r) => (
+                <TableRow key={r.date}>
+                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button
+                      className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
+                      onClick={() => showInvDrill(r.date)}
+                      disabled={r.invKg <= 0}
+                    >{fmtKg(r.invKg)}</button>
+                  </TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button
+                      className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
+                      onClick={() => showTallyDrill(r.date)}
+                      disabled={r.tallyKg <= 0}
+                    >{fmtKg(r.tallyKg)}</button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {dateRows.length > 0 && (
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button className="text-primary hover:underline" onClick={() => showInvDrill()}>{fmtKg(totals.invKg)}</button>
+                  </TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button className="text-primary hover:underline" onClick={() => showTallyDrill()}>{fmtKg(totals.tallyKg)}</button>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+      <DrillDialog state={drill} onClose={() => setDrill(s => ({ ...s, open: false }))} nameLabel="Customer / Debtor" />
+    </Card>
+  );
+}
+
+// ─── Section 2: Production ─────────────────────────────────────────────────
+function ProductionSection() {
+  const today = new Date();
+  const [range, setRange] = useState<DateRange>({ from: startOfMonth(today), to: endOfDay(today) });
+  const [drill, setDrill] = useState<{ open: boolean; title: string; records: any[] }>({ open: false, title: '', records: [] });
+
+  const proc = useQuery({
+    queryKey: ['sum-processing'],
+    queryFn: async () => (await supabase.from('processing_records')
+      .select('id, input_qty, created_at, process_type, source_type, output_type, batch_id, batches(batch_number, material, thickness, width, make, coating, grade), processing_output_items(width, length, qty_kg, num_pcs)')
+      .order('created_at', { ascending: false })).data || [],
+  });
+
+  // Classify each record as Coils→WIP or WIP→FG (or other)
+  const classify = (r: any): 'coil_to_wip' | 'wip_to_fg' | 'coil_to_fg' | 'other' => {
+    const src = (r.source_type || '').toLowerCase();
+    const out = (r.output_type || '').toLowerCase();
+    if (src === 'coil' && out === 'wip') return 'coil_to_wip';
+    if (src === 'wip' && out === 'fg') return 'wip_to_fg';
+    if (src === 'coil' && out === 'fg') return 'coil_to_fg';
+    return 'other';
+  };
+
+  const { dateRows, totals } = useMemo(() => {
+    const map = new Map<string, { c2w: number; w2f: number; c2f: number }>();
+    (proc.data || []).forEach((r: any) => {
+      if (!inRange(r.created_at, range)) return;
+      const d = isoDate(new Date(r.created_at));
+      if (!map.has(d)) map.set(d, { c2w: 0, w2f: 0, c2f: 0 });
+      const kg = Number(r.input_qty || 0);
+      const cls = classify(r);
+      if (cls === 'coil_to_wip') map.get(d)!.c2w += kg;
+      else if (cls === 'wip_to_fg') map.get(d)!.w2f += kg;
+      else if (cls === 'coil_to_fg') map.get(d)!.c2f += kg;
+    });
+    const rows = Array.from(map.entries()).map(([date, v]) => ({ date, ...v })).sort((a, b) => (a.date < b.date ? 1 : -1));
+    const totals = rows.reduce((s, r) => ({ c2w: s.c2w + r.c2w, w2f: s.w2f + r.w2f, c2f: s.c2f + r.c2f }), { c2w: 0, w2f: 0, c2f: 0 });
+    return { dateRows: rows, totals };
+  }, [proc.data, range]);
+
+  const showDrill = (kind: 'coil_to_wip' | 'wip_to_fg' | 'coil_to_fg', date?: string) => {
+    const records = (proc.data || []).filter((r: any) => {
+      if (classify(r) !== kind) return false;
+      return date ? (r.created_at && isoDate(new Date(r.created_at)) === date) : inRange(r.created_at, range);
+    });
+    const labels: Record<typeof kind, string> = {
+      coil_to_wip: 'Coils → WIP',
+      wip_to_fg: 'WIP → FG',
+      coil_to_fg: 'Coils → FG',
+    } as any;
+    setDrill({ open: true, title: `${labels[kind]} — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, records });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Factory className="h-5 w-5 text-indigo-600" />
+            <CardTitle className="text-base">Total Production</CardTitle>
+          </div>
+          <DateRangeFilter dateRange={range} setDateRange={setRange} label="Period" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs font-semibold">Date</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Coils → WIP (Kgs)</TableHead>
+                <TableHead className="text-xs font-semibold text-right">WIP → FG (Kgs)</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Coils → FG (Kgs)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dateRows.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">No production for selected period</TableCell></TableRow>
+              ) : dateRows.map((r) => (
+                <TableRow key={r.date}>
+                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showDrill('coil_to_wip', r.date)} disabled={r.c2w <= 0}>{fmtKg(r.c2w)}</button>
+                  </TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showDrill('wip_to_fg', r.date)} disabled={r.w2f <= 0}>{fmtKg(r.w2f)}</button>
+                  </TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showDrill('coil_to_fg', r.date)} disabled={r.c2f <= 0}>{fmtKg(r.c2f)}</button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {dateRows.length > 0 && (
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs text-right"><button className="text-primary hover:underline" onClick={() => showDrill('coil_to_wip')}>{fmtKg(totals.c2w)}</button></TableCell>
+                  <TableCell className="text-xs text-right"><button className="text-primary hover:underline" onClick={() => showDrill('wip_to_fg')}>{fmtKg(totals.w2f)}</button></TableCell>
+                  <TableCell className="text-xs text-right"><button className="text-primary hover:underline" onClick={() => showDrill('coil_to_fg')}>{fmtKg(totals.c2f)}</button></TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+      <ProductionDrillDialog state={drill} onClose={() => setDrill(s => ({ ...s, open: false }))} />
+    </Card>
+  );
+}
+
+// ─── Section 3: Purchases ──────────────────────────────────────────────────
+function PurchasesSection() {
+  const today = new Date();
+  const [range, setRange] = useState<DateRange>({ from: startOfMonth(today), to: endOfDay(today) });
+  const [drill, setDrill] = useState<DrillState>({ open: false, title: '', rows: [] });
+  const intra = useIntracompanyParties();
+
+  // Inventory inwards: batches received (use updated_at as the received date, matching prior tab)
+  const batches = useQuery({
+    queryKey: ['sum-batches-received'],
+    queryFn: async () => (await supabase.from('batches')
+      .select('id, net_weight, purchase_from, updated_at, status')
+      .eq('status', 'received')).data || [],
+  });
+  const tallyPurch = useQuery({
+    queryKey: ['sum-tally-purchases'],
+    queryFn: async () => (await supabase.from('tally_vouchers')
+      .select('party_name, line_items, date, voucher_type')
+      .ilike('voucher_type', 'Purchase%')
+      .limit(20000)).data || [],
+  });
+
+  const { dateRows, totals } = useMemo(() => {
+    const map = new Map<string, { invKg: number; tallyKg: number }>();
+    const add = (date: string | null | undefined, kg: number, key: 'invKg' | 'tallyKg') => {
+      if (!date || !inRange(date, range)) return;
+      const d = isoDate(new Date(date));
+      if (!map.has(d)) map.set(d, { invKg: 0, tallyKg: 0 });
+      map.get(d)![key] += kg;
+    };
+    (batches.data || []).forEach((r: any) => add(r.updated_at, Number(r.net_weight || 0), 'invKg'));
+    (tallyPurch.data || []).forEach((r: any) => {
+      if (intra.data?.isIntracompany(r.party_name)) return;
+      add(r.date, totalMTFromLineItems(r.line_items) * 1000, 'tallyKg');
+    });
+    const rows = Array.from(map.entries()).map(([date, v]) => ({ date, ...v })).sort((a, b) => (a.date < b.date ? 1 : -1));
+    const totals = rows.reduce((s, r) => ({ invKg: s.invKg + r.invKg, tallyKg: s.tallyKg + r.tallyKg }), { invKg: 0, tallyKg: 0 });
+    return { dateRows: rows, totals };
+  }, [batches.data, tallyPurch.data, range, intra.data]);
+
+  const showInvDrill = (date?: string) => {
+    const map = new Map<string, number>();
+    (batches.data || []).forEach((r: any) => {
+      const matchDate = date ? (r.updated_at && isoDate(new Date(r.updated_at)) === date) : inRange(r.updated_at, range);
+      if (!matchDate) return;
+      const name = r.purchase_from || '(no supplier)';
+      map.set(name, (map.get(name) || 0) + Number(r.net_weight || 0));
+    });
+    const rows = Array.from(map.entries()).map(([name, qtyKg]) => ({ name, qtyKg })).sort((a, b) => b.qtyKg - a.qtyKg);
+    setDrill({ open: true, title: `Inventory Inwards — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+  };
+
+  const showTallyDrill = (date?: string) => {
+    const map = new Map<string, number>();
+    (tallyPurch.data || []).forEach((r: any) => {
+      if (intra.data?.isIntracompany(r.party_name)) return;
+      const matchDate = date ? (r.date && isoDate(new Date(r.date)) === date) : inRange(r.date, range);
+      if (!matchDate) return;
+      const kg = totalMTFromLineItems(r.line_items) * 1000;
+      const name = r.party_name || '(unknown)';
+      map.set(name, (map.get(name) || 0) + kg);
+    });
+    const rows = Array.from(map.entries()).map(([name, qtyKg]) => ({ name, qtyKg })).sort((a, b) => b.qtyKg - a.qtyKg);
+    setDrill({ open: true, title: `Tally Purchases (Creditors) — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-teal-600" />
+            <CardTitle className="text-base">Total Purchases</CardTitle>
+          </div>
+          <DateRangeFilter dateRange={range} setDateRange={setRange} label="Period" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs font-semibold">Date</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Inventory Inward (Kgs)</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Tally Purchases (Kgs)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dateRows.length === 0 ? (
+                <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No data for selected period</TableCell></TableRow>
+              ) : dateRows.map((r) => (
+                <TableRow key={r.date}>
+                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showInvDrill(r.date)} disabled={r.invKg <= 0}>{fmtKg(r.invKg)}</button>
+                  </TableCell>
+                  <TableCell className="text-xs text-right">
+                    <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showTallyDrill(r.date)} disabled={r.tallyKg <= 0}>{fmtKg(r.tallyKg)}</button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {dateRows.length > 0 && (
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs text-right"><button className="text-primary hover:underline" onClick={() => showInvDrill()}>{fmtKg(totals.invKg)}</button></TableCell>
+                  <TableCell className="text-xs text-right"><button className="text-primary hover:underline" onClick={() => showTallyDrill()}>{fmtKg(totals.tallyKg)}</button></TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+      <DrillDialog state={drill} onClose={() => setDrill(s => ({ ...s, open: false }))} nameLabel="Supplier / Creditor" />
+    </Card>
+  );
+}
+
+// ─── Drill-down dialogs ────────────────────────────────────────────────────
+function DrillDialog({ state, onClose, nameLabel }: { state: DrillState; onClose: () => void; nameLabel: string }) {
+  const total = state.rows.reduce((s, r) => s + r.qtyKg, 0);
+  return (
+    <Dialog open={state.open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle className="text-base">{state.title}</DialogTitle></DialogHeader>
+        <div className="overflow-x-auto rounded-md border max-h-[60vh] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs font-semibold">{nameLabel}</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Total Quantity (Kgs)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {state.rows.length === 0 ? (
+                <TableRow><TableCell colSpan={2} className="text-center text-sm text-muted-foreground py-6">No records</TableCell></TableRow>
+              ) : state.rows.map((r) => (
+                <TableRow key={r.name}>
+                  <TableCell className="text-xs">{r.name}</TableCell>
+                  <TableCell className="text-xs text-right font-medium">{fmtKg(r.qtyKg)}</TableCell>
+                </TableRow>
+              ))}
+              {state.rows.length > 0 && (
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs text-right">{fmtKg(total)}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProductionDrillDialog({ state, onClose }: { state: { open: boolean; title: string; records: any[] }; onClose: () => void }) {
+  const total = state.records.reduce((s, r) => s + Number(r.input_qty || 0), 0);
+  return (
+    <Dialog open={state.open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader><DialogTitle className="text-base">{state.title}</DialogTitle></DialogHeader>
+        <div className="overflow-x-auto rounded-md border max-h-[60vh] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs font-semibold">Date</TableHead>
+                <TableHead className="text-xs font-semibold">Process</TableHead>
+                <TableHead className="text-xs font-semibold">Batch</TableHead>
+                <TableHead className="text-xs font-semibold">Material</TableHead>
+                <TableHead className="text-xs font-semibold">Input Dim</TableHead>
+                <TableHead className="text-xs font-semibold">Output Dims</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Input Qty (Kgs)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {state.records.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">No records</TableCell></TableRow>
+              ) : state.records.map((r: any) => {
+                const b = r.batches;
+                const outs = r.processing_output_items || [];
+                const outDims = outs.length
+                  ? [...new Set(outs.map((o: any) => `${o.width ?? '-'} x ${o.length ?? 'Coil'}`))].join(', ')
+                  : '-';
+                return (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-xs">{format(new Date(r.created_at), 'dd/MM/yy')}</TableCell>
+                    <TableCell className="text-xs">{r.process_type}</TableCell>
+                    <TableCell className="text-xs font-mono">{b?.batch_number || '-'}</TableCell>
+                    <TableCell className="text-xs">{b?.material || '-'}</TableCell>
+                    <TableCell className="text-xs">{b ? `${b.thickness ?? '-'} x ${b.width ?? '-'}` : '-'}</TableCell>
+                    <TableCell className="text-xs">{outDims}</TableCell>
+                    <TableCell className="text-xs text-right font-medium">{Number(r.input_qty || 0).toLocaleString('en-IN')}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {state.records.length > 0 && (
+                <TableRow className="bg-muted/40 font-semibold">
+                  <TableCell colSpan={6} className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs text-right">{fmtKg(total)}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function InventorySummaryTab() {
+  return (
     <div className="space-y-6">
-      {/* Main summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((card) => (
-          <Card key={card.label} className={cn("border", card.border, card.bg)}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg", card.bg)}>
-                  <card.icon className={cn("h-5 w-5", card.color)} />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">{card.label}</p>
-                  <p className={cn("text-lg font-bold", card.color)}>{formatWeight(card.value)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Smaller Scrap & Defective cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {smallCards.map((card) => (
-          <Card key={card.label} className={cn("border", card.border, card.bg)}>
-            <CardContent className="p-3">
-              <div className="flex items-center gap-2">
-                <card.icon className={cn("h-4 w-4", card.color)} />
-                <div>
-                  <p className="text-[10px] text-muted-foreground">{card.label}</p>
-                  <p className={cn("text-sm font-semibold", card.color)}>{formatWeight(card.value)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Total Inward with date filter + expandable details */}
-      <Collapsible open={inwardOpen} onOpenChange={setInwardOpen}>
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <ArrowDownToLine className="h-5 w-5 text-teal-600" />
-                <CardTitle className="text-base">Total Inward</CardTitle>
-                <span className="ml-auto text-xl font-bold text-teal-600">{formatWeight(inwardTotal)}</span>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", inwardOpen && "rotate-180")} />
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
-              <DateRangeFilter dateRange={inwardRange} setDateRange={setInwardRange} label="Period" />
-            </div>
-          </CardHeader>
-          <CollapsibleContent>
-            <CardContent className="pt-0">
-              {filteredInward.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No inward records for selected period</p>
-              ) : (
-                <div className="overflow-x-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="text-xs font-semibold">Date</TableHead>
-                        <TableHead className="text-xs font-semibold">Batch #</TableHead>
-                        <TableHead className="text-xs font-semibold">Material</TableHead>
-                        <TableHead className="text-xs font-semibold">Dimensions</TableHead>
-                        <TableHead className="text-xs font-semibold">Make</TableHead>
-                        <TableHead className="text-xs font-semibold">Coating</TableHead>
-                        <TableHead className="text-xs font-semibold">Grade</TableHead>
-                        <TableHead className="text-xs font-semibold">Supplier</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Net Wt (kg)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredInward.map((r: any) => (
-                        <TableRow key={r.id}>
-                          <TableCell className="text-xs">{format(new Date(r.updated_at), 'dd/MM/yy')}</TableCell>
-                          <TableCell className="text-xs font-mono">{r.batch_number}</TableCell>
-                          <TableCell className="text-xs">{r.material || '-'}</TableCell>
-                          <TableCell className="text-xs">{`${r.thickness ?? '-'} x ${r.width ?? '-'}`}</TableCell>
-                          <TableCell className="text-xs">{r.make || '-'}</TableCell>
-                          <TableCell className="text-xs">{r.coating || '-'}</TableCell>
-                          <TableCell className="text-xs">{r.grade || '-'}</TableCell>
-                          <TableCell className="text-xs">{r.purchase_from || '-'}</TableCell>
-                          <TableCell className="text-xs text-right font-medium">{(r.net_weight || 0).toLocaleString('en-IN')}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      {/* Production with date filter + expandable details */}
-      <Collapsible open={prodOpen} onOpenChange={setProdOpen}>
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-indigo-600" />
-                <CardTitle className="text-base">Total Production</CardTitle>
-                <span className="ml-auto text-xl font-bold text-indigo-600">{formatWeight(productionTotal)}</span>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", prodOpen && "rotate-180")} />
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
-              <DateRangeFilter dateRange={prodRange} setDateRange={setProdRange} label="Period" />
-            </div>
-          </CardHeader>
-          <CollapsibleContent>
-            <CardContent className="pt-0">
-              {filteredProduction.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No production records for selected period</p>
-              ) : (
-                <div className="overflow-x-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="text-xs font-semibold">Date</TableHead>
-                        <TableHead className="text-xs font-semibold">Type</TableHead>
-                        <TableHead className="text-xs font-semibold">Source → Output</TableHead>
-                        <TableHead className="text-xs font-semibold">Batch</TableHead>
-                        <TableHead className="text-xs font-semibold">Material</TableHead>
-                        <TableHead className="text-xs font-semibold">Input Dimensions</TableHead>
-                        <TableHead className="text-xs font-semibold">Output Dimensions</TableHead>
-                        
-                        <TableHead className="text-xs font-semibold text-right">Input Qty (kg)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredProduction.map((r: any) => {
-                        const batch = r.batches;
-                        const outputItems = r.processing_output_items || [];
-                        // Input dimensions: from coil (batch) if source=coil, else from WIP
-                        let inputDims = '-';
-                        if (r.source_type === 'wip') {
-                          // find WIP item by source_batch_id matching batch_id
-                          const wipItem = (wipLookupData || []).find((w: any) => w.source_batch_id === r.batch_id);
-                          if (wipItem) inputDims = `${wipItem.thickness ?? '-'} x ${wipItem.width ?? '-'}`;
-                        } else if (batch) {
-                          inputDims = `${batch.thickness ?? '-'} x ${batch.width ?? '-'}`;
-                        }
-                        // Output dimensions: from processing_output_items
-                        let outputDims = '-';
-                        if (outputItems.length > 0) {
-                          const dimStrs = outputItems.map((oi: any) => `${oi.width ?? '-'} x ${oi.length ?? 'Coil'}`);
-                          const unique = [...new Set(dimStrs)];
-                          outputDims = unique.join(', ');
-                        }
-                        return (
-                          <TableRow key={r.id}>
-                            <TableCell className="text-xs">{format(new Date(r.created_at), 'dd/MM/yy')}</TableCell>
-                            <TableCell className="text-xs">{r.process_type}</TableCell>
-                            <TableCell className="text-xs">
-                              <span className="capitalize">{r.source_type}</span> → <span className="capitalize">{r.output_type}</span>
-                            </TableCell>
-                            <TableCell className="text-xs font-mono">{batch?.batch_number || '-'}</TableCell>
-                            <TableCell className="text-xs">{batch?.material || '-'}</TableCell>
-                            <TableCell className="text-xs">{inputDims}</TableCell>
-                            <TableCell className="text-xs">{outputDims}</TableCell>
-                            
-                            <TableCell className="text-xs text-right font-medium">{(r.input_qty || 0).toLocaleString('en-IN')}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      {/* Dispatch with date filter + expandable details */}
-      <Collapsible open={dispatchOpen} onOpenChange={setDispatchOpen}>
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <ArrowDownUp className="h-5 w-5 text-rose-600" />
-                <CardTitle className="text-base">Total Dispatch</CardTitle>
-                <span className="ml-auto text-xl font-bold text-rose-600">{formatWeight(dispatchTotal)}</span>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", dispatchOpen && "rotate-180")} />
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
-              <DateRangeFilter dateRange={dispatchRange} setDateRange={setDispatchRange} label="Period" />
-            </div>
-          </CardHeader>
-          <CollapsibleContent>
-            <CardContent className="pt-0">
-              {filteredDispatch.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No dispatch records for selected period</p>
-              ) : (
-                <div className="overflow-x-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="text-xs font-semibold">Date</TableHead>
-                        <TableHead className="text-xs font-semibold">Type</TableHead>
-                        <TableHead className="text-xs font-semibold">Order #</TableHead>
-                        <TableHead className="text-xs font-semibold">Customer</TableHead>
-                        <TableHead className="text-xs font-semibold">SKU</TableHead>
-                        <TableHead className="text-xs font-semibold">Invoice</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Qty (kg)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredDispatch.map((r, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="text-xs">{r.date !== '-' ? format(new Date(r.date), 'dd/MM/yy') : '-'}</TableCell>
-                          <TableCell className="text-xs">
-                            <span className={cn(
-                              "px-1.5 py-0.5 rounded text-[10px] font-medium",
-                              r.type === 'Coil' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
-                              r.type === 'FG' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
-                              'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                            )}>
-                              {r.type}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs">{r.order_number}</TableCell>
-                          <TableCell className="text-xs">{r.customer_name}</TableCell>
-                          <TableCell className="text-xs font-mono">{r.sku}</TableCell>
-                          <TableCell className="text-xs">{r.invoice}</TableCell>
-                          <TableCell className="text-xs text-right font-medium">{r.qty.toLocaleString('en-IN')}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+      <DispatchesSection />
+      <ProductionSection />
+      <PurchasesSection />
     </div>
   );
 }
