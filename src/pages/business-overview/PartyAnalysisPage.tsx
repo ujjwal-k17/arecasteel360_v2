@@ -495,7 +495,7 @@ function PartyTable({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
+                {pageRows.map(r => (
                   <Fragment key={r.key}>
                     <tr className="border-b hover:bg-muted/40 cursor-pointer" onClick={() => toggle(r.key)}>
                       <td className="py-2">
@@ -567,7 +567,27 @@ function PartyTable({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-3 text-sm">
+                <button
+                  className="px-3 py-1 rounded border disabled:opacity-50 hover:bg-muted/50"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  Previous
+                </button>
+                <span className="text-muted-foreground">Page {page} of {totalPages}</span>
+                <button
+                  className="px-3 py-1 rounded border disabled:opacity-50 hover:bg-muted/50"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
