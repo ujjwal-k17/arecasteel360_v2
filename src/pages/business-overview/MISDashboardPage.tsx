@@ -75,7 +75,7 @@ export default function MISDashboardPage() {
     queryFn: async () => {
       let q = supabase
         .from('tally_vouchers')
-        .select('voucher_type, amount, line_items, company_name')
+        .select('voucher_type, amount, line_items, company_name, party_name')
         .gte('date', toISODate(from))
         .lte('date', toISODate(to));
       if (company !== 'all') q = q.eq('company_name', company);
@@ -83,6 +83,8 @@ export default function MISDashboardPage() {
       if (error) throw error;
       const result = { sales: { value: 0, mt: 0, n: 0 }, purchase: { value: 0, mt: 0, n: 0 }, receipt: 0, payment: 0 };
       (data ?? []).forEach((v: any) => {
+        // Exclude intracompany sales/purchase from MIS totals
+        if ((v.voucher_type === 'Sales' || v.voucher_type === 'Purchase') && intraSet.has(v.party_name)) return;
         const amt = Number(v.amount || 0);
         if (v.voucher_type === 'Sales') {
           result.sales.value += amt;
