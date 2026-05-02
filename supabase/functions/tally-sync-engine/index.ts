@@ -299,12 +299,70 @@ type LedgerRow = {
   company_name: string;
   ledger_name: string;
   ledger_group: string | null;
+  ultimate_group: string | null;
   closing_balance: number;
   as_of_date: string; // ISO
   synced_at: string;
 };
 
-function parseLedgers(xml: string, companyName: string, asOfIso: string, syncedAtIso: string): LedgerRow[] {
+type GroupRow = {
+  company_name: string;
+  group_name: string;
+  parent_group: string | null;
+  ultimate_parent: string | null;
+  synced_at: string;
+};
+
+function parseGroups(xml: string, companyName: string, syncedAtIso: string): GroupRow[] {
+  const rows: GroupRow[] = [];
+  const blocks = getAllBlocks(xml, 'GROUP');
+  const seen = new Set<string>();
+  for (const b of blocks) {
+    const name = extractNameAttr(b);
+    if (!name) continue;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const parent = getTagText(b, 'PARENT');
+    rows.push({
+      company_name: companyName,
+      group_name: name,
+      parent_group: parent && parent.length > 0 ? parent : null,
+      ultimate_parent: null, // computed below
+      synced_at: syncedAtIso,
+    });
+  }
+  return rows;
+}
+
+// Walk up parent chain to find the top-level (root) group for every group.
+// Root = a group whose parent is empty/null OR whose parent isn't in the map
+// (Tally reserved primary groups like "Sundry Debtors" themselves have empty PARENT).
+function computeUltimateParents(groups: GroupRow[]): GroupRow[] {
+  const byName = new Map<string, GroupRow>();
+  for (const g of groups) byName.set(g.group_name, g);
+
+  const resolve = (name: string, visiting: Set<string>): string => {
+    if (visiting.has(name)) return name; // cycle guard
+    visiting.add(name);
+    const g = byName.get(name);
+    if (!g) return name; // unknown parent — treat as its own root
+    if (!g.parent_group) return name; // root reached
+    return resolve(g.parent_group, visiting);
+  };
+
+  for (const g of groups) {
+    g.ultimate_parent = resolve(g.group_name, new Set<string>());
+  }
+  return groups;
+}
+
+function parseLedgers(
+  xml: string,
+  companyName: string,
+  asOfIso: string,
+  syncedAtIso: string,
+  ultimateByGroup: Map<string, string>,
+): LedgerRow[] {
   const rows: LedgerRow[] = [];
   const blocks = getAllBlocks(xml, 'LEDGER');
   const seen = new Set<string>();
@@ -315,10 +373,12 @@ function parseLedgers(xml: string, companyName: string, asOfIso: string, syncedA
     seen.add(name);
     const parent = getTagText(b, 'PARENT');
     const closing = parseTallyAmount(getTagText(b, 'CLOSINGBALANCE') || getTagText(b, 'OPENINGBALANCE'));
+    const ultimate = parent ? (ultimateByGroup.get(parent) ?? parent) : null;
     rows.push({
       company_name: companyName,
       ledger_name: name,
       ledger_group: parent,
+      ultimate_group: ultimate,
       closing_balance: closing,
       as_of_date: asOfIso,
       synced_at: syncedAtIso,
