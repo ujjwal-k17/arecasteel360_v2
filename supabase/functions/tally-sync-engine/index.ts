@@ -624,7 +624,7 @@ Deno.serve(async (req) => {
       records_fetched: totalRecords,
       completed_at: completedAtIso,
       error_message: errors.length ? errors.join(' | ') : null,
-      last_successful_chunk: anyData ? chunk_label : null,
+      last_successful_chunk: status === 'completed' ? chunk_label : null,
     })
     .eq('id', logId);
 

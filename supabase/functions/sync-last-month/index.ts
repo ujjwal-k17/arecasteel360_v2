@@ -6,7 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const CHUNKS_PER_CALL = 3;
 const SYNC_TYPE = "last_month";
 
 function fmt(d: Date): string {
@@ -14,10 +13,6 @@ function fmt(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}${m}${day}`;
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 function isoWeek(d: Date): { year: number; week: number } {
@@ -96,8 +91,6 @@ Deno.serve(async (req) => {
 
     const chunks = buildChunks();
     const summary: any[] = [];
-    let totalProcessed = 0;
-    let anyRemaining = false;
 
     for (const c of companies ?? []) {
       const { data: lastLogs } = await supabase
@@ -117,53 +110,57 @@ Deno.serve(async (req) => {
         if (idx >= 0) startIdx = idx + 1;
       }
 
-      const endIdx = Math.min(startIdx + CHUNKS_PER_CALL, chunks.length);
-      const companyResults: any[] = [];
-
-      for (let i = startIdx; i < endIdx; i++) {
-        if (await isPaused(supabase)) {
-          anyRemaining = true;
-          summary.push({
-            company: c.company_name,
-            resumed_from: lastChunk,
-            paused: true,
-            chunks_processed: companyResults.length,
-            chunks_remaining: chunks.length - i,
-            results: companyResults,
-          });
-          return new Response(
-            JSON.stringify({
-              success: true,
-              paused: true,
-              done: false,
-              total_chunks: chunks.length,
-              processed_this_call: totalProcessed,
-              summary,
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        const ch = chunks[i];
-        const fetch_ledgers = i === 0 && !lastChunk;
-        try {
-          const data = await callEngine(supabaseUrl, serviceKey, {
-            company_name: c.company_name,
-            from_date: ch.from,
-            to_date: ch.to,
-            sync_type: SYNC_TYPE,
-            chunk_label: ch.label,
-            fetch_ledgers,
-          });
-          companyResults.push({ chunk: ch.label, ok: true, data });
-          totalProcessed++;
-        } catch (e) {
-          companyResults.push({ chunk: ch.label, ok: false, error: String((e as any)?.message || e) });
-        }
-        if (i < endIdx - 1) await sleep(1500);
+      if (startIdx >= chunks.length) {
+        summary.push({
+          company: c.company_name,
+          resumed_from: lastChunk,
+          chunks_processed: 0,
+          chunks_remaining: 0,
+          results: [],
+        });
+        continue;
       }
 
-      const remaining = chunks.length - endIdx;
-      if (remaining > 0) anyRemaining = true;
+      if (await isPaused(supabase)) {
+        summary.push({
+          company: c.company_name,
+          resumed_from: lastChunk,
+          paused: true,
+          chunks_processed: 0,
+          chunks_remaining: chunks.length - startIdx,
+          results: [],
+        });
+        return new Response(
+          JSON.stringify({
+            success: true,
+            paused: true,
+            done: false,
+            total_chunks: chunks.length,
+            processed_this_call: 0,
+            summary,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const ch = chunks[startIdx];
+      const fetch_ledgers = startIdx === 0 && !lastChunk;
+      const companyResults: any[] = [];
+      try {
+        const data = await callEngine(supabaseUrl, serviceKey, {
+          company_name: c.company_name,
+          from_date: ch.from,
+          to_date: ch.to,
+          sync_type: SYNC_TYPE,
+          chunk_label: ch.label,
+          fetch_ledgers,
+        });
+        companyResults.push({ chunk: ch.label, ok: true, data });
+      } catch (e) {
+        companyResults.push({ chunk: ch.label, ok: false, error: String((e as any)?.message || e) });
+      }
+
+      const remaining = chunks.length - (startIdx + 1);
 
       summary.push({
         company: c.company_name,
@@ -172,14 +169,25 @@ Deno.serve(async (req) => {
         chunks_remaining: remaining,
         results: companyResults,
       });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          done: false,
+          total_chunks: chunks.length,
+          processed_this_call: companyResults.length,
+          summary,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        done: !anyRemaining,
+        done: true,
         total_chunks: chunks.length,
-        processed_this_call: totalProcessed,
+        processed_this_call: 0,
         summary,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
