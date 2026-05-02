@@ -1,12 +1,14 @@
 import { Fragment, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, ShoppingCart, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, ShoppingCart, Search, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { CompanyFilter } from '@/components/business-overview/CompanyFilter';
 import { LastSyncedFooter } from '@/components/business-overview/LastSyncedFooter';
 import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
@@ -30,6 +32,7 @@ function StatCard({ title, value, loading }: any) {
 }
 
 export default function PurchaseAnalysisPage() {
+  const qc = useQueryClient();
   const [company, setCompany] = useState<string>('all');
   const [monthSel, setMonthSel] = useState<string>('current');
   const [from, setFrom] = useState<string>(toISODate(currentMonthRange().from));
@@ -131,9 +134,23 @@ export default function PurchaseAnalysisPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold">Purchase Analysis</h1>
-        <p className="text-sm text-muted-foreground">Procurement performance — supplier wise</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Purchase Analysis</h1>
+          <p className="text-sm text-muted-foreground">Procurement performance — supplier wise</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ['purchase-analysis'] });
+            toast.success('Refreshing purchase data…');
+          }}
+          disabled={purchases.isFetching}
+        >
+          <RefreshCw className={`h-4 w-4 ${purchases.isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       <Card>
