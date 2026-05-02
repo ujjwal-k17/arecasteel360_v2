@@ -227,10 +227,44 @@ export function applyFIFO(invoices: FIFOInvoice[], receipts: FIFOReceipt[]): FIF
 //   7. Ageing bucketed from overdue debit entries
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Voucher-type classification.
+// Tally installations often customise voucher type names (e.g. "Credit Note Sales",
+// "Debit Note Purchase", "Service Invoice", "Rent Invoice"). We therefore match by
+// keyword rather than exact equality so that variants are correctly classified.
+//
+// Debit side  → increases what the debtor owes us  (Sales, Debit Notes, misc invoices)
+// Credit side → reduces what the debtor owes us    (Receipts, Credit Notes, Journals, Payments)
+
+export function classifyPartyVoucher(voucherType: string | null | undefined): 'debit' | 'credit' | null {
+  const t = (voucherType || '').toLowerCase().trim();
+  if (!t) return null;
+
+  // Credit side first — "Credit Note Sales" must NOT be misread as Sales.
+  if (t.includes('credit note')) return 'credit';
+  if (t.includes('receipt')) return 'credit';
+  if (t.includes('payment')) return 'credit';
+  if (t === 'journal' || t.startsWith('journal')) return 'credit';
+
+  // Debit side
+  if (t.includes('debit note')) return 'debit';
+  if (t.includes('sales') || t.includes('sale')) return 'debit';
+  if (t.includes('invoice')) return 'debit'; // Service Invoice, Rent Invoice
+  if (t.includes('purchase')) return 'debit'; // creditor side
+
+  return null;
+}
+
+// Kept for backward compatibility / fetch filters (UI fetches by these names).
+// We now broaden the fetch list to include common Tally variants.
 export const DEBIT_VOUCHER_TYPES = ['Sales', 'Debit Note'] as const;
 export const CREDIT_VOUCHER_TYPES = ['Receipt', 'Credit Note', 'Journal', 'Payment'] as const;
 export const ALL_PARTY_VOUCHER_TYPES = [
+  // Standard
   'Sales', 'Receipt', 'Journal', 'Credit Note', 'Debit Note', 'Payment',
+  // Tally variants seen in this dataset
+  'Credit Note Sales', 'Debit Note Sales', 'Debit Note Under Sale',
+  'Credit Note Purchase', 'CREDIT NOTE-PURCHASE', 'Debit Note Purchase',
+  'Service Invoice', 'Rent Invoice', 'Purchase', 'Purchase Goods',
 ] as const;
 
 export interface PartyVoucher {
@@ -310,12 +344,12 @@ export function calculatePartyBalance(params: {
   let sumCredit = 0;
   const debitEntries: PartyVoucher[] = [];
   vouchers.forEach((v) => {
-    const t = v.voucher_type;
+    const cls = classifyPartyVoucher(v.voucher_type);
     const amt = Number(v.amount || 0);
-    if ((DEBIT_VOUCHER_TYPES as readonly string[]).includes(t)) {
+    if (cls === 'debit') {
       sumDebit += amt;
       debitEntries.push(v);
-    } else if ((CREDIT_VOUCHER_TYPES as readonly string[]).includes(t)) {
+    } else if (cls === 'credit') {
       sumCredit += amt;
     }
   });
