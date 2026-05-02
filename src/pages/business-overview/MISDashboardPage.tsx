@@ -111,7 +111,8 @@ export default function MISDashboardPage() {
       let q = supabase
         .from('tally_ledger_balances')
         .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
-        .order('as_of_date', { ascending: false });
+        .order('as_of_date', { ascending: false })
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;

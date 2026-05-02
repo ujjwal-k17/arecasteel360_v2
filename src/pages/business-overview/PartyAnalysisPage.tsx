@@ -97,7 +97,8 @@ function AnalysisView({ side }: Mode) {
       let q = supabase
         .from('tally_vouchers')
         .select('voucher_number, voucher_type, party_name, amount, date, narration, company_name')
-        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment']);
+        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -113,7 +114,8 @@ function AnalysisView({ side }: Mode) {
       let q = supabase
         .from('tally_ledger_balances')
         .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
-        .order('as_of_date', { ascending: false });
+        .order('as_of_date', { ascending: false })
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -132,7 +134,7 @@ function AnalysisView({ side }: Mode) {
   const dm = useQuery({
     queryKey: ['debtor-master'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('debtor_master').select('*');
+      const { data, error } = await supabase.from('debtor_master').select('*').limit(10000);
       if (error) throw error;
       return data ?? [];
     },
@@ -141,7 +143,7 @@ function AnalysisView({ side }: Mode) {
   const cps = useQuery({
     queryKey: ['invoice-credit-periods'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('invoice_credit_periods').select('*');
+      const { data, error } = await supabase.from('invoice_credit_periods').select('*').limit(10000);
       if (error) throw error;
       return data ?? [];
     },
