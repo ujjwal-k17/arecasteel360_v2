@@ -352,11 +352,18 @@ const TALLY_PRIMARY_GROUPS = [
   'Current Assets',
   'Indirect Expenses',
   'Direct Expenses',
+  'Indirect Incomes',
   'Indirect Income',
+  'Direct Incomes',
   'Direct Income',
   'Purchase Accounts',
   'Sales Accounts',
+  'Duties &amp; Taxes',
   'Duties and Taxes',
+  'Investments',
+  'Branch / Divisions',
+  'Misc. Expenses (ASSET)',
+  'Suspense A/c',
 ];
 const PRIMARY_GROUP_SET = new Set(TALLY_PRIMARY_GROUPS.map(g => g.toLowerCase().trim()));
 const isPrimaryGroup = (name: string | null | undefined): boolean => {
