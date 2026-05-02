@@ -354,6 +354,55 @@ export default function SalesAnalysisPage() {
         </CardContent>
       </Card>
 
+      {showIntracompany && (
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              Intracompany Transactions
+              <Badge variant="secondary">Excluded from totals above</Badge>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Sales where the customer is one of your own Tally companies. Shown separately for transparency.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {groupedIntra.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No intracompany sales in this period.</p>
+            ) : (
+              <>
+                <div className="text-xs text-muted-foreground mb-2">
+                  {intraSummary.n} invoices • {formatMT(intraSummary.mt)} MT • {formatINR(intraSummary.value)}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b text-left text-xs text-muted-foreground">
+                      <tr>
+                        <th className="py-2">Debtor (Intracompany)</th>
+                        <th className="py-2">Company</th>
+                        <th className="py-2 text-right">Invoices</th>
+                        <th className="py-2 text-right">Total MT</th>
+                        <th className="py-2 text-right">Total Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedIntra.map(g => (
+                        <tr key={g.key} className="border-b">
+                          <td className="py-2 font-medium">{g.party}</td>
+                          <td className="py-2 text-muted-foreground">{g.company}</td>
+                          <td className="py-2 text-right">{g.invoices.length}</td>
+                          <td className="py-2 text-right">{formatMT(g.mt)}</td>
+                          <td className="py-2 text-right font-medium">{formatINR(g.value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <LastSyncedFooter />
     </div>
   );
