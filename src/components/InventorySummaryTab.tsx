@@ -68,12 +68,32 @@ function DateRangeFilter({ dateRange, setDateRange, label }: { dateRange: DateRa
 }
 
 const fmtKg = (kg: number) => `${(kg || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Kgs`;
-const isoDate = (d: Date) => format(d, 'yyyy-MM-dd');
+const parseAppDate = (value: string | Date | null | undefined): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const dateOnly = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const [, y, m, d] = dateOnly;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+const isoDate = (value: string | Date | null | undefined) => {
+  const d = parseAppDate(value);
+  return d ? format(d, 'yyyy-MM-dd') : '';
+};
+const displayDate = (value: string | Date | null | undefined, pattern = 'dd MMM yyyy') => {
+  const d = parseAppDate(value);
+  return d ? format(d, pattern) : '-';
+};
 const inRange = (dateStr: string | null | undefined, range: DateRange) => {
   if (!range.from) return true;
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  return d >= range.from && (!range.to || d <= range.to);
+  const key = isoDate(dateStr);
+  if (!key) return false;
+  const fromKey = isoDate(range.from);
+  const toKey = range.to ? isoDate(range.to) : '';
+  return key >= fromKey && (!toKey || key <= toKey);
 };
 
 interface DrillRow { name: string; qtyKg: number }
@@ -88,18 +108,20 @@ function DispatchesSection() {
 
   // Inventory dispatches: coil sales + FG sales + defective sales (all in Kgs)
   const coilSales = useQuery({
-    queryKey: ['sum-coil-sales'],
+    queryKey: ['sum-coil-sales', 'v2'],
     queryFn: async () => (await supabase.from('inventory_actions')
       .select('net_weight, sales_date, order_id')
-      .in('action_type', ['pack_coil_sale', 'loose_coil_sale'])).data || [],
+      .in('action_type', ['pack_coil_sale', 'loose_coil_sale'])
+      .order('sales_date', { ascending: false })
+      .limit(50000)).data || [],
   });
   const fgSales = useQuery({
-    queryKey: ['sum-fg-sales'],
-    queryFn: async () => (await supabase.from('fg_sales').select('quantity, sales_date, order_id')).data || [],
+    queryKey: ['sum-fg-sales', 'v2'],
+    queryFn: async () => (await supabase.from('fg_sales').select('quantity, sales_date, order_id').order('sales_date', { ascending: false }).limit(50000)).data || [],
   });
   const defSales = useQuery({
-    queryKey: ['sum-def-sales'],
-    queryFn: async () => (await supabase.from('defective_sales').select('quantity, sales_date, order_id')).data || [],
+    queryKey: ['sum-def-sales', 'v2'],
+    queryFn: async () => (await supabase.from('defective_sales').select('quantity, sales_date, order_id').order('sales_date', { ascending: false }).limit(50000)).data || [],
   });
   const orders = useQuery({
     queryKey: ['sum-orders'],
@@ -107,12 +129,17 @@ function DispatchesSection() {
   });
   // Tally sales
   const tallySales = useQuery({
-    queryKey: ['sum-tally-sales'],
-    queryFn: async () => (await supabase.from('tally_vouchers')
-      .select('party_name, line_items, date, voucher_type')
-      .eq('voucher_type', 'Sales')
-      .order('date', { ascending: false })
-      .limit(50000)).data || [],
+    queryKey: ['sum-tally-sales', 'v2', isoDate(range.from), isoDate(range.to)],
+    queryFn: async () => {
+      let q = supabase.from('tally_vouchers')
+        .select('party_name, line_items, date, voucher_type')
+        .eq('voucher_type', 'Sales')
+        .order('date', { ascending: false })
+        .limit(50000);
+      if (range.from) q = q.gte('date', isoDate(range.from));
+      if (range.to) q = q.lte('date', isoDate(range.to));
+      return (await q).data || [];
+    },
   });
 
   const orderMap = useMemo(() => {
