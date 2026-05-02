@@ -112,7 +112,11 @@ Deno.serve(async (req) => {
       let startIdx = 0;
       if (lastChunk) {
         const idx = chunks.findIndex((ch) => ch.label === lastChunk);
-        if (idx >= 0) startIdx = idx + 1;
+        // If the last successful chunk is the current (final) chunk whose window still
+        // extends to today, RE-RUN it to pick up new vouchers — don't skip past it.
+        // Only advance past it when there's a later chunk available (new ISO week began).
+        if (idx >= 0 && idx < chunks.length - 1) startIdx = idx + 1;
+        else if (idx >= 0) startIdx = idx; // re-run the same (latest) chunk
       }
 
       const endIdx = Math.min(startIdx + CHUNKS_PER_CALL, chunks.length);
