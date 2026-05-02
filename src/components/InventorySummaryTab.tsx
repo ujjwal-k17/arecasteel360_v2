@@ -316,7 +316,7 @@ function ProductionSection() {
     const map = new Map<string, { c2w: number; w2f: number; c2f: number }>();
     (proc.data || []).forEach((r: any) => {
       if (!inRange(r.created_at, range)) return;
-      const d = isoDate(new Date(r.created_at));
+      const d = isoDate(r.created_at);
       if (!map.has(d)) map.set(d, { c2w: 0, w2f: 0, c2f: 0 });
       const kg = Number(r.input_qty || 0);
       const cls = classify(r);
@@ -332,14 +332,14 @@ function ProductionSection() {
   const showDrill = (kind: 'coil_to_wip' | 'wip_to_fg' | 'coil_to_fg', date?: string) => {
     const records = (proc.data || []).filter((r: any) => {
       if (classify(r) !== kind) return false;
-      return date ? (r.created_at && isoDate(new Date(r.created_at)) === date) : inRange(r.created_at, range);
+      return date ? isoDate(r.created_at) === date : inRange(r.created_at, range);
     });
     const labels: Record<typeof kind, string> = {
       coil_to_wip: 'Coils → WIP',
       wip_to_fg: 'WIP → FG',
       coil_to_fg: 'Coils → FG',
     } as any;
-    setDrill({ open: true, title: `${labels[kind]} — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, records });
+    setDrill({ open: true, title: `${labels[kind]} — ${date ? displayDate(date) : 'All'}`, records });
   };
 
   return (
@@ -369,7 +369,7 @@ function ProductionSection() {
                 <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">No production for selected period</TableCell></TableRow>
               ) : dateRows.map((r) => (
                 <TableRow key={r.date}>
-                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs">{displayDate(r.date)}</TableCell>
                   <TableCell className="text-xs text-right">
                     <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showDrill('coil_to_wip', r.date)} disabled={r.c2w <= 0}>{fmtKg(r.c2w)}</button>
                   </TableCell>
