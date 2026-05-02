@@ -396,7 +396,7 @@ export default function TallySyncPage() {
         fn === 'sync-current-month' ? 'Current month' :
         fn === 'sync-last-month' ? 'Last month' :
         fn === 'sync-historical' ? 'Previous FY' : 'Current FY (YTD)';
-      if (fn === 'sync-historical' || fn === 'sync-last-month' || fn === 'sync-current-fy') {
+      if (fn === 'sync-historical' || fn === 'sync-last-month' || fn === 'sync-current-fy' || fn === 'sync-current-month') {
         if (data?.paused) {
           // toast already shown
         } else if (fail === 0 && ok > 0) {
