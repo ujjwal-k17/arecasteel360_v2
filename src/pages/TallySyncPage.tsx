@@ -227,13 +227,21 @@ export default function TallySyncPage() {
   const lastSuccessHours = hoursAgo(lastSuccess?.completed_at);
 
   const triggerSync = useMutation({
-    mutationFn: async (fn: SyncFn) => {
+    mutationFn: async (input: SyncFn | { fn: SyncFn; force?: boolean }) => {
+      const fn: SyncFn = typeof input === 'string' ? input : input.fn;
+      const force = typeof input === 'string' ? false : !!input.force;
       // --- Client-orchestrated historical sync (one chunk per edge call) ---
       if (fn === 'sync-historical') {
         // 1. Reset pause flag
         await supabase
           .from('tally_sync_control')
           .upsert({ sync_type: 'historical', is_paused: false }, { onConflict: 'sync_type' });
+
+        // 1b. If force re-sync, wipe prior historical log rows so chunks reprocess
+        if (force) {
+          await supabase.from('tally_sync_log').delete().eq('sync_type', 'historical');
+          qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
+        }
 
         // 2. Load active companies
         const { data: companies, error: cErr } = await supabase
@@ -436,7 +444,11 @@ export default function TallySyncPage() {
   });
 
   const runningFn: SyncFn | null = triggerSync.isPending
-    ? ((triggerSync.variables as SyncFn | undefined) ?? null)
+    ? (() => {
+        const v = triggerSync.variables as SyncFn | { fn: SyncFn } | undefined;
+        if (!v) return null;
+        return typeof v === 'string' ? v : v.fn;
+      })()
     : null;
 
   // Aggregate chunked logs into one row per (sync_type, company_name) so users
@@ -698,7 +710,7 @@ export default function TallySyncPage() {
                       onClick={() => {
                         setPausedHist(false);
                         pausedHistRef.current = false;
-                        triggerSync.mutate('sync-historical');
+                        triggerSync.mutate({ fn: 'sync-historical', force: true });
                       }}
                     >
                       Start now
