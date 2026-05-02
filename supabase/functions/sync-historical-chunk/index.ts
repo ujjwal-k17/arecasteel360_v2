@@ -29,13 +29,14 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Validate caller is an authenticated user
+    // Validate caller is an authenticated user via JWT claims (signing-keys system)
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const token = authHeader.replace("Bearer ", "").trim();
-    const { data: userData, error: userErr } = await userClient.auth.getUser(token);
-    if (userErr || !userData?.user) {
+    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims?.sub) {
+      console.error("Auth failed:", claimsErr?.message);
       return new Response(
         JSON.stringify({ success: false, error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
