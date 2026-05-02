@@ -60,7 +60,7 @@ export default function PartyLedgerPage() {
   // Voucher types to exclude — sales orders, purchase orders are commitments, not financial transactions.
   const EXCLUDED_VOUCHER_TYPES = ['Sales Order', 'Purchase Order', 'Order'];
 
-  // Transactions for selected party
+  // Transactions for selected party (within the selected period)
   const txns = useQuery({
     enabled: !!selectedParty,
     queryKey: ['party-ledger-txns', selectedParty, company, from, to],
@@ -81,20 +81,72 @@ export default function PartyLedgerPage() {
     },
   });
 
-  // Outstanding (closing balance from ledger)
+  // Opening balance for the period:
+  //   1. Earliest available ledger snapshot (sign-corrected to Dr-positive)
+  //   2. PLUS all vouchers from snapshot date up to (but not including) `from`
+  const openingQ = useQuery({
+    enabled: !!selectedParty,
+    queryKey: ['party-ledger-opening', selectedParty, company, from],
+    queryFn: async () => {
+      // 1. Earliest ledger snapshot
+      let snapQ = supabase
+        .from('tally_ledger_balances')
+        .select('closing_balance, as_of_date, company_name')
+        .eq('ledger_name', selectedParty as string)
+        .order('as_of_date', { ascending: true })
+        .limit(1000);
+      if (company !== 'all') snapQ = snapQ.eq('company_name', company);
+      const { data: snaps, error: snapErr } = await snapQ;
+      if (snapErr) throw snapErr;
+      // DB stores debit as negative, credit as positive.
+      // Ledger view convention: Debit positive, Credit negative.
+      const earliest = (snaps ?? [])[0];
+      const openingFromSnap = earliest ? -Number(earliest.closing_balance || 0) : 0;
+      const snapDate = earliest?.as_of_date ?? null;
+
+      // 2. Vouchers between snapshot date and `from` (exclusive of `from`)
+      let vQ = supabase
+        .from('tally_vouchers')
+        .select('voucher_type, amount, date')
+        .eq('party_name', selectedParty as string)
+        .lt('date', from)
+        .not('voucher_type', 'in', `(${EXCLUDED_VOUCHER_TYPES.map(t => `"${t}"`).join(',')})`)
+        .limit(10000);
+      if (snapDate) vQ = vQ.gte('date', snapDate);
+      if (company !== 'all') vQ = vQ.eq('company_name', company);
+      const { data: vBefore, error: vErr } = await vQ;
+      if (vErr) throw vErr;
+      const drCrDelta = (vBefore ?? []).reduce((s: number, v: any) => {
+        const { debit, credit } = debitCreditFor(v.voucher_type, Number(v.amount || 0));
+        return s + debit - credit;
+      }, 0);
+
+      return { opening: openingFromSnap + drCrDelta, snapDate };
+    },
+  });
+
+  // Outstanding (latest closing balance per company — sign-corrected, Dr positive)
   const outstandingQ = useQuery({
     enabled: !!selectedParty,
     queryKey: ['party-ledger-outstanding', selectedParty, company],
     queryFn: async () => {
       let q = supabase
         .from('tally_ledger_balances')
-        .select('closing_balance, company_name, ledger_group')
+        .select('closing_balance, as_of_date, company_name')
         .eq('ledger_name', selectedParty as string)
-        .limit(10000);
+        .order('as_of_date', { ascending: false })
+        .limit(1000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []).reduce((s: number, r: any) => s + Number(r.closing_balance || 0), 0);
+      const seen = new Set<string>();
+      let total = 0;
+      (data ?? []).forEach((r: any) => {
+        if (seen.has(r.company_name)) return;
+        seen.add(r.company_name);
+        total += -Number(r.closing_balance || 0);
+      });
+      return total;
     },
   });
 
@@ -109,14 +161,16 @@ export default function PartyLedgerPage() {
     return { invoiced, received };
   }, [txns.data]);
 
+  const opening = openingQ.data?.opening ?? 0;
+
   const rowsWithBalance = useMemo(() => {
-    let bal = 0;
+    let bal = opening;
     return (txns.data ?? []).map((v: any) => {
       const { debit, credit } = debitCreditFor(v.voucher_type, Number(v.amount || 0));
       bal += debit - credit;
       return { ...v, debit, credit, running: bal };
     });
-  }, [txns.data]);
+  }, [txns.data, opening]);
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -212,7 +266,7 @@ export default function PartyLedgerPage() {
             <CardContent>
               {txns.isLoading ? (
                 <Skeleton className="h-40 w-full" />
-              ) : rowsWithBalance.length === 0 ? (
+              ) : rowsWithBalance.length === 0 && Math.abs(opening) <= 0.01 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">No data found. Run Tally Sync to import data.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -229,6 +283,19 @@ export default function PartyLedgerPage() {
                       </tr>
                     </thead>
                     <tbody>
+                      {Math.abs(opening) > 0.01 && (
+                        <tr className="border-b bg-muted/30 font-medium">
+                          <td className="py-1.5">{formatDate(from)}</td>
+                          <td className="py-1.5 italic">Opening Balance</td>
+                          <td className="py-1.5">—</td>
+                          <td className="py-1.5 text-right">{opening > 0 ? formatINR(opening) : '—'}</td>
+                          <td className="py-1.5 text-right">{opening < 0 ? formatINR(-opening) : '—'}</td>
+                          <td className="py-1.5 text-right">{formatINR(opening)}</td>
+                          <td className="py-1.5 text-muted-foreground italic">
+                            Carried forward{openingQ.data?.snapDate ? ` since ${formatDate(openingQ.data.snapDate)}` : ''}
+                          </td>
+                        </tr>
+                      )}
                       {rowsWithBalance.map((r: any, i: number) => (
                         <tr key={`${r.voucher_number}-${i}`} className="border-b hover:bg-muted/40">
                           <td className="py-1.5">{formatDate(r.date)}</td>
