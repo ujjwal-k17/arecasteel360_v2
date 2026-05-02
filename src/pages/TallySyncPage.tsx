@@ -331,10 +331,11 @@ export default function TallySyncPage() {
         } as { fn: SyncFn; data: any };
       }
 
-      // --- Current-FY still uses old chunked orchestrator ---
-      if (fn === 'sync-current-fy') {
-        const syncType = CHUNKED_SYNCS[fn].syncType;
-        const pauseRef = pausedCurrFyRef;
+      // --- Chunked orchestrators: each edge call processes one small safe slice ---
+      if (fn === 'sync-current-fy' || fn === 'sync-last-month') {
+        const syncType = fn === 'sync-last-month' ? 'last_month' : CHUNKED_SYNCS[fn].syncType;
+        const label = fn === 'sync-last-month' ? 'Last month' : CHUNKED_SYNCS[fn].label;
+        const pauseRef = fn === 'sync-current-fy' ? pausedCurrFyRef : { current: false };
 
         await supabase
           .from('tally_sync_control')
@@ -344,21 +345,25 @@ export default function TallySyncPage() {
         let safety = 200;
         while (safety-- > 0) {
           if (pauseRef.current) {
-            toast.info(`${CHUNKED_SYNCS[fn].label} sync paused`);
+            toast.info(`${label} sync paused`);
             break;
           }
           const { data, error } = await supabase.functions.invoke(fn, { body: {} });
           if (error) throw error;
           lastData = data;
+          if (data?.success === false) {
+            const firstErr = data?.error || data?.summary?.flatMap((s: any) => s.results ?? []).find((r: any) => !r.ok)?.error;
+            throw new Error(firstErr || `${label} sync failed`);
+          }
           qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
           qc.invalidateQueries({ queryKey: ['tally-counts'] });
           if (data?.paused) {
-            toast.info(`${CHUNKED_SYNCS[fn].label} sync paused`);
+            toast.info(`${label} sync paused`);
             break;
           }
           if (data?.done) break;
           if (pauseRef.current) {
-            toast.info(`${CHUNKED_SYNCS[fn].label} sync paused`);
+            toast.info(`${label} sync paused`);
             break;
           }
         }
