@@ -426,7 +426,7 @@ function PurchasesSection() {
     const map = new Map<string, { invKg: number; tallyKg: number }>();
     const add = (date: string | null | undefined, kg: number, key: 'invKg' | 'tallyKg') => {
       if (!date || !inRange(date, range)) return;
-      const d = isoDate(new Date(date));
+      const d = isoDate(date);
       if (!map.has(d)) map.set(d, { invKg: 0, tallyKg: 0 });
       map.get(d)![key] += kg;
     };
@@ -443,27 +443,27 @@ function PurchasesSection() {
   const showInvDrill = (date?: string) => {
     const map = new Map<string, number>();
     (batches.data || []).forEach((r: any) => {
-      const matchDate = date ? (r.purchase_date && isoDate(new Date(r.purchase_date)) === date) : inRange(r.purchase_date, range);
+      const matchDate = date ? isoDate(r.purchase_date) === date : inRange(r.purchase_date, range);
       if (!matchDate) return;
       const name = r.purchase_from || '(no supplier)';
       map.set(name, (map.get(name) || 0) + Number(r.net_weight || 0));
     });
     const rows = Array.from(map.entries()).map(([name, qtyKg]) => ({ name, qtyKg })).sort((a, b) => b.qtyKg - a.qtyKg);
-    setDrill({ open: true, title: `Inventory Inwards — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+    setDrill({ open: true, title: `Inventory Inwards — ${date ? displayDate(date) : 'All'}`, rows });
   };
 
   const showTallyDrill = (date?: string) => {
     const map = new Map<string, number>();
     (tallyPurch.data || []).forEach((r: any) => {
       if (intra.data?.isIntracompany(r.party_name)) return;
-      const matchDate = date ? (r.date && isoDate(new Date(r.date)) === date) : inRange(r.date, range);
+      const matchDate = date ? isoDate(r.date) === date : inRange(r.date, range);
       if (!matchDate) return;
       const kg = totalMTFromLineItems(r.line_items) * 1000;
       const name = r.party_name || '(unknown)';
       map.set(name, (map.get(name) || 0) + kg);
     });
     const rows = Array.from(map.entries()).map(([name, qtyKg]) => ({ name, qtyKg })).sort((a, b) => b.qtyKg - a.qtyKg);
-    setDrill({ open: true, title: `Tally Purchases (Creditors) — ${date ? format(new Date(date), 'dd MMM yyyy') : 'All'}`, rows });
+    setDrill({ open: true, title: `Tally Purchases (Creditors) — ${date ? displayDate(date) : 'All'}`, rows });
   };
 
   return (
@@ -492,7 +492,7 @@ function PurchasesSection() {
                 <TableRow><TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">No data for selected period</TableCell></TableRow>
               ) : dateRows.map((r) => (
                 <TableRow key={r.date}>
-                  <TableCell className="text-xs">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                  <TableCell className="text-xs">{displayDate(r.date)}</TableCell>
                   <TableCell className="text-xs text-right">
                     <button className="font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" onClick={() => showInvDrill(r.date)} disabled={r.invKg <= 0}>{fmtKg(r.invKg)}</button>
                   </TableCell>
