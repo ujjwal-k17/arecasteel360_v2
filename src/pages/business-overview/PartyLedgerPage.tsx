@@ -57,6 +57,9 @@ export default function PartyLedgerPage() {
     },
   });
 
+  // Voucher types to exclude — sales orders, purchase orders are commitments, not financial transactions.
+  const EXCLUDED_VOUCHER_TYPES = ['Sales Order', 'Purchase Order', 'Order'];
+
   // Transactions for selected party
   const txns = useQuery({
     enabled: !!selectedParty,
@@ -68,6 +71,7 @@ export default function PartyLedgerPage() {
         .eq('party_name', selectedParty as string)
         .gte('date', from)
         .lte('date', to)
+        .not('voucher_type', 'in', `(${EXCLUDED_VOUCHER_TYPES.map(t => `"${t}"`).join(',')})`)
         .order('date', { ascending: true });
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
