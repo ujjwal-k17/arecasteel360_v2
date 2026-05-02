@@ -97,7 +97,8 @@ function AnalysisView({ side }: Mode) {
       let q = supabase
         .from('tally_vouchers')
         .select('voucher_number, voucher_type, party_name, amount, date, narration, company_name')
-        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment']);
+        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -113,7 +114,8 @@ function AnalysisView({ side }: Mode) {
       let q = supabase
         .from('tally_ledger_balances')
         .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
-        .order('as_of_date', { ascending: false });
+        .order('as_of_date', { ascending: false })
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -132,7 +134,7 @@ function AnalysisView({ side }: Mode) {
   const dm = useQuery({
     queryKey: ['debtor-master'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('debtor_master').select('*');
+      const { data, error } = await supabase.from('debtor_master').select('*').limit(10000);
       if (error) throw error;
       return data ?? [];
     },
@@ -141,7 +143,7 @@ function AnalysisView({ side }: Mode) {
   const cps = useQuery({
     queryKey: ['invoice-credit-periods'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('invoice_credit_periods').select('*');
+      const { data, error } = await supabase.from('invoice_credit_periods').select('*').limit(10000);
       if (error) throw error;
       return data ?? [];
     },
@@ -362,7 +364,14 @@ function AnalysisView({ side }: Mode) {
         </Alert>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <Card className={bucketFilter === 'all' ? 'ring-2 ring-primary cursor-pointer' : 'cursor-pointer'} onClick={() => setBucketFilter('all')}>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground">Total Active {cfg.partyLabel}s</div>
+            <div className="text-lg font-bold mt-1">{mainRows.length}</div>
+            <div className="text-xs text-muted-foreground">with outstanding &gt; 0</div>
+          </CardContent>
+        </Card>
         {buckets.map(b => (
           <Card
             key={b}
@@ -436,6 +445,16 @@ function PartyTable({
   creditLabel: string;
   showSalesRep: boolean;
 }) {
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(1);
+  const totalOutstanding = useMemo(() => rows.reduce((s, r) => s + (r.totalOutstanding || 0), 0), [rows]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  // Reset to page 1 if filter shrinks results below current page
+  useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const startIdx = rows.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endIdx = Math.min(page * PAGE_SIZE, rows.length);
+
   return (
     <Card>
       <CardHeader>
@@ -448,7 +467,20 @@ function PartyTable({
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No data found.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 text-sm">
+              <div>
+                <span className="font-medium">Showing {rows.length} {title.toLowerCase()}</span>
+                <span className="text-muted-foreground"> — Total Outstanding: </span>
+                <span className="font-semibold">{formatINR(totalOutstanding)}</span>
+              </div>
+              {rows.length > PAGE_SIZE && (
+                <div className="text-xs text-muted-foreground">
+                  Rows {startIdx}–{endIdx} of {rows.length}
+                </div>
+              )}
+            </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b text-left text-xs text-muted-foreground">
                 <tr>
@@ -463,7 +495,7 @@ function PartyTable({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
+                {pageRows.map(r => (
                   <Fragment key={r.key}>
                     <tr className="border-b hover:bg-muted/40 cursor-pointer" onClick={() => toggle(r.key)}>
                       <td className="py-2">
@@ -535,7 +567,27 @@ function PartyTable({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-3 text-sm">
+                <button
+                  className="px-3 py-1 rounded border disabled:opacity-50 hover:bg-muted/50"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  Previous
+                </button>
+                <span className="text-muted-foreground">Page {page} of {totalPages}</span>
+                <button
+                  className="px-3 py-1 rounded border disabled:opacity-50 hover:bg-muted/50"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

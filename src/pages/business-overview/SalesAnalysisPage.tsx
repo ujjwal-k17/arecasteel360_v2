@@ -72,7 +72,8 @@ export default function SalesAnalysisPage() {
         .eq('voucher_type', 'Sales')
         .gte('date', toISODate(range.from))
         .lte('date', toISODate(range.to))
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .limit(10000);
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -83,7 +84,7 @@ export default function SalesAnalysisPage() {
   const cps = useQuery({
     queryKey: ['invoice-credit-periods'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('invoice_credit_periods').select('*');
+      const { data, error } = await supabase.from('invoice_credit_periods').select('*').limit(10000);
       if (error) throw error;
       const map = new Map<string, number>();
       (data ?? []).forEach((c: any) => map.set(`${c.company_name}::${c.voucher_number}`, c.credit_period_days));
