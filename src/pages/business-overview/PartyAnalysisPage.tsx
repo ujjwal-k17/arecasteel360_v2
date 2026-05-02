@@ -109,13 +109,13 @@ function AnalysisView({ side }: Mode) {
 
   // Vouchers — pull both this side AND the opposite (for "Advance from Customers" on creditor view)
   const vchr = useQuery({
-    queryKey: ['party-analysis', 'vouchers', company, side],
+      queryKey: ['party-analysis', 'vouchers', company, side],
     queryFn: async () => {
       return fetchAllRows((from, to) => {
         let q = supabase
           .from('tally_vouchers')
           .select('voucher_number, voucher_type, party_name, amount, date, narration, company_name')
-          .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
+          .in('voucher_type', ALL_PARTY_VOUCHER_TYPES as unknown as string[])
           .range(from, to);
         if (company !== 'all') q = q.eq('company_name', company);
         return q;
@@ -123,10 +123,9 @@ function AnalysisView({ side }: Mode) {
     },
   });
 
-  // Ledger balances — always use the latest snapshot per (company, ledger).
-  // Tally writes one row per as_of_date; we keep only the most recent.
+  // Ledger balances — keep ALL snapshots (need earliest for opening balance + latest for closing).
   const ledg = useQuery({
-    queryKey: ['party-analysis', 'ledgers', company, side],
+    queryKey: ['party-analysis', 'ledgers-all', company, side],
     queryFn: async () => {
       const ledgerGroups = side === 'debtors'
         ? ['Sundry Debtors']
@@ -136,7 +135,7 @@ function AnalysisView({ side }: Mode) {
           .from('tally_ledger_balances')
           .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
           .in(field, ledgerGroups)
-          .order('as_of_date', { ascending: false })
+          .order('as_of_date', { ascending: true })
           .range(from, to);
         if (company !== 'all') q = q.eq('company_name', company);
         return q;
@@ -145,16 +144,15 @@ function AnalysisView({ side }: Mode) {
         fetchByGroupField('ultimate_group'),
         fetchByGroupField('ledger_group'),
       ]);
-      const data = [...byUltimateGroup, ...byLedgerGroup];
-      // Dedupe — first occurrence wins (already sorted desc by as_of_date)
+      // Dedupe by full row identity (company + ledger + as_of_date)
       const seen = new Set<string>();
-      const latest = data.filter((r: any) => {
-        const k = `${r.company_name}::${r.ledger_name}`;
+      const all = [...byUltimateGroup, ...byLedgerGroup].filter((r: any) => {
+        const k = `${r.company_name}::${r.ledger_name}::${r.as_of_date}`;
         if (seen.has(k)) return false;
         seen.add(k);
         return true;
       });
-      return latest;
+      return all;
     },
   });
 
