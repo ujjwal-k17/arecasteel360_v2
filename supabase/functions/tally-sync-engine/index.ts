@@ -784,6 +784,7 @@ Deno.serve(async (req) => {
       success: status === 'completed',
       records_fetched: totalRecords,
       ledger_count: ledgerCount,
+      group_count: groupCount,
       voucher_count: voucherCount,
       duration_seconds: durationSeconds,
       errors_if_any: errors.length ? errors : null,
