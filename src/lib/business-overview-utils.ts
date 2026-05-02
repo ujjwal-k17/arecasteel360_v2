@@ -210,3 +210,230 @@ export function applyFIFO(invoices: FIFOInvoice[], receipts: FIFOReceipt[]): FIF
     };
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New ledger-anchored balance calculator.
+// Steps (per spec):
+//   1. Opening balance = earliest tally_ledger_balances row for this (company, ledger)
+//   2. Sum debit vouchers  (Sales, Debit Note)
+//   3. Sum credit vouchers (Receipt, Credit Note, Journal, Payment)
+//   4. Total Outstanding   = Opening Dr + Σ Debits − (Opening Cr + Σ Credits)
+//   5. Verify against latest closing_balance — flag mismatch > ₹1
+//   6. FIFO over debit-only entries (with opening Dr as first synthetic entry)
+//   7. Ageing bucketed from overdue debit entries
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const DEBIT_VOUCHER_TYPES = ['Sales', 'Debit Note'] as const;
+export const CREDIT_VOUCHER_TYPES = ['Receipt', 'Credit Note', 'Journal', 'Payment'] as const;
+export const ALL_PARTY_VOUCHER_TYPES = [
+  'Sales', 'Receipt', 'Journal', 'Credit Note', 'Debit Note', 'Payment',
+] as const;
+
+export interface PartyVoucher {
+  voucher_number: string;
+  voucher_type: string;
+  date: string;
+  amount: number;
+  narration?: string | null;
+}
+
+export interface PartyLedgerSnap {
+  as_of_date: string;
+  closing_balance: number;
+}
+
+export interface InvoiceRow {
+  voucher_number: string;
+  invoice_date: string;
+  original_amount: number;
+  paid_amount: number;
+  outstanding: number;
+  credit_period_days: number;
+  due_date: string;
+  days_overdue: number;
+  status: 'Paid' | 'Partial' | 'Unpaid' | 'Overdue';
+  is_opening: boolean;
+  narration?: string | null;
+}
+
+export interface PartyBalance {
+  // Side: 'debtors' uses Dr-as-positive convention. 'creditors' uses Cr-as-positive.
+  side: 'debtors' | 'creditors';
+  openingDebit: number;       // Dr opening (receivable for debtors / advance-given for creditors)
+  openingCredit: number;      // Cr opening (advance-received / payable)
+  totalDebit: number;         // Opening Dr + Σ Sales + Σ Debit Notes
+  totalCredit: number;        // Opening Cr + Σ Receipts + Σ Credit Notes + Σ Journal + Σ Payment
+  computedOutstanding: number; // totalDebit − totalCredit (signed; > 0 = receivable for debtors)
+  ledgerOutstanding: number;   // From latest closing_balance (sign-corrected for the side)
+  mismatch: number;            // computed − ledger (absolute, in rupees)
+  hasMismatch: boolean;        // |mismatch| > 1
+  totalOverdue: number;
+  ageing: Record<AgeingBucket, number>;
+  maxOverdueDays: number;
+  invoices: InvoiceRow[];      // Debit entries only, outstanding > 0, sorted overdue desc
+}
+
+/**
+ * Build an opening-balance synthetic invoice from the earliest ledger snapshot.
+ * For debtors: a *debit* opening (closing_balance < 0 in our DB) becomes a receivable.
+ * For creditors: a *credit* opening (closing_balance > 0 in our DB) becomes a payable.
+ */
+export function calculatePartyBalance(params: {
+  side: 'debtors' | 'creditors';
+  vouchers: PartyVoucher[];          // already filtered to this party + company
+  ledgerSnaps: PartyLedgerSnap[];    // all snapshots for this party + company
+  creditPeriodResolver: (voucherNumber: string, invoiceDateISO: string) => number;
+}): PartyBalance {
+  const { side, vouchers, ledgerSnaps, creditPeriodResolver } = params;
+
+  // ── Step 1: opening & latest snapshots
+  const sortedSnaps = [...ledgerSnaps].sort((a, b) => a.as_of_date.localeCompare(b.as_of_date));
+  const opening = sortedSnaps[0];
+  const latest = sortedSnaps[sortedSnaps.length - 1];
+
+  // In our DB: debit balance is stored NEGATIVE, credit balance is stored POSITIVE.
+  let openingDebit = 0;
+  let openingCredit = 0;
+  let openingDateISO = opening?.as_of_date ?? '1970-01-01';
+  if (opening) {
+    const ob = Number(opening.closing_balance || 0);
+    if (ob < 0) openingDebit = -ob;
+    else if (ob > 0) openingCredit = ob;
+  }
+
+  // ── Steps 2 & 3: classify vouchers
+  let sumDebit = 0;
+  let sumCredit = 0;
+  const debitEntries: PartyVoucher[] = [];
+  vouchers.forEach((v) => {
+    const t = v.voucher_type;
+    const amt = Number(v.amount || 0);
+    if ((DEBIT_VOUCHER_TYPES as readonly string[]).includes(t)) {
+      sumDebit += amt;
+      debitEntries.push(v);
+    } else if ((CREDIT_VOUCHER_TYPES as readonly string[]).includes(t)) {
+      sumCredit += amt;
+    }
+  });
+
+  const totalDebit = openingDebit + sumDebit;
+  const totalCredit = openingCredit + sumCredit;
+  const computedOutstanding = totalDebit - totalCredit;
+
+  // ── Step 5: ledger closing-balance reconciliation
+  let ledgerOutstanding = 0;
+  if (latest) {
+    const cb = Number(latest.closing_balance || 0);
+    // Debtors: debit (negative in DB) is positive receivable.
+    // Creditors: credit (positive in DB) is positive payable.
+    ledgerOutstanding = side === 'debtors' ? -cb : cb;
+  }
+  const mismatch = computedOutstanding - ledgerOutstanding;
+  const hasMismatch = Math.abs(mismatch) > 1;
+
+  // ── Step 6: FIFO over debit entries only (with opening as first synthetic row)
+  const fifoEntries: Array<{
+    voucher_number: string;
+    date: string;
+    amount: number;
+    is_opening: boolean;
+    narration?: string | null;
+  }> = [];
+  if (openingDebit > 0.01) {
+    fifoEntries.push({
+      voucher_number: 'Opening Balance',
+      date: openingDateISO,
+      amount: openingDebit,
+      is_opening: true,
+    });
+  }
+  debitEntries.forEach((v) => {
+    fifoEntries.push({
+      voucher_number: v.voucher_number,
+      date: v.date,
+      amount: Number(v.amount || 0),
+      is_opening: false,
+      narration: v.narration ?? null,
+    });
+  });
+
+  // Credit pool = all credit-side money (incl. opening Cr).
+  let creditPool = totalCredit;
+  fifoEntries.sort((a, b) => a.date.localeCompare(b.date));
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const invoices: InvoiceRow[] = fifoEntries.map((e) => {
+    const original = e.amount;
+    let paid = 0;
+    if (creditPool > 0) {
+      paid = Math.min(creditPool, original);
+      creditPool -= paid;
+    }
+    const outstanding = Math.max(0, original - paid);
+    const credit = e.is_opening ? 0 : creditPeriodResolver(e.voucher_number, e.date);
+    const invDate = new Date(e.date);
+    const dueDate = new Date(invDate);
+    dueDate.setDate(dueDate.getDate() + credit);
+    const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / 86400000);
+
+    let status: InvoiceRow['status'];
+    if (outstanding <= 0.01) status = 'Paid';
+    else if (paid > 0.01) status = daysOverdue > 0 ? 'Overdue' : 'Partial';
+    else status = daysOverdue > 0 ? 'Overdue' : 'Unpaid';
+
+    return {
+      voucher_number: e.voucher_number,
+      invoice_date: e.date,
+      original_amount: original,
+      paid_amount: paid,
+      outstanding,
+      credit_period_days: credit,
+      due_date: dueDate.toISOString().slice(0, 10),
+      days_overdue: daysOverdue,
+      status,
+      is_opening: e.is_opening,
+      narration: e.narration,
+    };
+  });
+
+  // ── Step 7: ageing
+  const ageing: Record<AgeingBucket, number> = {
+    not_yet_due: 0, '1_30': 0, '31_60': 0, '61_90': 0, '90_plus': 0,
+  };
+  let totalOverdue = 0;
+  let maxOverdueDays = 0;
+  invoices.forEach((inv) => {
+    if (inv.outstanding <= 0.01) return;
+    if (inv.days_overdue <= 0) {
+      ageing.not_yet_due += inv.outstanding;
+      return;
+    }
+    totalOverdue += inv.outstanding;
+    if (inv.days_overdue > maxOverdueDays) maxOverdueDays = inv.days_overdue;
+    ageing[ageingBucketFor(inv.days_overdue)] += inv.outstanding;
+  });
+
+  // Filter & sort the invoice list for the drill-down (outstanding > 0, overdue desc).
+  const drillDown = invoices
+    .filter((i) => i.outstanding > 0.01)
+    .sort((a, b) => b.days_overdue - a.days_overdue);
+
+  return {
+    side,
+    openingDebit,
+    openingCredit,
+    totalDebit,
+    totalCredit,
+    computedOutstanding,
+    ledgerOutstanding,
+    mismatch,
+    hasMismatch,
+    totalOverdue,
+    ageing,
+    maxOverdueDays,
+    invoices: drillDown,
+  };
+}
+

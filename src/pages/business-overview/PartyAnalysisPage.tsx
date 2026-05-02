@@ -12,10 +12,12 @@ import { CompanyFilter } from '@/components/business-overview/CompanyFilter';
 import { LastSyncedFooter } from '@/components/business-overview/LastSyncedFooter';
 import DebtorMasterTab from '@/components/business-overview/DebtorMasterTab';
 import {
-  formatINR, formatINRCompact, formatDate, applyFIFO, ageingBucketFor, AGEING_LABELS, AgeingBucket,
-  debtorOutstandingFromClosing, creditorOutstandingFromClosing, resolveCreditPeriod,
+  formatINR, formatINRCompact, formatDate, ageingBucketFor, AGEING_LABELS, AgeingBucket,
+  calculatePartyBalance, ALL_PARTY_VOUCHER_TYPES, resolveCreditPeriod,
+  type InvoiceRow,
 } from '@/lib/business-overview-utils';
 import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
+import { toast } from 'sonner';
 
 interface Mode {
   side: 'debtors' | 'creditors';
@@ -107,13 +109,13 @@ function AnalysisView({ side }: Mode) {
 
   // Vouchers — pull both this side AND the opposite (for "Advance from Customers" on creditor view)
   const vchr = useQuery({
-    queryKey: ['party-analysis', 'vouchers', company, side],
+      queryKey: ['party-analysis', 'vouchers', company, side],
     queryFn: async () => {
       return fetchAllRows((from, to) => {
         let q = supabase
           .from('tally_vouchers')
           .select('voucher_number, voucher_type, party_name, amount, date, narration, company_name')
-          .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
+          .in('voucher_type', ALL_PARTY_VOUCHER_TYPES as unknown as string[])
           .range(from, to);
         if (company !== 'all') q = q.eq('company_name', company);
         return q;
@@ -121,10 +123,9 @@ function AnalysisView({ side }: Mode) {
     },
   });
 
-  // Ledger balances — always use the latest snapshot per (company, ledger).
-  // Tally writes one row per as_of_date; we keep only the most recent.
+  // Ledger balances — keep ALL snapshots (need earliest for opening balance + latest for closing).
   const ledg = useQuery({
-    queryKey: ['party-analysis', 'ledgers', company, side],
+    queryKey: ['party-analysis', 'ledgers-all', company, side],
     queryFn: async () => {
       const ledgerGroups = side === 'debtors'
         ? ['Sundry Debtors']
@@ -134,7 +135,7 @@ function AnalysisView({ side }: Mode) {
           .from('tally_ledger_balances')
           .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
           .in(field, ledgerGroups)
-          .order('as_of_date', { ascending: false })
+          .order('as_of_date', { ascending: true })
           .range(from, to);
         if (company !== 'all') q = q.eq('company_name', company);
         return q;
@@ -143,16 +144,15 @@ function AnalysisView({ side }: Mode) {
         fetchByGroupField('ultimate_group'),
         fetchByGroupField('ledger_group'),
       ]);
-      const data = [...byUltimateGroup, ...byLedgerGroup];
-      // Dedupe — first occurrence wins (already sorted desc by as_of_date)
+      // Dedupe by full row identity (company + ledger + as_of_date)
       const seen = new Set<string>();
-      const latest = data.filter((r: any) => {
-        const k = `${r.company_name}::${r.ledger_name}`;
+      const all = [...byUltimateGroup, ...byLedgerGroup].filter((r: any) => {
+        const k = `${r.company_name}::${r.ledger_name}::${r.as_of_date}`;
         if (seen.has(k)) return false;
         seen.add(k);
         return true;
       });
-      return latest;
+      return all;
     },
   });
 
@@ -228,99 +228,122 @@ function AnalysisView({ side }: Mode) {
 
   const buckets: AgeingBucket[] = ['not_yet_due', '1_30', '31_60', '61_90', '90_plus'];
 
-  // Build party rows.
-  // For debtors: only Sundry Debtors with debit balance (positive after sign flip).
-  //   credit balances on Sundry Debtors are advances → moved to creditor view as "Advance from Customers".
-  // For creditors: Sundry Creditors normal (positive closing) + advance customers section.
+  // Build party rows using the new ledger-anchored balance calculator.
+  // Outstanding always == ledger closing balance (sign-corrected). FIFO is used only
+  // for invoice-wise paid/outstanding/overdue distribution in the drill-down.
   const { mainRows, advanceRows } = useMemo(() => {
     if (!vchr.data || !ledg.data) return { mainRows: [], advanceRows: [] };
 
     const intraSet = intra.data ?? new Set<string>();
 
-    // Group vouchers by company::party for FIFO calc later
-    const grouper = (invType: string, recType: string) => {
-      const g = new Map<string, { invoices: any[]; receipts: any[] }>();
-      vchr.data.forEach((v: any) => {
-        if (intraSet.has(v.party_name)) return;
-        const key = `${v.company_name}::${v.party_name ?? ''}`;
-        if (!g.has(key)) g.set(key, { invoices: [], receipts: [] });
-        const rec = g.get(key)!;
-        if (v.voucher_type === invType) rec.invoices.push(v);
-        else if (v.voucher_type === recType) rec.receipts.push(v);
-      });
-      return g;
-    };
+    // Group vouchers by company::party
+    const vchrByParty = new Map<string, any[]>();
+    vchr.data.forEach((v: any) => {
+      if (intraSet.has(v.party_name)) return;
+      const key = `${v.company_name}::${v.party_name ?? ''}`;
+      if (!vchrByParty.has(key)) vchrByParty.set(key, []);
+      vchrByParty.get(key)!.push(v);
+    });
 
-    const debtorGroups = grouper('Sales', 'Receipt');
-    const creditorGroups = grouper('Purchase', 'Payment');
+    // Group ledger snapshots by company::ledger
+    type Snap = { as_of_date: string; closing_balance: number; ultimate_group?: string; ledger_group?: string };
+    const snapsByLedger = new Map<string, Snap[]>();
+    const groupByLedger = new Map<string, string>();
+    ledg.data.forEach((l: any) => {
+      const key = `${l.company_name}::${l.ledger_name}`;
+      if (!snapsByLedger.has(key)) snapsByLedger.set(key, []);
+      snapsByLedger.get(key)!.push(l);
+      const grp = l.ultimate_group ?? l.ledger_group ?? '';
+      if (!groupByLedger.has(key)) groupByLedger.set(key, grp);
+    });
 
     const buildRow = (
       key: string,
       partyName: string,
       companyKey: string,
-      groups: Map<string, { invoices: any[]; receipts: any[] }>,
-      ledgerOutstanding: number,
       isAdvance: boolean,
+      side_: 'debtors' | 'creditors',
     ) => {
-      const g = groups.get(key) ?? { invoices: [], receipts: [] };
-      const invs = g.invoices.map((s: any) => ({
-        voucher_number: s.voucher_number,
-        date: s.date,
-        amount: Number(s.amount || 0),
-        narration: s.narration,
-        credit_period_days: resolveCreditPeriod(companyKey, s.voucher_number, partyName, cpMap, dmMap),
-      }));
-      const recs = g.receipts.map((r: any) => ({ date: r.date, amount: Number(r.amount || 0) }));
-      const fifo = applyFIFO(invs, recs);
-      const totalOverdue = fifo
-        .filter(r => r.outstanding > 0 && r.days_overdue > 0)
-        .reduce((s, r) => s + r.outstanding, 0);
-      const maxOverdueDays = Math.max(0, ...fifo.filter(r => r.outstanding > 0).map(r => r.days_overdue));
-      const ageBucket = ageingBucketFor(maxOverdueDays);
+      const partyVchrs = (vchrByParty.get(key) ?? []) as any[];
+      const snaps = snapsByLedger.get(key) ?? [];
       const partyDM = dmRecordMap.get(key);
+
+      const balance = calculatePartyBalance({
+        side: side_,
+        vouchers: partyVchrs.map((v: any) => ({
+          voucher_number: v.voucher_number,
+          voucher_type: v.voucher_type,
+          date: v.date,
+          amount: Number(v.amount || 0),
+          narration: v.narration,
+        })),
+        ledgerSnaps: snaps.map((s: any) => ({
+          as_of_date: s.as_of_date,
+          closing_balance: Number(s.closing_balance || 0),
+        })),
+        creditPeriodResolver: (vno, _date) =>
+          resolveCreditPeriod(companyKey, vno, partyName, cpMap, dmMap),
+      });
+
+      // For "Advance from Customers" rows on the creditor side, ledgerOutstanding (debtor-side
+      // computation) is negative; flip to a positive payable.
+      const totalOutstanding = isAdvance
+        ? Math.max(0, -balance.ledgerOutstanding)
+        : Math.max(0, balance.ledgerOutstanding);
+
+      const ageBucket = balance.maxOverdueDays > 0
+        ? ageingBucketFor(balance.maxOverdueDays)
+        : 'not_yet_due' as AgeingBucket;
+
       return {
         key,
         company: companyKey,
         party: partyName,
         creditPeriod: partyDM?.credit_period_days ?? null,
         salesRep: partyDM?.sales_rep ?? null,
-        totalOutstanding: ledgerOutstanding,
-        totalOverdue,
-        maxOverdueDays,
+        totalOutstanding,
+        totalOverdue: balance.totalOverdue,
+        maxOverdueDays: balance.maxOverdueDays,
         ageBucket,
         isAdvance,
-        fifo: fifo.filter(r => r.outstanding > 0).sort((a, b) => b.days_overdue - a.days_overdue),
+        balance,
+        invoices: balance.invoices,
       };
     };
 
     const main: any[] = [];
     const advances: any[] = [];
 
-    ledg.data.forEach((l: any) => {
-      const partyName = l.ledger_name;
+    // Iterate the union of ledger-keys and voucher-keys so that parties with vouchers
+    // but no ledger row (rare) still surface, but only debtors/creditors are kept.
+    const allKeys = new Set<string>([...snapsByLedger.keys(), ...vchrByParty.keys()]);
+
+    allKeys.forEach((key) => {
+      const [companyKey, partyName] = key.split('::');
+      if (!partyName) return;
       if (intraSet.has(partyName)) return;
-      const grp = l.ultimate_group ?? l.ledger_group;
-      const key = `${l.company_name}::${partyName}`;
-      const closing = Number(l.closing_balance || 0);
+
+      const grp = groupByLedger.get(key);
+      // If we have no ledger at all for this party, default-classify by side
+      // (cannot determine group; skip — outstanding wouldn't be reliable anyway).
+      if (!grp) return;
 
       if (grp === 'Sundry Debtors') {
-        const out = debtorOutstandingFromClosing(closing); // flipped
         if (side === 'debtors') {
-          // Show ALL debtors with any debit balance, no minimum threshold.
-          if (out > 0) {
-            main.push(buildRow(key, partyName, l.company_name, debtorGroups, out, false));
-          }
+          // Compute side='debtors' to get debit-positive ledgerOutstanding
+          const row = buildRow(key, partyName, companyKey, false, 'debtors');
+          if (row.totalOutstanding > 0) main.push(row);
         } else {
-          // creditor view: pick up advances (credit balance on debtor ledger)
-          if (out < 0) {
-            advances.push(buildRow(key, partyName, l.company_name, debtorGroups, Math.abs(out), true));
+          // creditor view → advances (credit balance on debtor ledger).
+          // Use side='debtors' to compute ledgerOutstanding, then check it's negative.
+          const probe = buildRow(key, partyName, companyKey, true, 'debtors');
+          if (probe.balance.ledgerOutstanding < 0) {
+            advances.push(probe);
           }
         }
       } else if (grp === 'Sundry Creditors' && side === 'creditors') {
-        const out = creditorOutstandingFromClosing(closing);
-        if (out > 0) {
-          main.push(buildRow(key, partyName, l.company_name, creditorGroups, out, false));
-        }
+        const row = buildRow(key, partyName, companyKey, false, 'creditors');
+        if (row.totalOutstanding > 0) main.push(row);
       }
     });
 
@@ -526,7 +549,16 @@ function PartyTable({
                       <td className="py-2">
                         {expanded.has(r.key) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </td>
-                      <td className="py-2 font-medium">{r.party}</td>
+                      <td className="py-2 font-medium">
+                        <span className="inline-flex items-center gap-1.5">
+                          {r.party}
+                          {r.balance?.hasMismatch && (
+                            <span title={`Balance mismatch of ${formatINR(Math.abs(r.balance.mismatch))} — sync may be incomplete`}>
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="py-2 text-muted-foreground">{r.company}</td>
                       {showSalesRep && <td className="py-2 text-muted-foreground">{r.salesRep ?? '—'}</td>}
                       <td className="py-2 text-right">{r.creditPeriod ?? '—'}</td>
@@ -541,50 +573,7 @@ function PartyTable({
                     {expanded.has(r.key) && (
                       <tr className="bg-muted/20">
                         <td colSpan={showSalesRep ? 8 : 7} className="p-3">
-                          {r.fifo.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                              No outstanding invoices found in synced data.
-                              {r.totalOutstanding > 0 && ' Closing balance from Tally suggests outstanding exists — historical vouchers may not be synced.'}
-                            </p>
-                          ) : (
-                            <table className="w-full text-xs">
-                              <thead className="text-muted-foreground">
-                                <tr>
-                                  <th className="text-left py-1">Invoice #</th>
-                                  <th className="text-left py-1">Invoice Date</th>
-                                  <th className="text-right py-1">Original</th>
-                                  <th className="text-right py-1">Paid</th>
-                                  <th className="text-right py-1">Outstanding</th>
-                                  <th className="text-right py-1">{creditLabel}</th>
-                                  <th className="text-left py-1">Due Date</th>
-                                  <th className="text-right py-1">Overdue Days</th>
-                                  <th className="text-left py-1">Status</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {r.fifo.map((f: any) => (
-                                  <tr key={f.voucher_number} className={`border-t ${f.days_overdue > 0 ? 'bg-destructive/5' : ''}`}>
-                                    <td className="py-1">{f.voucher_number}</td>
-                                    <td className="py-1">{formatDate(f.invoice_date)}</td>
-                                    <td className="py-1 text-right">{formatINR(f.original_amount)}</td>
-                                    <td className="py-1 text-right">{formatINR(f.paid_amount)}</td>
-                                    <td className="py-1 text-right font-medium">{formatINR(f.outstanding)}</td>
-                                    <td className="py-1 text-right">{f.credit_period_days || 0}</td>
-                                    <td className="py-1">{formatDate(f.due_date)}</td>
-                                    <td className={`py-1 text-right font-medium ${f.days_overdue > 0 ? 'text-destructive' : ''}`}>
-                                      {f.days_overdue > 0 ? f.days_overdue : '—'}
-                                    </td>
-                                    <td className="py-1">
-                                      <Badge variant={
-                                        f.status === 'Overdue' ? 'destructive' :
-                                        f.status === 'Paid' ? 'secondary' : 'default'
-                                      }>{f.status}</Badge>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
+                          <DrillDown row={r} creditLabel={creditLabel} />
                         </td>
                       </tr>
                     )}
@@ -618,3 +607,147 @@ function PartyTable({
     </Card>
   );
 }
+
+// ─── Drill-down with editable credit periods + summary + mismatch warning ───
+function DrillDown({ row, creditLabel }: { row: any; creditLabel: string }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const invoices = (row.invoices ?? []) as InvoiceRow[];
+  const balance = row.balance;
+
+  const totals = useMemo(() => {
+    let inv = 0, paid = 0, out = 0, over = 0;
+    invoices.forEach(i => {
+      inv += i.original_amount;
+      paid += i.paid_amount;
+      out += i.outstanding;
+      if (i.days_overdue > 0 && i.outstanding > 0) over += i.outstanding;
+    });
+    return { inv, paid, out, over };
+  }, [invoices]);
+
+  const saveCreditPeriod = async (voucher: string, value: number) => {
+    if (voucher === 'Opening Balance') return;
+    setSavingKey(voucher);
+    try {
+      const { error } = await supabase
+        .from('invoice_credit_periods')
+        .upsert({
+          company_name: row.company,
+          voucher_number: voucher,
+          credit_period_days: value,
+        }, { onConflict: 'company_name,voucher_number' });
+      if (error) throw error;
+      toast.success('Credit period updated');
+      qc.invalidateQueries({ queryKey: ['invoice-credit-periods'] });
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to save');
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  if (invoices.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No outstanding invoices found in synced data.
+        {row.totalOutstanding > 0 && ' Closing balance from Tally suggests outstanding exists — historical vouchers may not be synced.'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <table className="w-full text-xs">
+        <thead className="text-muted-foreground">
+          <tr>
+            <th className="text-left py-1">Invoice #</th>
+            <th className="text-left py-1">Invoice Date</th>
+            <th className="text-right py-1">Invoice Amount</th>
+            <th className="text-right py-1">Paid</th>
+            <th className="text-right py-1">Outstanding</th>
+            <th className="text-right py-1">{creditLabel} (days)</th>
+            <th className="text-left py-1">Due Date</th>
+            <th className="text-right py-1">Overdue Days</th>
+            <th className="text-left py-1">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoices.map((f) => {
+            const isOpening = f.is_opening || f.voucher_number === 'Opening Balance';
+            const draftVal = draft[f.voucher_number];
+            return (
+              <tr key={f.voucher_number} className={`border-t ${f.days_overdue > 0 ? 'bg-destructive/5' : ''} ${isOpening ? 'italic' : ''}`}>
+                <td className="py-1">{isOpening ? 'Opening Balance' : f.voucher_number}</td>
+                <td className="py-1">{formatDate(f.invoice_date)}</td>
+                <td className="py-1 text-right">{formatINR(f.original_amount)}</td>
+                <td className="py-1 text-right">{formatINR(f.paid_amount)}</td>
+                <td className="py-1 text-right font-medium">{formatINR(f.outstanding)}</td>
+                <td className="py-1 text-right">
+                  {isOpening ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : (
+                    <Input
+                      type="number"
+                      className="h-7 w-20 text-right text-xs ml-auto"
+                      value={draftVal ?? String(f.credit_period_days || 0)}
+                      disabled={savingKey === f.voucher_number}
+                      onChange={(e) => setDraft(prev => ({ ...prev, [f.voucher_number]: e.target.value }))}
+                      onBlur={() => {
+                        const raw = draft[f.voucher_number];
+                        if (raw == null) return;
+                        const n = parseInt(raw, 10);
+                        if (isNaN(n) || n < 0) return;
+                        if (n === (f.credit_period_days || 0)) return;
+                        saveCreditPeriod(f.voucher_number, n);
+                      }}
+                    />
+                  )}
+                </td>
+                <td className="py-1">{formatDate(f.due_date)}</td>
+                <td className={`py-1 text-right font-medium ${f.days_overdue > 0 ? 'text-destructive' : ''}`}>
+                  {f.days_overdue > 0 ? f.days_overdue : '—'}
+                </td>
+                <td className="py-1">
+                  <Badge variant={
+                    f.status === 'Overdue' ? 'destructive' :
+                    f.status === 'Paid' ? 'secondary' : 'default'
+                  }>{f.status}</Badge>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot className="border-t-2 font-semibold">
+          <tr>
+            <td className="py-2" colSpan={2}>Totals</td>
+            <td className="py-2 text-right">{formatINR(totals.inv)}</td>
+            <td className="py-2 text-right">{formatINR(totals.paid)}</td>
+            <td className="py-2 text-right">{formatINR(totals.out)}</td>
+            <td className="py-2"></td>
+            <td className="py-2"></td>
+            <td className="py-2 text-right text-destructive">{totals.over > 0 ? formatINR(totals.over) : '—'}</td>
+            <td className="py-2"></td>
+          </tr>
+          <tr className="text-xs text-muted-foreground">
+            <td colSpan={4} className="py-1">Ledger closing balance (Tally)</td>
+            <td className="py-1 text-right">{formatINR(row.totalOutstanding)}</td>
+            <td colSpan={4}></td>
+          </tr>
+        </tfoot>
+      </table>
+      {balance?.hasMismatch && (
+        <div className="text-xs text-destructive flex items-start gap-1.5 pt-1">
+          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            Balance mismatch of {formatINR(Math.abs(balance.mismatch))} — historical sync may be incomplete.
+            Run Full Year History sync for accurate data.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+

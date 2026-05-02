@@ -14,9 +14,8 @@ import {
   totalMTFromLineItems,
   currentMonthRange,
   toISODate,
-  applyFIFO,
-  debtorOutstandingFromClosing,
-  creditorOutstandingFromClosing,
+  calculatePartyBalance,
+  ALL_PARTY_VOUCHER_TYPES,
   resolveCreditPeriod,
 } from '@/lib/business-overview-utils';
 import { useLastSyncAt } from '@/hooks/useTallyCompanies';
@@ -106,79 +105,61 @@ export default function MISDashboardPage() {
     },
   });
 
+  // ALL ledger snapshots — needed for opening balance + latest closing.
   const ledgers = useQuery({
-    queryKey: ['mis', 'ledgers', company],
+    queryKey: ['mis', 'ledgers-all', company],
     queryFn: async () => {
-      let q = supabase
-        .from('tally_ledger_balances')
-        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
-        .order('as_of_date', { ascending: false })
-        .limit(10000);
-      if (company !== 'all') q = q.eq('company_name', company);
-      const { data, error } = await q;
-      if (error) throw error;
-      // Always use latest snapshot per (company, ledger).
-      const seen = new Set<string>();
-      return (data ?? []).filter((r: any) => {
-        const k = `${r.company_name}::${r.ledger_name}`;
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
+      // Page through to bypass the 1000-row default cap.
+      const rows: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        let q = supabase
+          .from('tally_ledger_balances')
+          .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
+          .order('as_of_date', { ascending: true })
+          .range(from, from + 999);
+        if (company !== 'all') q = q.eq('company_name', company);
+        const { data, error } = await q;
+        if (error) throw error;
+        const batch = data ?? [];
+        rows.push(...batch);
+        if (batch.length < 1000) break;
+      }
+      return rows;
     },
   });
 
-  // Overdue calc — fetch all Sales + Receipt vouchers in scope.
-  const overdue = useQuery({
-    queryKey: ['mis', 'overdue', company],
-    queryFn: async () => {
-      // Pull all Sales/Receipt/Purchase/Payment in current FY scope to be lighter.
-      let qSales = supabase
-        .from('tally_vouchers')
-        .select('voucher_number, party_name, amount, date, company_name')
-        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
-        .order('date', { ascending: true })
-        .limit(10000);
-      if (company !== 'all') qSales = qSales.eq('company_name', company);
-      const { data, error } = await qSales;
-      if (error) throw error;
+  // Latest snapshot per (company, ledger) — for the bank/outstanding stat cards.
+  const latestLedgers = useMemo(() => {
+    const byKey = new Map<string, any>();
+    (ledgers.data ?? []).forEach((r: any) => {
+      const k = `${r.company_name}::${r.ledger_name}`;
+      const cur = byKey.get(k);
+      if (!cur || (r.as_of_date ?? '') > (cur.as_of_date ?? '')) byKey.set(k, r);
+    });
+    return Array.from(byKey.values());
+  }, [ledgers.data]);
 
-      // Credit period overrides
-      const { data: cps } = await supabase.from('invoice_credit_periods').select('*').limit(10000);
-      const cpMap = new Map<string, number>();
-      (cps ?? []).forEach((c: any) => cpMap.set(`${c.company_name}::${c.voucher_number}`, c.credit_period_days));
-      const { data: dms } = await supabase.from('debtor_master').select('company_name, ledger_name, credit_period_days').limit(10000);
-      const dmMap = new Map<string, number>();
-      (dms ?? []).forEach((d: any) => {
-        if (d.credit_period_days != null) dmMap.set(`${d.company_name}::${d.ledger_name}`, d.credit_period_days);
-      });
-
-      // Group by party + company
-      type Rec = { sales: any[]; purchases: any[]; receipts: any[]; payments: any[] };
-      const map = new Map<string, Rec>();
-      (data ?? []).forEach((v: any) => {
-        const key = `${v.company_name}::${v.party_name}`;
-        if (!map.has(key)) map.set(key, { sales: [], purchases: [], receipts: [], payments: [] });
-        const rec = map.get(key)!;
-        // Re-fetch type via voucher_type isn't here; we need it
-      });
-
-      return { vouchers: data ?? [], cpMap, dmMap };
-    },
-  });
-
-  // Need voucher_type for overdue grouping — refetch with type
+  // Overdue calc using the new ledger-anchored calculator.
   const overdueDetail = useQuery({
-    queryKey: ['mis', 'overdueDetail', company, intraKey],
+    queryKey: ['mis', 'overdueDetail-v2', company, intraKey, ledgers.dataUpdatedAt],
+    enabled: !!ledgers.data,
     queryFn: async () => {
-      let q = supabase
-        .from('tally_vouchers')
-        .select('voucher_number, voucher_type, party_name, amount, date, company_name')
-        .in('voucher_type', ['Sales', 'Receipt', 'Purchase', 'Payment'])
-        .limit(10000);
-      if (company !== 'all') q = q.eq('company_name', company);
-      const { data, error } = await q;
-      if (error) throw error;
+      // Fetch all party-relevant vouchers.
+      const allVchrs: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        let q = supabase
+          .from('tally_vouchers')
+          .select('voucher_number, voucher_type, party_name, amount, date, company_name')
+          .in('voucher_type', ALL_PARTY_VOUCHER_TYPES as unknown as string[])
+          .range(from, from + 999);
+        if (company !== 'all') q = q.eq('company_name', company);
+        const { data, error } = await q;
+        if (error) throw error;
+        const batch = data ?? [];
+        allVchrs.push(...batch);
+        if (batch.length < 1000) break;
+      }
+
       const { data: cps } = await supabase.from('invoice_credit_periods').select('company_name, voucher_number, credit_period_days').limit(10000);
       const { data: dms } = await supabase.from('debtor_master').select('company_name, ledger_name, credit_period_days').limit(10000);
       const cpMap = new Map<string, number>();
@@ -188,18 +169,24 @@ export default function MISDashboardPage() {
         if (d.credit_period_days != null) dmMap.set(`${d.company_name}::${d.ledger_name}`, d.credit_period_days);
       });
 
-      type Rec = { sales: any[]; purchases: any[]; receipts: any[]; payments: any[] };
-      const groups = new Map<string, Rec>();
-      (data ?? []).forEach((v: any) => {
-        // Exclude intracompany parties from overdue calculations
+      // Group vouchers + ledger snapshots by company::party.
+      const vchrByParty = new Map<string, any[]>();
+      allVchrs.forEach((v: any) => {
         if (intraSet.has(v.party_name)) return;
         const key = `${v.company_name}::${v.party_name ?? ''}`;
-        if (!groups.has(key)) groups.set(key, { sales: [], purchases: [], receipts: [], payments: [] });
-        const g = groups.get(key)!;
-        if (v.voucher_type === 'Sales') g.sales.push(v);
-        else if (v.voucher_type === 'Receipt') g.receipts.push(v);
-        else if (v.voucher_type === 'Purchase') g.purchases.push(v);
-        else if (v.voucher_type === 'Payment') g.payments.push(v);
+        if (!vchrByParty.has(key)) vchrByParty.set(key, []);
+        vchrByParty.get(key)!.push(v);
+      });
+
+      const snapsByLedger = new Map<string, any[]>();
+      const groupByLedger = new Map<string, string>();
+      (ledgers.data ?? []).forEach((l: any) => {
+        if (intraSet.has(l.ledger_name)) return;
+        const key = `${l.company_name}::${l.ledger_name}`;
+        if (!snapsByLedger.has(key)) snapsByLedger.set(key, []);
+        snapsByLedger.get(key)!.push(l);
+        const grp = l.ultimate_group ?? l.ledger_group ?? '';
+        if (!groupByLedger.has(key)) groupByLedger.set(key, grp);
       });
 
       let totalDebtorOverdue = 0;
@@ -207,38 +194,39 @@ export default function MISDashboardPage() {
       const overdueDebtors: { party: string; amount: number; days: number }[] = [];
       const overdueCreditors: { party: string; amount: number; days: number }[] = [];
 
-      groups.forEach((g, key) => {
+      const allKeys = new Set<string>([...snapsByLedger.keys(), ...vchrByParty.keys()]);
+      allKeys.forEach((key) => {
         const [companyKey, partyName] = key.split('::');
-        const salesInv = g.sales.map((s: any) => ({
-          voucher_number: s.voucher_number,
-          date: s.date,
-          amount: Number(s.amount || 0),
-          credit_period_days: resolveCreditPeriod(companyKey, s.voucher_number, partyName, cpMap, dmMap),
-        }));
-        const recVchr = g.receipts.map((r: any) => ({ date: r.date, amount: Number(r.amount || 0) }));
-        const fifoDeb = applyFIFO(salesInv, recVchr);
-        const debOver = fifoDeb.filter(r => r.outstanding > 0 && r.days_overdue > 0);
-        const debOverSum = debOver.reduce((s, r) => s + r.outstanding, 0);
-        totalDebtorOverdue += debOverSum;
-        if (debOverSum > 0) {
-          const maxDays = Math.max(...debOver.map(r => r.days_overdue), 0);
-          overdueDebtors.push({ party: partyName, amount: debOverSum, days: maxDays });
-        }
+        if (!partyName) return;
+        const grp = groupByLedger.get(key);
+        if (!grp) return;
+        if (grp !== 'Sundry Debtors' && grp !== 'Sundry Creditors') return;
 
-        const purInv = g.purchases.map((s: any) => ({
-          voucher_number: s.voucher_number,
-          date: s.date,
-          amount: Number(s.amount || 0),
-          credit_period_days: resolveCreditPeriod(companyKey, s.voucher_number, partyName, cpMap, dmMap),
-        }));
-        const payVchr = g.payments.map((r: any) => ({ date: r.date, amount: Number(r.amount || 0) }));
-        const fifoCre = applyFIFO(purInv, payVchr);
-        const creOver = fifoCre.filter(r => r.outstanding > 0 && r.days_overdue > 0);
-        const creOverSum = creOver.reduce((s, r) => s + r.outstanding, 0);
-        totalCreditorOverdue += creOverSum;
-        if (creOverSum > 0) {
-          const maxDays = Math.max(...creOver.map(r => r.days_overdue), 0);
-          overdueCreditors.push({ party: partyName, amount: creOverSum, days: maxDays });
+        const side: 'debtors' | 'creditors' = grp === 'Sundry Debtors' ? 'debtors' : 'creditors';
+        const partyVchrs = vchrByParty.get(key) ?? [];
+        const snaps = snapsByLedger.get(key) ?? [];
+        const balance = calculatePartyBalance({
+          side,
+          vouchers: partyVchrs.map((v: any) => ({
+            voucher_number: v.voucher_number,
+            voucher_type: v.voucher_type,
+            date: v.date,
+            amount: Number(v.amount || 0),
+          })),
+          ledgerSnaps: snaps.map((s: any) => ({
+            as_of_date: s.as_of_date,
+            closing_balance: Number(s.closing_balance || 0),
+          })),
+          creditPeriodResolver: (vno) => resolveCreditPeriod(companyKey, vno, partyName, cpMap, dmMap),
+        });
+
+        if (balance.totalOverdue <= 0) return;
+        if (side === 'debtors') {
+          totalDebtorOverdue += balance.totalOverdue;
+          overdueDebtors.push({ party: partyName, amount: balance.totalOverdue, days: balance.maxOverdueDays });
+        } else {
+          totalCreditorOverdue += balance.totalOverdue;
+          overdueCreditors.push({ party: partyName, amount: balance.totalOverdue, days: balance.maxOverdueDays });
         }
       });
 
@@ -248,23 +236,24 @@ export default function MISDashboardPage() {
     },
   });
 
-  // Sign-flip + intracompany exclusion for outstanding totals.
-  const debtorOutstanding = (ledgers.data ?? [])
+  // Outstanding totals — straight from latest ledger snapshot (sign-corrected).
+  const debtorOutstanding = latestLedgers
     .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Debtors')
     .filter((l: any) => !intraSet.has(l.ledger_name))
     .reduce((s: number, l: any) => {
-      const flipped = debtorOutstandingFromClosing(l.closing_balance);
-      return s + (flipped > 0 ? flipped : 0); // only debit balances count as debtor outstanding
+      const flipped = -Number(l.closing_balance || 0); // debtor: debit → positive
+      return s + (flipped > 0 ? flipped : 0);
     }, 0);
-  const creditorOutstanding = (ledgers.data ?? [])
+  const creditorOutstanding = latestLedgers
     .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Creditors')
     .filter((l: any) => !intraSet.has(l.ledger_name))
     .reduce((s: number, l: any) => {
-      const out = creditorOutstandingFromClosing(l.closing_balance);
+      const out = Number(l.closing_balance || 0);
       return s + (out > 0 ? out : 0);
     }, 0);
-  const banks = (ledgers.data ?? []).filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Bank Accounts');
+  const banks = latestLedgers.filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Bank Accounts');
   const bankTotal = banks.reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
+
 
 
   const m = monthly.data;
