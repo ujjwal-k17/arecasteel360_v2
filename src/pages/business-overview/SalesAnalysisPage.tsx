@@ -42,12 +42,14 @@ function StatCard({ title, value, icon: Icon, loading }: any) {
 export default function SalesAnalysisPage() {
   const qc = useQueryClient();
   const [company, setCompany] = useState<string>('all');
-  const [monthSel, setMonthSel] = useState<string>('current'); // 'current' | 'last' | 'custom'
+  const [monthSel, setMonthSel] = useState<string>('current');
   const [from, setFrom] = useState<string>(toISODate(currentMonthRange().from));
   const [to, setTo] = useState<string>(toISODate(currentMonthRange().to));
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editingCP, setEditingCP] = useState<Record<string, string>>({});
+  const [showIntracompany, setShowIntracompany] = useState(false);
+  const intra = useIntracompanyParties();
 
   const range = useMemo(() => {
     if (monthSel === 'current') return currentMonthRange();
