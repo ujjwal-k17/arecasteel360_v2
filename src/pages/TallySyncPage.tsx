@@ -38,8 +38,6 @@ import { AlertTriangle, RefreshCcw, Pause, Play, Loader2 } from 'lucide-react';
 
 type SyncFn = 'sync-current-month' | 'sync-last-month' | 'sync-historical' | 'sync-current-fy';
 
-
-
 // FY = India fiscal year, Apr 1 -> Mar 31
 function getFyWindows() {
   const now = new Date();
@@ -50,6 +48,38 @@ function getFyWindows() {
   const prevFyEnd = new Date(fyStartYear, 2, 31);
   const currFyStart = new Date(fyStartYear, 3, 1);
   return { prevFyStart, prevFyEnd, currFyStart, currFyEnd: now };
+}
+
+// --- Frontend chunk generator (mirrors weekly chunking from old edge fn) ---
+function fmtYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+function isoWeek(d: Date): { year: number; week: number } {
+  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (target.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const diff = (target.getTime() - firstThursday.getTime()) / 86400000;
+  const week = 1 + Math.round((diff - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return { year: target.getUTCFullYear(), week };
+}
+function buildWeeklyChunks(start: Date, end: Date, suffix = ''): { label: string; from: string; to: string }[] {
+  const chunks: { label: string; from: string; to: string }[] = [];
+  let cursor = new Date(start);
+  while (cursor <= end) {
+    const chunkEnd = new Date(cursor);
+    chunkEnd.setDate(chunkEnd.getDate() + 6);
+    const actualEnd = chunkEnd > end ? end : chunkEnd;
+    const { year, week } = isoWeek(cursor);
+    const label = `${year}-W${String(week).padStart(2, '0')}${suffix}`;
+    chunks.push({ label, from: fmtYYYYMMDD(cursor), to: fmtYYYYMMDD(actualEnd) });
+    cursor = new Date(actualEnd);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return chunks;
 }
 
 function fmtDate(d: Date) {
