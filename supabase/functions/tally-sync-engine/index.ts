@@ -334,9 +334,46 @@ function parseGroups(xml: string, companyName: string, syncedAtIso: string): Gro
   return rows;
 }
 
-// Walk up parent chain to find the top-level (root) group for every group.
-// Root = a group whose parent is empty/null OR whose parent isn't in the map
-// (Tally reserved primary groups like "Sundry Debtors" themselves have empty PARENT).
+// Standard Tally primary groups — the recursive walk stops here.
+// Matching is case-insensitive and trim-tolerant.
+const TALLY_PRIMARY_GROUPS = [
+  'Sundry Debtors',
+  'Sundry Creditors',
+  'Bank Accounts',
+  'Cash-in-Hand',
+  'Bank OD Accounts',
+  'Loans and Advances (Asset)',
+  'Stock-in-Hand',
+  'Fixed Assets',
+  'Capital Account',
+  'Reserves and Surplus',
+  'Loans (Liability)',
+  'Current Liabilities',
+  'Current Assets',
+  'Indirect Expenses',
+  'Direct Expenses',
+  'Indirect Income',
+  'Direct Income',
+  'Purchase Accounts',
+  'Sales Accounts',
+  'Duties and Taxes',
+];
+const PRIMARY_GROUP_SET = new Set(TALLY_PRIMARY_GROUPS.map(g => g.toLowerCase().trim()));
+const isPrimaryGroup = (name: string | null | undefined): boolean => {
+  if (!name) return false;
+  return PRIMARY_GROUP_SET.has(name.toLowerCase().trim());
+};
+const isTallyRootMarker = (name: string | null | undefined): boolean => {
+  if (!name) return true;
+  const t = name.trim().toLowerCase();
+  return t === '' || t === 'primary';
+};
+
+// Walk up parent chain stopping at standard Tally primary groups.
+// Logic:
+//  - If current group is itself a primary group → return it.
+//  - Else look at parent_group; if parent is empty / "Primary" → return current (last meaningful).
+//  - Else recurse into parent.
 function computeUltimateParents(groups: GroupRow[]): GroupRow[] {
   const byName = new Map<string, GroupRow>();
   for (const g of groups) byName.set(g.group_name, g);
@@ -344,10 +381,12 @@ function computeUltimateParents(groups: GroupRow[]): GroupRow[] {
   const resolve = (name: string, visiting: Set<string>): string => {
     if (visiting.has(name)) return name; // cycle guard
     visiting.add(name);
+    if (isPrimaryGroup(name)) return name; // ceiling reached
     const g = byName.get(name);
-    if (!g) return name; // unknown parent — treat as its own root
-    if (!g.parent_group) return name; // root reached
-    return resolve(g.parent_group, visiting);
+    if (!g) return name; // unknown — treat as its own root
+    if (isTallyRootMarker(g.parent_group)) return name; // last meaningful
+    if (isPrimaryGroup(g.parent_group)) return g.parent_group as string;
+    return resolve(g.parent_group as string, visiting);
   };
 
   for (const g of groups) {
