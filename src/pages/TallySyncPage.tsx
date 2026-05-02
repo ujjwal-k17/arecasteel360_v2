@@ -390,7 +390,7 @@ export default function TallySyncPage() {
         fn === 'sync-current-month' ? 'Current month' :
         fn === 'sync-last-month' ? 'Last month' :
         fn === 'sync-historical' ? 'Previous FY' : 'Current FY (YTD)';
-      if (fn === 'sync-historical') {
+      if (fn === 'sync-historical' || fn === 'sync-last-month' || fn === 'sync-current-fy') {
         if (data?.paused) {
           // toast already shown
         } else if (fail === 0 && ok > 0) {
@@ -402,8 +402,6 @@ export default function TallySyncPage() {
         } else {
           toast.error(`${label} failed${data?.first_error ? ` — ${data.first_error}` : ''}`);
         }
-      } else if (fn === 'sync-current-fy') {
-        toast.success(`${label} sync complete`);
       } else if (fail === 0 && total > 0) {
         toast.success(`${label} sync complete — ${ok} of ${total} companies OK`);
       } else if (ok > 0 && fail > 0) {
