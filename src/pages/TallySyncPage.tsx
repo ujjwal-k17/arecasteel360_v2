@@ -706,7 +706,7 @@ export default function TallySyncPage() {
                       onClick={() => {
                         setPausedHist(false);
                         pausedHistRef.current = false;
-                        triggerSync.mutate('sync-historical');
+                        triggerSync.mutate({ fn: 'sync-historical', force: true });
                       }}
                     >
                       Start now
