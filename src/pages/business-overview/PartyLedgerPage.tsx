@@ -25,10 +25,15 @@ import { Button } from '@/components/ui/button';
 // - Journal / Contra → use amount sign (treated as debit if positive)
 function debitCreditFor(vtype: string, amount: number) {
   const t = (vtype || '').toLowerCase();
-  if (t.includes('sales') || t.includes('debit note')) return { debit: amount, credit: 0 };
-  if (t.includes('purchase') || t.includes('credit note')) return { debit: 0, credit: amount };
-  if (t === 'receipt') return { debit: 0, credit: amount };
-  if (t === 'payment') return { debit: amount, credit: 0 };
+  // Credit-side checks first — "Credit Note Sales" / "Credit Note Purchase" must
+  // not be misread as Sales/Purchase. Order matters here.
+  if (t.includes('credit note')) return { debit: 0, credit: amount };
+  if (t.includes('debit note')) return { debit: amount, credit: 0 };
+  if (t.includes('receipt')) return { debit: 0, credit: amount };
+  if (t.includes('payment')) return { debit: amount, credit: 0 };
+  if (t.includes('sales') || t.includes('sale')) return { debit: amount, credit: 0 };
+  if (t.includes('invoice')) return { debit: amount, credit: 0 }; // Service/Rent Invoice
+  if (t.includes('purchase')) return { debit: 0, credit: amount };
   return { debit: amount, credit: 0 };
 }
 
