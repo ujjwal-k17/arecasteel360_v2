@@ -100,7 +100,7 @@ export default function MISDashboardPage() {
     queryFn: async () => {
       let q = supabase
         .from('tally_ledger_balances')
-        .select('ledger_name, ledger_group, closing_balance, company_name');
+        .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name');
       if (company !== 'all') q = q.eq('company_name', company);
       const { data, error } = await q;
       if (error) throw error;
@@ -230,12 +230,12 @@ export default function MISDashboardPage() {
   });
 
   const debtorOutstanding = (ledgers.data ?? [])
-    .filter((l: any) => l.ledger_group === 'Sundry Debtors')
+    .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Debtors')
     .reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
   const creditorOutstanding = (ledgers.data ?? [])
-    .filter((l: any) => l.ledger_group === 'Sundry Creditors')
+    .filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Sundry Creditors')
     .reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
-  const banks = (ledgers.data ?? []).filter((l: any) => l.ledger_group === 'Bank Accounts');
+  const banks = (ledgers.data ?? []).filter((l: any) => (l.ultimate_group ?? l.ledger_group) === 'Bank Accounts');
   const bankTotal = banks.reduce((s: number, l: any) => s + Number(l.closing_balance || 0), 0);
 
   const m = monthly.data;

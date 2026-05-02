@@ -231,6 +231,36 @@ function buildLedgerXml(company: string): string {
 </ENVELOPE>`;
 }
 
+function buildGroupsXml(company: string): string {
+  // Returns master Group rows with NAME and PARENT — needed to compute the
+  // ultimate (top-level) parent of every group dynamically.
+  return `<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>GroupCollection</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>${escapeXml(company)}</SVCURRENTCOMPANY>
+        <LOADCOMPANYONDEMAND>Yes</LOADCOMPANYONDEMAND>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="GroupCollection" ISMODIFY="No">
+            <TYPE>Group</TYPE>
+            <FETCH>NAME,PARENT</FETCH>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+}
+
 function buildDayBookXml(company: string, fromDate: string, toDate: string): string {
   return `<ENVELOPE>
   <HEADER>
@@ -269,12 +299,70 @@ type LedgerRow = {
   company_name: string;
   ledger_name: string;
   ledger_group: string | null;
+  ultimate_group: string | null;
   closing_balance: number;
   as_of_date: string; // ISO
   synced_at: string;
 };
 
-function parseLedgers(xml: string, companyName: string, asOfIso: string, syncedAtIso: string): LedgerRow[] {
+type GroupRow = {
+  company_name: string;
+  group_name: string;
+  parent_group: string | null;
+  ultimate_parent: string | null;
+  synced_at: string;
+};
+
+function parseGroups(xml: string, companyName: string, syncedAtIso: string): GroupRow[] {
+  const rows: GroupRow[] = [];
+  const blocks = getAllBlocks(xml, 'GROUP');
+  const seen = new Set<string>();
+  for (const b of blocks) {
+    const name = extractNameAttr(b);
+    if (!name) continue;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const parent = getTagText(b, 'PARENT');
+    rows.push({
+      company_name: companyName,
+      group_name: name,
+      parent_group: parent && parent.length > 0 ? parent : null,
+      ultimate_parent: null, // computed below
+      synced_at: syncedAtIso,
+    });
+  }
+  return rows;
+}
+
+// Walk up parent chain to find the top-level (root) group for every group.
+// Root = a group whose parent is empty/null OR whose parent isn't in the map
+// (Tally reserved primary groups like "Sundry Debtors" themselves have empty PARENT).
+function computeUltimateParents(groups: GroupRow[]): GroupRow[] {
+  const byName = new Map<string, GroupRow>();
+  for (const g of groups) byName.set(g.group_name, g);
+
+  const resolve = (name: string, visiting: Set<string>): string => {
+    if (visiting.has(name)) return name; // cycle guard
+    visiting.add(name);
+    const g = byName.get(name);
+    if (!g) return name; // unknown parent — treat as its own root
+    if (!g.parent_group) return name; // root reached
+    return resolve(g.parent_group, visiting);
+  };
+
+  for (const g of groups) {
+    g.ultimate_parent = resolve(g.group_name, new Set<string>());
+  }
+  return groups;
+}
+
+function parseLedgers(
+  xml: string,
+  companyName: string,
+  asOfIso: string,
+  syncedAtIso: string,
+  ultimateByGroup: Map<string, string>,
+): LedgerRow[] {
   const rows: LedgerRow[] = [];
   const blocks = getAllBlocks(xml, 'LEDGER');
   const seen = new Set<string>();
@@ -285,10 +373,12 @@ function parseLedgers(xml: string, companyName: string, asOfIso: string, syncedA
     seen.add(name);
     const parent = getTagText(b, 'PARENT');
     const closing = parseTallyAmount(getTagText(b, 'CLOSINGBALANCE') || getTagText(b, 'OPENINGBALANCE'));
+    const ultimate = parent ? (ultimateByGroup.get(parent) ?? parent) : null;
     rows.push({
       company_name: companyName,
       ledger_name: name,
       ledger_group: parent,
+      ultimate_group: ultimate,
       closing_balance: closing,
       as_of_date: asOfIso,
       synced_at: syncedAtIso,
@@ -537,7 +627,52 @@ Deno.serve(async (req) => {
   }
   await sleep(INTER_STEP_GAP_MS);
 
-  // Step 3 — Ledger balances (skipped when fetch_ledgers=false, e.g. for
+  // Step 3a — Groups (always fetched when ledgers are fetched, so the
+  // group→ultimate_parent map is fresh before ledgers are processed).
+  let groupCount = 0;
+  const ultimateByGroup = new Map<string, string>();
+  if (fetch_ledgers) {
+    try {
+      const groupXml = buildGroupsXml(company_name);
+      const res = await tallyRequestWithRetry(tallyUrl, groupXml, 'groups');
+      if (!res.ok) {
+        errors.push(res.error);
+      } else {
+        const groupRows = computeUltimateParents(parseGroups(res.text, company_name, syncedAtIso));
+        for (const g of groupRows) {
+          if (g.ultimate_parent) ultimateByGroup.set(g.group_name, g.ultimate_parent);
+        }
+        if (groupRows.length > 0) {
+          const up = await upsertInChunks(
+            supabase,
+            'tally_groups',
+            groupRows,
+            'company_name,group_name',
+          );
+          groupCount = up.inserted;
+          if (up.error) errors.push(`group upsert: ${up.error}`);
+        }
+        console.log(`[groups] ${company_name}: ${groupRows.length} groups, map size ${ultimateByGroup.size}`);
+      }
+    } catch (e: any) {
+      errors.push(`groups: ${e?.message || String(e)}`);
+    }
+    await sleep(INTER_STEP_GAP_MS);
+  }
+
+  // If we skipped the group fetch (e.g. historical chunks after the first),
+  // hydrate the map from whatever we already stored in tally_groups.
+  if (ultimateByGroup.size === 0) {
+    const { data: existingGroups } = await supabase
+      .from('tally_groups')
+      .select('group_name, ultimate_parent')
+      .eq('company_name', company_name);
+    for (const g of existingGroups ?? []) {
+      if (g.ultimate_parent) ultimateByGroup.set(g.group_name, g.ultimate_parent);
+    }
+  }
+
+  // Step 3b — Ledger balances (skipped when fetch_ledgers=false, e.g. for
   // historical chunks after the first one — ledgers are a master snapshot,
   // not weekly data, and re-fetching duplicates rows and inflates counts).
   let ledgerCount = 0;
@@ -548,7 +683,7 @@ Deno.serve(async (req) => {
       if (!res.ok) {
         errors.push(res.error);
       } else {
-        const rows = parseLedgers(res.text, company_name, asOfIso, syncedAtIso);
+        const rows = parseLedgers(res.text, company_name, asOfIso, syncedAtIso, ultimateByGroup);
         if (rows.length > 0) {
           const up = await upsertInChunks(
             supabase,
@@ -649,6 +784,7 @@ Deno.serve(async (req) => {
       success: status === 'completed',
       records_fetched: totalRecords,
       ledger_count: ledgerCount,
+      group_count: groupCount,
       voucher_count: voucherCount,
       duration_seconds: durationSeconds,
       errors_if_any: errors.length ? errors : null,

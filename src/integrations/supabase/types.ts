@@ -1220,6 +1220,33 @@ export type Database = {
         }
         Relationships: []
       }
+      tally_groups: {
+        Row: {
+          company_name: string
+          group_name: string
+          id: string
+          parent_group: string | null
+          synced_at: string
+          ultimate_parent: string | null
+        }
+        Insert: {
+          company_name: string
+          group_name: string
+          id?: string
+          parent_group?: string | null
+          synced_at?: string
+          ultimate_parent?: string | null
+        }
+        Update: {
+          company_name?: string
+          group_name?: string
+          id?: string
+          parent_group?: string | null
+          synced_at?: string
+          ultimate_parent?: string | null
+        }
+        Relationships: []
+      }
       tally_ledger_balances: {
         Row: {
           as_of_date: string
@@ -1229,6 +1256,7 @@ export type Database = {
           ledger_group: string | null
           ledger_name: string
           synced_at: string
+          ultimate_group: string | null
         }
         Insert: {
           as_of_date: string
@@ -1238,6 +1266,7 @@ export type Database = {
           ledger_group?: string | null
           ledger_name: string
           synced_at?: string
+          ultimate_group?: string | null
         }
         Update: {
           as_of_date?: string
@@ -1247,6 +1276,7 @@ export type Database = {
           ledger_group?: string | null
           ledger_name?: string
           synced_at?: string
+          ultimate_group?: string | null
         }
         Relationships: []
       }
