@@ -344,12 +344,12 @@ export function calculatePartyBalance(params: {
   let sumCredit = 0;
   const debitEntries: PartyVoucher[] = [];
   vouchers.forEach((v) => {
-    const t = v.voucher_type;
+    const cls = classifyPartyVoucher(v.voucher_type);
     const amt = Number(v.amount || 0);
-    if ((DEBIT_VOUCHER_TYPES as readonly string[]).includes(t)) {
+    if (cls === 'debit') {
       sumDebit += amt;
       debitEntries.push(v);
-    } else if ((CREDIT_VOUCHER_TYPES as readonly string[]).includes(t)) {
+    } else if (cls === 'credit') {
       sumCredit += amt;
     }
   });
