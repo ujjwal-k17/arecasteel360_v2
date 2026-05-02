@@ -1,84 +1,162 @@
-# Switch Tally Sync to Cloudflare Tunnel
+# Debtor Analysis & Master — Four Fixes
 
-## Goal
-Replace direct public-IP access (`http://103.239.89.153:9000`) — which is unreachable from the internet and causes "signal has been aborted" timeouts — with the Cloudflare Tunnel URL `https://360.arecasteel.com`. Keep the direct IP as a secondary fallback.
+## Current state (from DB inspection)
 
-## Will this fix "signal has been aborted"?
-Yes. The tunnel hostname is reachable globally over HTTPS. Cloudflare's edge accepts the request immediately and forwards it through the persistent outbound tunnel to `localhost:9000` on the Tally PC. No port-forwarding, no public-IP dependency, no firewall holes. Typical round-trip 200–800 ms — well inside the 10 s timeout.
+- `tally_ledger_balances`: **5,922 total rows**, but only **2,961 distinct (company, ledger)** pairs → ~**2,961 duplicate snapshot rows** to remove.
+- `CORETECH DYNAMICS` (Areca Indocorp LLP — Gzb): 2 snapshots (2026-05-02 and 2026-04-07), both with `closing_balance = -103`. Latest = ₹103 debit → should show as ₹103 outstanding in Debtor Analysis.
+- 17 distinct `ledger_group` values under Sundry Debtors. Existing `sales_reps`: Shivam Singh, SP Gupta, Vinod Singh, Siyaram Sharma. Several Tally sub-groups (Bipin Pandey, Arvind Kumar, SANTOSH DUBEY, Alok Kumar, JB Steel Group, Siyaram, etc.) will become new sales reps.
+- Generic groups like `Sundry Debtors`, `Retail Debtors - Gzb`, `Resin Debtors`, `Sundry Debtors TMT Bars`, `Brokerage on Sales` are NOT sales-rep names — these must be excluded from auto-creation.
 
-The only ways the timeout could still occur after this change:
-- `cloudflared` is not running on the Tally PC
-- Tunnel hostname not mapped to `http://localhost:9000`
-- Tally itself is closed (no listener on port 9000)
-- Cloudflare Access policy blocks the edge function (would return 403, not abort)
+---
 
-## Changes
+## Fix 1 — Always use latest ledger snapshot
 
-### 1. Add runtime secret
-- `TALLY_TUNNEL_URL` = `https://360.arecasteel.com`
-- Optional fallback `TALLY_DIRECT_URL` = `http://103.239.89.153:9000` (defaulted in code if missing)
+**File:** `src/pages/business-overview/PartyAnalysisPage.tsx` (and `MISDashboardPage.tsx` if it reads ledger balances similarly)
 
-### 2. `supabase/functions/tally-ping/index.ts`
-Read both URLs from env. Try tunnel first (10 s timeout). On timeout / network error / 5xx, retry the direct IP (10 s timeout). Return which URL succeeded so the UI can show it.
+Replace the plain `select` from `tally_ledger_balances` with a client-side dedup that keeps only the row with the max `as_of_date` per `(company_name, ledger_name)`:
 
-Response shape:
-```json
-{ "reachable": true, "url": "https://360.arecasteel.com", "via": "tunnel", "error": null, "checked_at": "..." }
+```ts
+const { data } = await supabase
+  .from('tally_ledger_balances')
+  .select('ledger_name, ledger_group, ultimate_group, closing_balance, company_name, as_of_date')
+  .order('as_of_date', { ascending: false });
+
+// Keep first occurrence per (company, ledger) — that's the latest snapshot
+const seen = new Set<string>();
+const latest = (data ?? []).filter(r => {
+  const k = `${r.company_name}::${r.ledger_name}`;
+  if (seen.has(k)) return false;
+  seen.add(k); return true;
+});
 ```
 
-### 3. `supabase/functions/tally-sync-engine/index.ts`
-Currently reads `tally_url` from `tally_companies` table and falls back to the hardcoded IP. Update the resolution order to:
-1. `tally_companies.tally_url` (if set by admin)
-2. `TALLY_TUNNEL_URL` env
-3. `TALLY_DIRECT_URL` env / hardcoded IP
+This guarantees **never sum/double-count** snapshots.
 
-Wrap the Tally fetch in a try-tunnel-then-fallback helper so any sync (historical, current FY, current month, last month) automatically benefits. The four sync wrapper functions all call into `tally-sync-engine`, so this single change covers them.
+## Fix 2 — Remove minimum-balance filter
 
-### 4. `src/pages/TallySyncPage.tsx`
-- Remove the hardcoded `TALLY_URL` constant; let the edge function decide.
-- Status line shows the URL returned by `tally-ping` (e.g. "Tally Connected — via tunnel (https://360.arecasteel.com)" or "Tally Connected — via direct IP (fallback)").
-- Refresh button keeps current behavior; toast surfaces which path succeeded.
+**File:** `src/pages/business-overview/PartyAnalysisPage.tsx` line ~272
+
+Current: `if (out > 0.01) { main.push(...) }` — keeps tiny balances out.
+Change to: `if (out > 0) { main.push(...) }` — only excludes exactly zero/credit. Same for the creditor advance branch (`out < 0`).
+
+This guarantees CORETECH (₹103) and any small-balance debtor appears.
+
+## Fix 3 — Dedupe `tally_ledger_balances`
+
+Run a one-time cleanup migration:
+
+```sql
+DELETE FROM tally_ledger_balances t
+USING (
+  SELECT id, ROW_NUMBER() OVER (
+    PARTITION BY company_name, ledger_name
+    ORDER BY as_of_date DESC, synced_at DESC
+  ) AS rn
+  FROM tally_ledger_balances
+) s
+WHERE t.id = s.id AND s.rn > 1;
+```
+
+Then add a unique index to prevent future duplicates from older snapshots being kept alongside newer ones — the sync engine already upserts with the latest as_of_date, but we'll add:
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS ux_tally_ledger_balances_company_ledger
+  ON tally_ledger_balances (company_name, ledger_name);
+```
+
+(If the engine relies on inserting different `as_of_date` rows, we'll instead keep the dedupe purely as a one-time cleanup and add a post-sync dedupe step. I'll verify the engine's upsert key before applying the unique index — Tally Sync module is not being modified.)
+
+Expected removal: **~2,961 rows** (5,922 → 2,961).
+
+## Fix 4 — Auto-populate Sales Rep from `ledger_group`
+
+### Generic groups to skip (not real sales reps)
+A hardcoded skip-list:
+```
+Sundry Debtors, Sundry Creditors, Retail Debtors - Gzb, Resin Debtors,
+Sundry Debtors TMT Bars, Brokerage on Sales
+```
+
+### One-time backfill (SQL migration / data step)
+
+```sql
+-- 1. Insert new sales_reps from Tally ledger_group (excluding generics & duplicates)
+INSERT INTO sales_reps (name, is_active)
+SELECT DISTINCT lb.ledger_group, true
+FROM tally_ledger_balances lb
+WHERE lb.ultimate_group = 'Sundry Debtors'
+  AND lb.ledger_group IS NOT NULL
+  AND lb.ledger_group NOT IN (
+    'Sundry Debtors','Sundry Creditors','Retail Debtors - Gzb',
+    'Resin Debtors','Sundry Debtors TMT Bars','Brokerage on Sales'
+  )
+  AND NOT EXISTS (SELECT 1 FROM sales_reps sr WHERE sr.name = lb.ledger_group);
+
+-- 2. Auto-set sales_rep on debtor_master where currently NULL.
+--    Use latest snapshot per (company, ledger).
+WITH latest AS (
+  SELECT DISTINCT ON (company_name, ledger_name)
+    company_name, ledger_name, ledger_group
+  FROM tally_ledger_balances
+  WHERE ultimate_group = 'Sundry Debtors'
+  ORDER BY company_name, ledger_name, as_of_date DESC
+)
+UPDATE debtor_master dm
+SET sales_rep = latest.ledger_group, updated_at = now()
+FROM latest
+WHERE dm.company_name = latest.company_name
+  AND dm.ledger_name = latest.ledger_name
+  AND dm.sales_rep IS NULL
+  AND EXISTS (SELECT 1 FROM sales_reps sr WHERE sr.name = latest.ledger_group);
+```
+
+### Recurring auto-population (after every sync)
+
+Update `src/lib/business-overview-sync.ts` `upsertDebtorsFromSales()` to also:
+1. Fetch latest-snapshot debtor ledgers from `tally_ledger_balances` (filtered to `Sundry Debtors`).
+2. Insert any missing `ledger_group` into `sales_reps` (excluding generic skip-list, case-insensitive dedupe).
+3. Upsert `debtor_master` rows; for rows where `sales_rep IS NULL`, set it to `ledger_group` if that group is in `sales_reps`.
+
+Logic preserved: **never overwrite** `sales_rep` if user has set it.
+
+This runs from `TallySyncPage.tsx` line 433 (already invoked post-sync), so it runs after every future sync automatically.
+
+## Confirmation queries (run after fixes)
+
+```sql
+-- a) CORETECH visible (latest snapshot only)
+SELECT * FROM (
+  SELECT DISTINCT ON (company_name, ledger_name) *
+  FROM tally_ledger_balances
+  ORDER BY company_name, ledger_name, as_of_date DESC
+) s WHERE ledger_name ILIKE '%CORETECH%';
+
+-- b) Sales reps auto-created (after − before)
+SELECT COUNT(*) FROM sales_reps;
+
+-- c) Debtors auto-populated
+SELECT COUNT(*) FROM debtor_master WHERE sales_rep IS NOT NULL;
+
+-- d) Duplicates removed
+SELECT 5922 - (SELECT COUNT(*) FROM tally_ledger_balances) AS removed;
+```
+
+I'll report all four numbers in the implementation message.
+
+---
 
 ## Technical details
 
-**Fallback helper (used in both ping and sync-engine):**
-```ts
-async function fetchTally(body: string, urls: {tunnel?: string, direct?: string}) {
-  const tryFetch = async (url: string) => {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10_000);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/xml' },
-        body,
-        signal: ctrl.signal,
-      });
-      return { ok: res.ok, status: res.status, text: await res.text(), url };
-    } finally { clearTimeout(t); }
-  };
-  if (urls.tunnel) {
-    try { return { ...(await tryFetch(urls.tunnel)), via: 'tunnel' as const }; }
-    catch (e) { /* fall through */ }
-  }
-  if (urls.direct) {
-    return { ...(await tryFetch(urls.direct)), via: 'direct' as const };
-  }
-  throw new Error('No Tally URL configured');
-}
-```
+**Files to edit**
+- `src/pages/business-overview/PartyAnalysisPage.tsx` — latest-snapshot dedupe + remove `> 0.01` threshold.
+- `src/pages/business-overview/MISDashboardPage.tsx` — same latest-snapshot dedupe if it reads ledger balances.
+- `src/lib/business-overview-sync.ts` — extend `upsertDebtorsFromSales()` with sales-rep auto-creation + auto-assignment, using latest snapshot only.
 
-**Files touched:**
-- `supabase/functions/tally-ping/index.ts` — rewrite with fallback helper, read env
-- `supabase/functions/tally-sync-engine/index.ts` — replace single `fetch(tallyUrl, ...)` call sites with `fetchTally(...)`; resolution order updated
-- `src/pages/TallySyncPage.tsx` — drop hardcoded URL, render `via` + `url` from ping response
-- Add secret `TALLY_TUNNEL_URL` (will prompt you when implementation starts)
+**Migration**
+- One SQL migration containing: dedupe DELETE on `tally_ledger_balances`, sales_reps INSERT, debtor_master UPDATE.
 
-**Not touched:**
-- `tally_companies.tally_url` DB column stays (still respected as highest-priority override)
-- Sync wrapper functions (`sync-historical`, `sync-current-fy`, `sync-current-month`, `sync-last-month`) — they delegate to the engine
-- No DB migration needed
+**Not touched**
+- `supabase/functions/tally-sync-engine/*` and other Tally Sync module files.
+- No DB schema changes other than possibly adding a unique index (only if compatible with the engine's current upsert behavior — verified before applying).
 
-## Out of scope
-- Cloudflare Access service-token auth (can be added later if you lock down the tunnel)
-- UI to edit tunnel URL from admin settings (using secret per your choice)
+**Skip-list rationale**: Generic group names like `Sundry Debtors`, `Resin Debtors`, `Retail Debtors - Gzb` are not people — auto-creating them as sales reps would pollute the dropdown. Real human-named sub-groups become reps.
