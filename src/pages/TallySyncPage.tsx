@@ -227,9 +227,114 @@ export default function TallySyncPage() {
 
   const triggerSync = useMutation({
     mutationFn: async (fn: SyncFn) => {
-      if (fn === 'sync-historical' || fn === 'sync-current-fy') {
+      // --- Client-orchestrated historical sync (one chunk per edge call) ---
+      if (fn === 'sync-historical') {
+        // 1. Reset pause flag
+        await supabase
+          .from('tally_sync_control')
+          .upsert({ sync_type: 'historical', is_paused: false }, { onConflict: 'sync_type' });
+
+        // 2. Load active companies
+        const { data: companies, error: cErr } = await supabase
+          .from('tally_companies')
+          .select('company_name')
+          .eq('is_active', true)
+          .order('company_name');
+        if (cErr) throw cErr;
+        if (!companies || companies.length === 0) {
+          toast.info('No active companies to sync');
+          return { fn, data: { done: true } } as { fn: SyncFn; data: any };
+        }
+
+        // 3. Build full chunk list for previous FY
+        const { prevFyStart, prevFyEnd } = getFyWindows();
+        const chunks = buildWeeklyChunks(prevFyStart, prevFyEnd);
+        if (chunks.length === 0) {
+          toast.info('No chunks to process');
+          return { fn, data: { done: true } } as { fn: SyncFn; data: any };
+        }
+
+        // 4. Load already-completed chunk labels per company (resume support)
+        const { data: doneRows } = await supabase
+          .from('tally_sync_log')
+          .select('company_name, chunk_label')
+          .eq('sync_type', 'historical')
+          .eq('status', 'completed')
+          .not('chunk_label', 'is', null);
+        const completed = new Set<string>(
+          (doneRows ?? []).map((r) => `${r.company_name}::${r.chunk_label}`),
+        );
+
+        let okCount = 0;
+        let failCount = 0;
+        let firstErr: string | null = null;
+
+        // 5. Loop: company × chunk, single edge-fn call each
+        for (const c of companies) {
+          let firstChunkForCompany = true;
+          for (const ch of chunks) {
+            // Pause check (DB-backed so it survives reload)
+            if (pausedHistRef.current) {
+              toast.info('Previous FY sync paused');
+              return { fn, data: { paused: true, ok_count: okCount, fail_count: failCount } } as any;
+            }
+            const { data: ctrl } = await supabase
+              .from('tally_sync_control')
+              .select('is_paused')
+              .eq('sync_type', 'historical')
+              .maybeSingle();
+            if (ctrl?.is_paused) {
+              setPausedHist(true);
+              pausedHistRef.current = true;
+              toast.info('Previous FY sync paused');
+              return { fn, data: { paused: true, ok_count: okCount, fail_count: failCount } } as any;
+            }
+
+            const key = `${c.company_name}::${ch.label}`;
+            if (completed.has(key)) {
+              firstChunkForCompany = false;
+              continue;
+            }
+
+            try {
+              const { data, error } = await supabase.functions.invoke('sync-historical-chunk', {
+                body: {
+                  company_name: c.company_name,
+                  from_date: ch.from,
+                  to_date: ch.to,
+                  chunk_label: ch.label,
+                  sync_type: 'historical',
+                  fetch_ledgers: firstChunkForCompany,
+                },
+              });
+              if (error) throw error;
+              if (data?.success === false) {
+                failCount++;
+                if (!firstErr) firstErr = data?.engine?.error || 'Chunk failed';
+              } else {
+                okCount++;
+              }
+            } catch (e: any) {
+              failCount++;
+              if (!firstErr) firstErr = e?.message || String(e);
+            }
+
+            firstChunkForCompany = false;
+            qc.invalidateQueries({ queryKey: ['tally-sync-log'] });
+            qc.invalidateQueries({ queryKey: ['tally-counts'] });
+          }
+        }
+
+        return {
+          fn,
+          data: { done: true, ok_count: okCount, fail_count: failCount, first_error: firstErr },
+        } as { fn: SyncFn; data: any };
+      }
+
+      // --- Current-FY still uses old chunked orchestrator ---
+      if (fn === 'sync-current-fy') {
         const syncType = CHUNKED_SYNCS[fn].syncType;
-        const pauseRef = fn === 'sync-historical' ? pausedHistRef : pausedCurrFyRef;
+        const pauseRef = pausedCurrFyRef;
 
         await supabase
           .from('tally_sync_control')
@@ -271,7 +376,19 @@ export default function TallySyncPage() {
         fn === 'sync-current-month' ? 'Current month' :
         fn === 'sync-last-month' ? 'Last month' :
         fn === 'sync-historical' ? 'Previous FY' : 'Current FY (YTD)';
-      if (fn === 'sync-historical' || fn === 'sync-current-fy') {
+      if (fn === 'sync-historical') {
+        if (data?.paused) {
+          // toast already shown
+        } else if (fail === 0 && ok > 0) {
+          toast.success(`${label} sync complete — ${ok} chunks processed`);
+        } else if (ok > 0 && fail > 0) {
+          toast.warning(`${label}: ${ok} ok, ${fail} failed${data?.first_error ? ` — ${data.first_error}` : ''}`);
+        } else if (ok === 0 && fail === 0) {
+          toast.info(`${label}: nothing to sync (already complete)`);
+        } else {
+          toast.error(`${label} failed${data?.first_error ? ` — ${data.first_error}` : ''}`);
+        }
+      } else if (fn === 'sync-current-fy') {
         toast.success(`${label} sync complete`);
       } else if (fail === 0 && total > 0) {
         toast.success(`${label} sync complete — ${ok} of ${total} companies OK`);
