@@ -364,7 +364,14 @@ function AnalysisView({ side }: Mode) {
         </Alert>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <Card className={bucketFilter === 'all' ? 'ring-2 ring-primary cursor-pointer' : 'cursor-pointer'} onClick={() => setBucketFilter('all')}>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground">Total Active {cfg.partyLabel}s</div>
+            <div className="text-lg font-bold mt-1">{mainRows.length}</div>
+            <div className="text-xs text-muted-foreground">with outstanding &gt; 0</div>
+          </CardContent>
+        </Card>
         {buckets.map(b => (
           <Card
             key={b}
