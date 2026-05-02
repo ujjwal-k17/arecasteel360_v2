@@ -12,14 +12,14 @@ import {
 import { toast } from 'sonner';
 import { ManageSalesRepsDialog, useSalesReps } from './ManageSalesRepsDialog';
 import { CompanyFilter } from './CompanyFilter';
-import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
+
 
 export default function DebtorMasterTab() {
   const qc = useQueryClient();
   const [company, setCompany] = useState('all');
   const [search, setSearch] = useState('');
   const [editingCP, setEditingCP] = useState<Record<string, string>>({});
-  const intra = useIntracompanyParties();
+  // intracompany flag is read directly from each row's is_intracompany column
   const reps = useSalesReps();
 
   const dm = useQuery({
