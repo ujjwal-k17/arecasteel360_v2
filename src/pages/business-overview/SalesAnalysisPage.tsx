@@ -1,13 +1,16 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronRight, TrendingUp, Search, Save } from 'lucide-react';
 import { CompanyFilter } from '@/components/business-overview/CompanyFilter';
 import { LastSyncedFooter } from '@/components/business-overview/LastSyncedFooter';
+import { useIntracompanyParties } from '@/hooks/useIntracompanyParties';
 import {
   formatINR,
   formatINRCompact,
@@ -39,12 +42,14 @@ function StatCard({ title, value, icon: Icon, loading }: any) {
 export default function SalesAnalysisPage() {
   const qc = useQueryClient();
   const [company, setCompany] = useState<string>('all');
-  const [monthSel, setMonthSel] = useState<string>('current'); // 'current' | 'last' | 'custom'
+  const [monthSel, setMonthSel] = useState<string>('current');
   const [from, setFrom] = useState<string>(toISODate(currentMonthRange().from));
   const [to, setTo] = useState<string>(toISODate(currentMonthRange().to));
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editingCP, setEditingCP] = useState<Record<string, string>>({});
+  const [showIntracompany, setShowIntracompany] = useState(false);
+  const intra = useIntracompanyParties();
 
   const range = useMemo(() => {
     if (monthSel === 'current') return currentMonthRange();
@@ -86,8 +91,22 @@ export default function SalesAnalysisPage() {
     },
   });
 
+  // Split sales into intra/non-intra. The "shown" view depends on the toggle.
+  const { mainSales, intraSales } = useMemo(() => {
+    const intraSet = intra.data ?? new Set<string>();
+    const main: any[] = [];
+    const ic: any[] = [];
+    (sales.data ?? []).forEach((v: any) => {
+      if (intraSet.has(v.party_name)) ic.push(v);
+      else main.push(v);
+    });
+    return { mainSales: main, intraSales: ic };
+  }, [sales.data, intra.data]);
+
+  const shown = mainSales;
+
   const summary = useMemo(() => {
-    const data = sales.data ?? [];
+    const data = shown;
     const partyByKey = new Set(data.map((d: any) => `${d.company_name}::${d.party_name ?? ''}`));
     return {
       value: data.reduce((s: number, d: any) => s + Number(d.amount || 0), 0),
@@ -95,11 +114,11 @@ export default function SalesAnalysisPage() {
       n: data.length,
       parties: partyByKey.size,
     };
-  }, [sales.data]);
+  }, [shown]);
 
-  const grouped = useMemo(() => {
+  const buildGrouped = (rows: any[]) => {
     const map = new Map<string, { party: string; company: string; invoices: any[]; mt: number; value: number }>();
-    (sales.data ?? []).forEach((v: any) => {
+    rows.forEach((v: any) => {
       const key = `${v.company_name}::${v.party_name ?? '(unknown)'}`;
       if (!map.has(key)) {
         map.set(key, { party: v.party_name ?? '(unknown)', company: v.company_name, invoices: [], mt: 0, value: 0 });
@@ -116,7 +135,16 @@ export default function SalesAnalysisPage() {
       arr = arr.filter(x => x.party.toLowerCase().includes(s));
     }
     return arr;
-  }, [sales.data, search]);
+  };
+
+  const grouped = useMemo(() => buildGrouped(shown), [shown, search]);
+  const groupedIntra = useMemo(() => buildGrouped(intraSales), [intraSales, search]);
+
+  const intraSummary = useMemo(() => ({
+    value: intraSales.reduce((s, d) => s + Number(d.amount || 0), 0),
+    mt: intraSales.reduce((s, d) => s + totalMTFromLineItems(d.line_items), 0),
+    n: intraSales.length,
+  }), [intraSales]);
 
   const toggle = (key: string) =>
     setExpanded(prev => {
@@ -193,7 +221,11 @@ export default function SalesAnalysisPage() {
             <label className="text-xs text-muted-foreground">Company</label>
             <CompanyFilter value={company} onChange={setCompany} />
           </div>
-          <div className="space-y-1 ml-auto">
+          <div className="flex items-center gap-2 ml-auto">
+            <label className="text-xs text-muted-foreground">Show Intracompany</label>
+            <Switch checked={showIntracompany} onCheckedChange={setShowIntracompany} />
+          </div>
+          <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Search Debtor</label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -322,9 +354,56 @@ export default function SalesAnalysisPage() {
         </CardContent>
       </Card>
 
+      {showIntracompany && (
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              Intracompany Transactions
+              <Badge variant="secondary">Excluded from totals above</Badge>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Sales where the customer is one of your own Tally companies. Shown separately for transparency.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {groupedIntra.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No intracompany sales in this period.</p>
+            ) : (
+              <>
+                <div className="text-xs text-muted-foreground mb-2">
+                  {intraSummary.n} invoices • {formatMT(intraSummary.mt)} MT • {formatINR(intraSummary.value)}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b text-left text-xs text-muted-foreground">
+                      <tr>
+                        <th className="py-2">Debtor (Intracompany)</th>
+                        <th className="py-2">Company</th>
+                        <th className="py-2 text-right">Invoices</th>
+                        <th className="py-2 text-right">Total MT</th>
+                        <th className="py-2 text-right">Total Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedIntra.map(g => (
+                        <tr key={g.key} className="border-b">
+                          <td className="py-2 font-medium">{g.party}</td>
+                          <td className="py-2 text-muted-foreground">{g.company}</td>
+                          <td className="py-2 text-right">{g.invoices.length}</td>
+                          <td className="py-2 text-right">{formatMT(g.mt)}</td>
+                          <td className="py-2 text-right font-medium">{formatINR(g.value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <LastSyncedFooter />
     </div>
   );
 }
-
-import { Fragment } from 'react';

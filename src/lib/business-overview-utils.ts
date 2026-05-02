@@ -65,6 +65,38 @@ export function totalMTFromLineItems(lineItems: unknown): number {
   return lineItems.reduce((sum: number, item: any) => sum + parseQtyToMT(item?.qty), 0);
 }
 
+// Tally stores debit balances as negative and credit balances as positive in our DB.
+// For Debtor view (receivables): debit balance = money owed TO us = should display as positive.
+// So flip the sign: outstanding = -closing_balance.
+// Positive result => debtor owes us. Negative result => advance received from customer.
+export function debtorOutstandingFromClosing(closing: number | null | undefined): number {
+  return -Number(closing || 0);
+}
+
+// For Creditor view (payables): credit balance = money owed BY us = positive in DB already.
+// So creditor outstanding = closing_balance directly.
+export function creditorOutstandingFromClosing(closing: number | null | undefined): number {
+  return Number(closing || 0);
+}
+
+// Resolve credit period for an invoice using the documented hierarchy:
+// 1. invoice_credit_periods (per-voucher override)
+// 2. debtor_master.credit_period_days (per-party default)
+// 3. 0 (due immediately)
+export function resolveCreditPeriod(
+  companyName: string,
+  voucherNumber: string,
+  partyName: string,
+  cpMap: Map<string, number>,
+  dmMap: Map<string, number>,
+): number {
+  const v = cpMap.get(`${companyName}::${voucherNumber}`);
+  if (v != null) return v;
+  const d = dmMap.get(`${companyName}::${partyName}`);
+  if (d != null) return d;
+  return 0;
+}
+
 // Indian financial year helpers (April–March).
 export function currentFYRange(): { from: Date; to: Date } {
   const now = new Date();
